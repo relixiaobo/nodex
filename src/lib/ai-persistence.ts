@@ -2,18 +2,22 @@ import type { AgentMessage } from '@mariozechner/pi-agent-core';
 import { openDB, type DBSchema, type IDBPDatabase, type IDBPTransaction, unwrap } from 'idb';
 import { linearToTree } from './ai-chat-tree.js';
 import type { BridgeEntry, ChatSession, MessageNode } from './ai-chat-tree.js';
-import { buildChatSessionSearchSummary } from './ai-chat-summary.js';
+import { buildChatSessionSearchSummary, buildChatSessionUserMessageSummaries } from './ai-chat-summary.js';
 import type { ChatTurnDebugRecord } from './ai-debug.js';
 import { IMAGE_PLACEHOLDER, messageHasImage, replaceMessageImages } from './ai-message-images.js';
 
 const DB_NAME = 'soma-ai-chat';
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 const STORE_NAME = 'sessions';
 const META_STORE_NAME = 'session-metas';
+const USER_MESSAGE_META_STORE_NAME = 'session-user-metas';
 const DEBUG_STORE_NAME = 'session-debug-turns';
 const UPDATED_AT_INDEX = 'updatedAt';
-const SESSION_STORE_NAMES = [STORE_NAME, META_STORE_NAME] as const;
-const ALL_STORE_NAMES = [STORE_NAME, META_STORE_NAME, DEBUG_STORE_NAME] as const;
+const SESSION_ID_INDEX = 'sessionId';
+const SESSION_ORDER_INDEX = 'sessionOrder';
+const SESSION_META_STORE_NAMES = [STORE_NAME, META_STORE_NAME] as const;
+const SESSION_DATA_STORE_NAMES = [STORE_NAME, META_STORE_NAME, USER_MESSAGE_META_STORE_NAME] as const;
+const ALL_STORE_NAMES = [STORE_NAME, META_STORE_NAME, USER_MESSAGE_META_STORE_NAME, DEBUG_STORE_NAME] as const;
 
 export interface ChatSessionMeta {
   id: string;
@@ -21,6 +25,15 @@ export interface ChatSessionMeta {
   updatedAt: number;
   searchText: string;
   userMessageCount: number;
+}
+
+export interface ChatSessionUserMessageMeta {
+  id: string;
+  sessionId: string;
+  messageId: string;
+  text: string;
+  createdAt: number;
+  order: number;
 }
 
 interface LegacyChatSession {
@@ -52,6 +65,14 @@ interface ChatPersistenceDB extends DBSchema {
     value: ChatSessionMeta;
     indexes: {
       [UPDATED_AT_INDEX]: number;
+    };
+  };
+  [USER_MESSAGE_META_STORE_NAME]: {
+    key: string;
+    value: ChatSessionUserMessageMeta;
+    indexes: {
+      [SESSION_ID_INDEX]: string;
+      [SESSION_ORDER_INDEX]: [string, number];
     };
   };
   [DEBUG_STORE_NAME]: {
@@ -115,7 +136,7 @@ function toSessionMeta(session: ChatSession): ChatSessionMeta {
 function ensureStore(
   db: IDBPDatabase<ChatPersistenceDB>,
   transaction: IDBPTransaction<ChatPersistenceDB, typeof ALL_STORE_NAMES, 'versionchange'>,
-  storeName: typeof SESSION_STORE_NAMES[number],
+  storeName: typeof SESSION_META_STORE_NAMES[number],
 ): IDBObjectStore {
   const store = db.objectStoreNames.contains(storeName)
     ? unwrap(transaction.objectStore(storeName))
@@ -123,6 +144,25 @@ function ensureStore(
 
   if (!store.indexNames.contains(UPDATED_AT_INDEX)) {
     store.createIndex(UPDATED_AT_INDEX, UPDATED_AT_INDEX);
+  }
+
+  return store;
+}
+
+function ensureUserMessageMetaStore(
+  db: IDBPDatabase<ChatPersistenceDB>,
+  transaction: IDBPTransaction<ChatPersistenceDB, typeof ALL_STORE_NAMES, 'versionchange'>,
+): IDBObjectStore {
+  const store = db.objectStoreNames.contains(USER_MESSAGE_META_STORE_NAME)
+    ? unwrap(transaction.objectStore(USER_MESSAGE_META_STORE_NAME))
+    : unwrap(db.createObjectStore(USER_MESSAGE_META_STORE_NAME, { keyPath: 'id' }));
+
+  if (!store.indexNames.contains(SESSION_ID_INDEX)) {
+    store.createIndex(SESSION_ID_INDEX, SESSION_ID_INDEX);
+  }
+
+  if (!store.indexNames.contains(SESSION_ORDER_INDEX)) {
+    store.createIndex(SESSION_ORDER_INDEX, [SESSION_ID_INDEX, 'order']);
   }
 
   return store;
@@ -139,7 +179,25 @@ function ensureDebugStore(
   return unwrap(db.createObjectStore(DEBUG_STORE_NAME, { keyPath: 'id' }));
 }
 
-function syncSessionMetas(sessionStore: IDBObjectStore, metaStore: IDBObjectStore): void {
+function toSessionUserMessageMetas(session: ChatSession): ChatSessionUserMessageMeta[] {
+  return buildChatSessionUserMessageSummaries(session).map((message) => ({
+    id: `${session.id}:${message.messageId}`,
+    sessionId: session.id,
+    messageId: message.messageId,
+    text: message.text,
+    createdAt: message.createdAt,
+    order: message.order,
+  }));
+}
+
+function backfillDerivedSessionStores(
+  sessionStore: IDBObjectStore,
+  options: {
+    metaStore?: IDBObjectStore | null;
+    userMessageStore?: IDBObjectStore | null;
+    debugStore?: IDBObjectStore | null;
+  },
+): void {
   const cursorRequest = sessionStore.openCursor();
 
   cursorRequest.onsuccess = () => {
@@ -147,34 +205,32 @@ function syncSessionMetas(sessionStore: IDBObjectStore, metaStore: IDBObjectStor
     if (!cursor) return;
 
     const rawValue = cursor.value as PersistedChatSession | LegacyChatSession;
-    const nextValue = isLegacyChatSession(rawValue)
-      ? migrateLegacySession(rawValue)
-      : normalizeChatSession(rawValue);
+    const nextValue = isLegacyChatSession(rawValue) ? migrateLegacySession(rawValue) : normalizeChatSession(rawValue);
+    let shouldUpdateSession = isLegacyChatSession(rawValue);
 
-    if (isLegacyChatSession(rawValue)) {
-      cursor.update(nextValue);
+    if (options.debugStore && !isLegacyChatSession(rawValue)) {
+      const turns = normalizeChatDebugTurns(rawValue.debugTurns);
+      if (turns.length > 0) {
+        options.debugStore.put({
+          id: rawValue.id,
+          turns,
+        } satisfies ChatDebugTurnsRecord);
+        shouldUpdateSession = true;
+      }
     }
 
-    metaStore.put(toSessionMeta(nextValue));
-    cursor.continue();
-  };
-}
+    if (options.metaStore) {
+      options.metaStore.put(toSessionMeta(nextValue));
+    }
 
-function migrateEmbeddedDebugTurns(sessionStore: IDBObjectStore, debugStore: IDBObjectStore): void {
-  const cursorRequest = sessionStore.openCursor();
+    if (options.userMessageStore) {
+      for (const messageMeta of toSessionUserMessageMetas(nextValue)) {
+        options.userMessageStore.put(messageMeta);
+      }
+    }
 
-  cursorRequest.onsuccess = () => {
-    const cursor = cursorRequest.result;
-    if (!cursor) return;
-
-    const rawValue = cursor.value as PersistedChatSession;
-    const turns = normalizeChatDebugTurns(rawValue.debugTurns);
-    if (turns.length > 0) {
-      debugStore.put({
-        id: rawValue.id,
-        turns,
-      } satisfies ChatDebugTurnsRecord);
-      cursor.update(normalizeChatSession(rawValue));
+    if (shouldUpdateSession) {
+      cursor.update(nextValue);
     }
 
     cursor.continue();
@@ -189,16 +245,15 @@ async function getDB(): Promise<IDBPDatabase<ChatPersistenceDB>> {
     upgrade(db, oldVersion, _newVersion, transaction) {
       const sessionStore = ensureStore(db, transaction, STORE_NAME);
       const metaStore = ensureStore(db, transaction, META_STORE_NAME);
+      const userMessageStore = ensureUserMessageMetaStore(db, transaction);
+      const debugStore = ensureDebugStore(db, transaction);
 
-      if (oldVersion < 4) {
-        syncSessionMetas(sessionStore, metaStore);
-      }
-
-      if (oldVersion < 3) {
-        const debugStore = ensureDebugStore(db, transaction);
-        migrateEmbeddedDebugTurns(sessionStore, debugStore);
-      } else {
-        ensureDebugStore(db, transaction);
+      if (oldVersion < 3 || oldVersion < 4 || oldVersion < 5) {
+        backfillDerivedSessionStores(sessionStore, {
+          metaStore: oldVersion < 4 ? metaStore : null,
+          userMessageStore: oldVersion < 5 ? userMessageStore : null,
+          debugStore: oldVersion < 3 ? debugStore : null,
+        });
       }
     },
     terminated() {
@@ -231,6 +286,30 @@ function stripMappingImagesForPersistence(mapping: Record<string, MessageNode>):
   );
 }
 
+async function replaceSessionUserMessageMetas(
+  tx: IDBPTransaction<ChatPersistenceDB, typeof SESSION_DATA_STORE_NAMES, 'readwrite'>,
+  session: ChatSession,
+): Promise<void> {
+  const store = tx.objectStore(USER_MESSAGE_META_STORE_NAME);
+  await deleteSessionUserMessageMetas(tx, session.id);
+  for (const messageMeta of toSessionUserMessageMetas(session)) {
+    await store.put(messageMeta);
+  }
+}
+
+async function deleteSessionUserMessageMetas(
+  tx: IDBPTransaction<ChatPersistenceDB, typeof SESSION_DATA_STORE_NAMES | typeof ALL_STORE_NAMES, 'readwrite'>,
+  sessionId: string,
+): Promise<void> {
+  const store = tx.objectStore(USER_MESSAGE_META_STORE_NAME);
+  let cursor = await store.index(SESSION_ID_INDEX).openCursor(IDBKeyRange.only(sessionId));
+
+  while (cursor) {
+    await cursor.delete();
+    cursor = await cursor.continue();
+  }
+}
+
 export async function saveChatSession(session: ChatSession): Promise<ChatSession> {
   const db = await getDB();
   const updatedAt = Date.now();
@@ -238,7 +317,7 @@ export async function saveChatSession(session: ChatSession): Promise<ChatSession
 
   // P1-6: Read existing inside the same transaction to avoid race with
   // markSessionSynced or importRemoteSession writing between read and write.
-  const tx = db.transaction(SESSION_STORE_NAMES, 'readwrite');
+  const tx = db.transaction(SESSION_DATA_STORE_NAMES, 'readwrite');
   const store = tx.objectStore(STORE_NAME);
 
   const existing = await store.get(session.id);
@@ -259,6 +338,7 @@ export async function saveChatSession(session: ChatSession): Promise<ChatSession
 
   await store.put(nextSession);
   await tx.objectStore(META_STORE_NAME).put(toSessionMeta(nextSession));
+  await replaceSessionUserMessageMetas(tx, nextSession);
   await tx.done;
 
   return nextSession;
@@ -270,9 +350,14 @@ export async function getChatSession(sessionId: string): Promise<ChatSession | n
   return session ? normalizeChatSession(session) : null;
 }
 
+export async function getChatSessionMeta(sessionId: string): Promise<ChatSessionMeta | null> {
+  const db = await getDB();
+  return (await db.get(META_STORE_NAME, sessionId)) ?? null;
+}
+
 export async function getLatestChatSession(): Promise<ChatSession | null> {
   const db = await getDB();
-  const tx = db.transaction(SESSION_STORE_NAMES, 'readonly');
+  const tx = db.transaction([STORE_NAME, META_STORE_NAME] as const, 'readonly');
   const metaCursor = await tx.objectStore(META_STORE_NAME)
     .index(UPDATED_AT_INDEX)
     .openCursor(null, 'prev');
@@ -304,12 +389,119 @@ export async function listChatSessionMetas(): Promise<ChatSessionMeta[]> {
   return metas;
 }
 
+export async function listChatSessionMetasPage(options: {
+  after?: number | null;
+  before?: number | null;
+  excludeId?: string | null;
+  limit: number;
+  offset: number;
+  predicate?: (meta: ChatSessionMeta) => boolean;
+}): Promise<{ items: ChatSessionMeta[]; hasMore: boolean }> {
+  const db = await getDB();
+  const tx = db.transaction(META_STORE_NAME, 'readonly');
+  const items: ChatSessionMeta[] = [];
+  const needed = options.limit + 1;
+  const predicate = options.predicate ?? (() => true);
+  let matched = 0;
+  let cursor = await tx.objectStore(META_STORE_NAME)
+    .index(UPDATED_AT_INDEX)
+    .openCursor(null, 'prev');
+
+  while (cursor) {
+    const meta = cursor.value;
+
+    if (options.excludeId && meta.id === options.excludeId) {
+      cursor = await cursor.continue();
+      continue;
+    }
+
+    if (options.after !== null && options.after !== undefined && meta.updatedAt < options.after) {
+      cursor = await cursor.continue();
+      continue;
+    }
+
+    if (options.before !== null && options.before !== undefined && meta.updatedAt > options.before) {
+      cursor = await cursor.continue();
+      continue;
+    }
+
+    if (!predicate(meta)) {
+      cursor = await cursor.continue();
+      continue;
+    }
+
+    if (matched >= options.offset) {
+      items.push(meta);
+      if (items.length >= needed) break;
+    }
+
+    matched += 1;
+    cursor = await cursor.continue();
+  }
+
+  await tx.done;
+
+  return {
+    items: items.slice(0, options.limit),
+    hasMore: items.length > options.limit,
+  };
+}
+
+export async function listChatSessionUserMessageMetasPage(options: {
+  sessionId: string;
+  limit: number;
+  offset: number;
+  predicate?: (message: ChatSessionUserMessageMeta) => boolean;
+}): Promise<{ items: ChatSessionUserMessageMeta[]; hasMore: boolean }> {
+  const db = await getDB();
+  const tx = db.transaction(USER_MESSAGE_META_STORE_NAME, 'readonly');
+  const items: ChatSessionUserMessageMeta[] = [];
+  const needed = options.limit + 1;
+  const predicate = options.predicate ?? (() => true);
+  const canAdvanceByOffset = options.predicate === undefined && options.offset > 0;
+  let matched = 0;
+  let cursor = await tx.objectStore(USER_MESSAGE_META_STORE_NAME)
+    .index(SESSION_ORDER_INDEX)
+    .openCursor(IDBKeyRange.bound([options.sessionId, 0], [options.sessionId, Number.MAX_SAFE_INTEGER]));
+
+  if (canAdvanceByOffset && cursor) {
+    cursor = await cursor.advance(options.offset);
+  }
+
+  while (cursor) {
+    const message = cursor.value;
+
+    if (!predicate(message)) {
+      cursor = await cursor.continue();
+      continue;
+    }
+
+    if (canAdvanceByOffset || matched >= options.offset) {
+      items.push(message);
+      if (items.length >= needed) break;
+    }
+
+    if (!canAdvanceByOffset) {
+      matched += 1;
+    }
+    cursor = await cursor.continue();
+  }
+
+  await tx.done;
+
+  return {
+    items: items.slice(0, options.limit),
+    hasMore: items.length > options.limit,
+  };
+}
+
 export async function deleteChatSession(sessionId: string): Promise<void> {
   const db = await getDB();
   const tx = db.transaction(ALL_STORE_NAMES, 'readwrite');
   await Promise.all([
     tx.objectStore(STORE_NAME).delete(sessionId),
     tx.objectStore(META_STORE_NAME).delete(sessionId),
+    deleteSessionUserMessageMetas(tx, sessionId),
     tx.objectStore(DEBUG_STORE_NAME).delete(sessionId),
   ]);
   await tx.done;
@@ -349,6 +541,7 @@ export async function clearAllChatSessions(): Promise<void> {
   await Promise.all([
     tx.objectStore(STORE_NAME).clear(),
     tx.objectStore(META_STORE_NAME).clear(),
+    tx.objectStore(USER_MESSAGE_META_STORE_NAME).clear(),
     tx.objectStore(DEBUG_STORE_NAME).clear(),
   ]);
   await tx.done;
@@ -393,7 +586,7 @@ export async function getDirtyChatSessions(): Promise<ChatSession[]> {
  */
 export async function markSessionSynced(sessionId: string, revision: number): Promise<void> {
   const db = await getDB();
-  const tx = db.transaction(SESSION_STORE_NAMES, 'readwrite');
+  const tx = db.transaction(SESSION_META_STORE_NAMES, 'readwrite');
   const store = tx.objectStore(STORE_NAME);
   const session = await store.get(sessionId);
   if (!session) {
@@ -420,7 +613,7 @@ export async function importRemoteSession(
   remoteRevision: number,
 ): Promise<'imported' | 'skipped' | 'conflict'> {
   const db = await getDB();
-  const tx = db.transaction(SESSION_STORE_NAMES, 'readwrite');
+  const tx = db.transaction(SESSION_DATA_STORE_NAMES, 'readwrite');
   const store = tx.objectStore(STORE_NAME);
   const metaStore = tx.objectStore(META_STORE_NAME);
   const local = await store.get(remoteSession.id);
@@ -434,6 +627,7 @@ export async function importRemoteSession(
     };
     await store.put(synced);
     await metaStore.put(toSessionMeta(synced));
+    await replaceSessionUserMessageMetas(tx, synced);
     await tx.done;
     return 'imported';
   }
@@ -451,6 +645,7 @@ export async function importRemoteSession(
       };
       await store.put(synced);
       await metaStore.put(toSessionMeta(synced));
+      await replaceSessionUserMessageMetas(tx, synced);
       await tx.done;
       return 'conflict'; // Imported but was a conflict
     }
@@ -466,6 +661,7 @@ export async function importRemoteSession(
   };
   await store.put(synced);
   await metaStore.put(toSessionMeta(synced));
+  await replaceSessionUserMessageMetas(tx, synced);
   await tx.done;
   return 'imported';
 }

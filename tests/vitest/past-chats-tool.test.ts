@@ -150,9 +150,9 @@ describe('past_chats tool', () => {
     } as never);
 
     expect(result.details).toEqual({
-      total: 1,
       offset: 0,
       limit: 10,
+      hasMore: false,
       sessions: [{
         id: 'session_alpha',
         title: 'Pricing review',
@@ -239,9 +239,9 @@ describe('past_chats tool', () => {
     } as never);
 
     expect(result.details).toEqual({
-      total: 1,
       offset: 0,
       limit: 10,
+      hasMore: false,
       sessions: [{
         id: 'session_meta_only',
         title: 'Strategy sync',
@@ -270,9 +270,9 @@ describe('past_chats tool', () => {
 
     expect(result.details).toEqual({
       title: 'Pricing review',
-      total: 1,
       offset: 0,
       limit: 10,
+      hasMore: false,
       userMessages: [{
         id: expect.any(String),
         text: 'What did we decide for enterprise?',
@@ -313,6 +313,80 @@ describe('past_chats tool', () => {
 
       expect(messageTexts).toContain(expectedText);
     }
+  });
+
+  it('uses hasMore instead of exact totals when session search spans multiple pages', async () => {
+    await seedSessions([
+      buildSession('session_1', 'One', [createUserMessage('pricing alpha', 1)], Date.parse('2026-03-01T10:00:00Z')),
+      buildSession('session_2', 'Two', [createUserMessage('pricing beta', 2)], Date.parse('2026-03-02T10:00:00Z')),
+      buildSession('session_3', 'Three', [createUserMessage('pricing gamma', 3)], Date.parse('2026-03-03T10:00:00Z')),
+    ]);
+
+    const tool = createPastChatsTool();
+    const result = await tool.execute('tool_past_chats', {
+      query: 'pricing',
+      limit: 2,
+    } as never);
+
+    expect(result.details).toEqual({
+      offset: 0,
+      limit: 2,
+      hasMore: true,
+      sessions: [
+        {
+          id: 'session_3',
+          title: 'Three',
+          updatedAt: '2026-03-03T10:00:00.000Z',
+          userMessageCount: 1,
+        },
+        {
+          id: 'session_2',
+          title: 'Two',
+          updatedAt: '2026-03-02T10:00:00.000Z',
+          userMessageCount: 1,
+        },
+      ],
+      next: 'Choose a session id from sessions and call past_chats(sessionId: "...") to browse its user messages.',
+    });
+  });
+
+  it('uses message metadata paging for session message browsing', async () => {
+    await seedSessions([
+      buildSession('session_paged', 'Paged session', [
+        createUserMessage('pricing alpha', 1),
+        createAssistantMessage([{ type: 'text', text: 'ack' }], 2),
+        createUserMessage('pricing beta', 3),
+        createAssistantMessage([{ type: 'text', text: 'ack' }], 4),
+        createUserMessage('pricing gamma', 5),
+      ], Date.parse('2026-03-08T10:00:00Z')),
+    ]);
+
+    const tool = createPastChatsTool();
+    const result = await tool.execute('tool_past_chats', {
+      sessionId: 'session_paged',
+      query: 'pricing',
+      limit: 2,
+    } as never);
+
+    expect(result.details).toEqual({
+      title: 'Paged session',
+      offset: 0,
+      limit: 2,
+      hasMore: true,
+      userMessages: [
+        {
+          id: expect.any(String),
+          text: 'pricing alpha',
+          createdAt: '1970-01-01T00:00:00.001Z',
+        },
+        {
+          id: expect.any(String),
+          text: 'pricing beta',
+          createdAt: '1970-01-01T00:00:00.003Z',
+        },
+      ],
+      next: 'Choose a message id from userMessages and call past_chats(sessionId: "...", messageId: "...") to read the full exchange.',
+    });
   });
 
   it('reads a user message with assistant replies, skipping tool results and paginating long text', async () => {

@@ -86,3 +86,19 @@ export function buildChatSessionSearchSummary(
     userMessageCount: getVisibleUserMessages(session).length,
   };
 }
+
+export interface ChatSessionUserMessageSummary {
+  messageId: string;
+  text: string;
+  createdAt: number;
+  order: number;
+}
+
+export function buildChatSessionUserMessageSummaries(session: ChatSession): ChatSessionUserMessageSummary[] {
+  return getVisibleUserMessages(session).map(({ node, text }, index) => ({
+    messageId: node.id,
+    text,
+    createdAt: node.message!.timestamp,
+    order: index,
+  }));
+}

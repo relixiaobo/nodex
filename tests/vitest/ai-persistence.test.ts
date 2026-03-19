@@ -8,8 +8,10 @@ import {
   deleteChatSession,
   getChatDebugTurns,
   getChatSession,
+  getChatSessionMeta,
   getLatestChatSession,
   listChatSessionMetas,
+  listChatSessionUserMessageMetasPage,
   resetChatPersistenceForTests,
   saveChatDebugTurns,
   saveChatSession,
@@ -127,6 +129,46 @@ async function seedV2SessionsWithEmbeddedDebugTurns(sessions: Array<ChatSession 
   });
 }
 
+async function seedV4SessionsWithSearchSummary(sessions: ChatSession[]): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, 4);
+
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      const sessionStore = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+      sessionStore.createIndex(UPDATED_AT_INDEX, UPDATED_AT_INDEX);
+      const metaStore = db.createObjectStore('session-metas', { keyPath: 'id' });
+      metaStore.createIndex(UPDATED_AT_INDEX, UPDATED_AT_INDEX);
+      db.createObjectStore('session-debug-turns', { keyPath: 'id' });
+    };
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const db = request.result;
+      const tx = db.transaction([STORE_NAME, 'session-metas'], 'readwrite');
+      const sessionStore = tx.objectStore(STORE_NAME);
+      const metaStore = tx.objectStore('session-metas');
+
+      for (const session of sessions) {
+        sessionStore.put(session);
+        metaStore.put({
+          id: session.id,
+          title: session.title,
+          updatedAt: session.updatedAt,
+          searchText: session.title ?? '',
+          userMessageCount: getLinearPath(session).filter((node) => node.message?.role === 'user').length,
+        });
+      }
+
+      tx.oncomplete = () => {
+        db.close();
+        resolve();
+      };
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    };
+  });
+}
+
 describe('ai persistence', () => {
   beforeEach(async () => {
     await resetPersistence();
@@ -161,7 +203,53 @@ describe('ai persistence', () => {
       searchText: 'hello\n\nhello',
       userMessageCount: 1,
     });
+    expect(await getChatSessionMeta('session_2')).toMatchObject({
+      id: 'session_2',
+      title: 'follow up',
+      userMessageCount: 1,
+    });
+    expect(await listChatSessionUserMessageMetasPage({
+      sessionId: 'session_2',
+      offset: 0,
+      limit: 10,
+    })).toEqual({
+      items: [{
+        id: expect.any(String),
+        sessionId: 'session_2',
+        messageId: expect.any(String),
+        text: 'follow up',
+        createdAt: 2,
+        order: 0,
+      }],
+      hasMore: false,
+    });
     expect(metas[0].updatedAt).toBeGreaterThanOrEqual(metas[1].updatedAt);
+  });
+
+  it('pages user message metadata by offset without loading the full session tree', async () => {
+    await saveChatSession(buildSession('session_page', [
+      { role: 'user', content: 'alpha', timestamp: 1 },
+      { role: 'assistant', content: [{ type: 'text', text: 'ack' }], api: 'anthropic-messages', provider: 'anthropic', model: 'claude-sonnet-4-5', usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } }, stopReason: 'stop', timestamp: 2 },
+      { role: 'user', content: 'beta', timestamp: 3 },
+      { role: 'assistant', content: [{ type: 'text', text: 'ack' }], api: 'anthropic-messages', provider: 'anthropic', model: 'claude-sonnet-4-5', usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } }, stopReason: 'stop', timestamp: 4 },
+      { role: 'user', content: 'gamma', timestamp: 5 },
+    ], { title: 'paging' }));
+
+    expect(await listChatSessionUserMessageMetasPage({
+      sessionId: 'session_page',
+      offset: 1,
+      limit: 1,
+    })).toEqual({
+      items: [{
+        id: expect.any(String),
+        sessionId: 'session_page',
+        messageId: expect.any(String),
+        text: 'beta',
+        createdAt: 3,
+        order: 1,
+      }],
+      hasMore: true,
+    });
   });
 
   it('persists per-session selected model state alongside the chat tree', async () => {
@@ -289,6 +377,14 @@ describe('ai persistence', () => {
     expect(await getChatSession('session_delete')).toBeNull();
     expect(await getChatDebugTurns('session_delete')).toEqual([]);
     expect(await listChatSessionMetas()).toEqual([]);
+    expect(await listChatSessionUserMessageMetasPage({
+      sessionId: 'session_delete',
+      offset: 0,
+      limit: 10,
+    })).toEqual({
+      items: [],
+      hasMore: false,
+    });
   });
 
   it('strips image blocks from message nodes before persisting', async () => {
@@ -414,6 +510,21 @@ describe('ai persistence', () => {
         userMessageCount: 1,
       },
     ]);
+    expect(await listChatSessionUserMessageMetasPage({
+      sessionId: 'legacy_session',
+      offset: 0,
+      limit: 10,
+    })).toEqual({
+      items: [{
+        id: expect.any(String),
+        sessionId: 'legacy_session',
+        messageId: expect.any(String),
+        text: 'legacy hello',
+        createdAt: 1,
+        order: 0,
+      }],
+      hasMore: false,
+    });
   });
 
   it('migrates embedded debug turns from the session store into the dedicated debug store', async () => {
@@ -478,5 +589,63 @@ describe('ai persistence', () => {
         userMessageCount: 1,
       },
     ]);
+    expect(await listChatSessionUserMessageMetasPage({
+      sessionId: 'session_embedded_debug',
+      offset: 0,
+      limit: 10,
+    })).toEqual({
+      items: [{
+        id: expect.any(String),
+        sessionId: 'session_embedded_debug',
+        messageId: expect.any(String),
+        text: 'hello',
+        createdAt: 1,
+        order: 0,
+      }],
+      hasMore: false,
+    });
+  });
+
+  it('backfills user message metadata when upgrading a v4 database', async () => {
+    await seedV4SessionsWithSearchSummary([
+      buildSession('session_v4', [
+        { role: 'user', content: 'legacy alpha', timestamp: 1 },
+        { role: 'assistant', content: [{ type: 'text', text: 'ack' }], api: 'anthropic-messages', provider: 'anthropic', model: 'claude-sonnet-4-5', usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } }, stopReason: 'stop', timestamp: 2 },
+        { role: 'user', content: 'legacy beta', timestamp: 3 },
+      ], { updatedAt: 3, title: 'v4 session' }),
+    ]);
+
+    resetChatPersistenceForTests();
+
+    expect(await getChatSessionMeta('session_v4')).toMatchObject({
+      id: 'session_v4',
+      title: 'v4 session',
+      userMessageCount: 2,
+    });
+    expect(await listChatSessionUserMessageMetasPage({
+      sessionId: 'session_v4',
+      offset: 0,
+      limit: 10,
+    })).toEqual({
+      items: [
+        {
+          id: expect.any(String),
+          sessionId: 'session_v4',
+          messageId: expect.any(String),
+          text: 'legacy alpha',
+          createdAt: 1,
+          order: 0,
+        },
+        {
+          id: expect.any(String),
+          sessionId: 'session_v4',
+          messageId: expect.any(String),
+          text: 'legacy beta',
+          createdAt: 3,
+          order: 1,
+        },
+      ],
+      hasMore: false,
+    });
   });
 });

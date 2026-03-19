@@ -1,8 +1,14 @@
-import type { AgentMessage, AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core';
+import type { AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core';
 import { Type } from '@mariozechner/pi-ai';
 import type { ChatSession, MessageNode } from '../ai-chat-tree.js';
-import { extractAssistantText, extractUserText, getActivePath, getVisibleUserMessages } from '../ai-chat-summary.js';
-import { getChatSession, listChatSessionMetas } from '../ai-persistence.js';
+import { extractAssistantText, extractUserText, getActivePath } from '../ai-chat-summary.js';
+import {
+  type ChatSessionMeta,
+  getChatSession,
+  getChatSessionMeta,
+  listChatSessionMetasPage,
+  listChatSessionUserMessageMetasPage,
+} from '../ai-persistence.js';
 import { fuzzyMatch } from '../fuzzy-search.js';
 import { formatResultText } from './shared.js';
 
@@ -58,7 +64,7 @@ export interface PastChatsToolRuntime {
   getCurrentSessionId?: () => string | null;
 }
 
-type SessionMeta = Awaited<ReturnType<typeof listChatSessionMetas>>[number];
+type SessionMeta = ChatSessionMeta;
 
 interface SessionSummary {
   id: string;
@@ -189,36 +195,33 @@ async function listSessionSummaries(
   const before = parseTimeFilter(params.before, 'before');
   const query = normalizeQuery(params.query);
   const { limit, offset } = getListPagingParams(params);
-
-  const metas = (await listChatSessionMetas())
-    .filter((meta) => meta.id !== currentSessionId)
-    .filter((meta) => after === null || meta.updatedAt >= after)
-    .filter((meta) => before === null || meta.updatedAt <= before);
-
-  const summaries: SessionSummary[] = [];
-
-  for (const meta of metas) {
-    if (!matchesQuery(meta.searchText, query)) continue;
-
-    summaries.push({
-      id: meta.id,
-      title: getSessionTitle(meta),
-      updatedAt: new Date(meta.updatedAt).toISOString(),
-      userMessageCount: meta.userMessageCount,
-    });
-  }
-
-  const result = {
-    total: summaries.length,
+  const predicate = query ? (meta: SessionMeta) => matchesQuery(meta.searchText, query) : undefined;
+  const { items, hasMore } = await listChatSessionMetasPage({
+    after,
+    before,
+    excludeId: currentSessionId,
     offset,
     limit,
-    sessions: summaries.slice(offset, offset + limit),
+    predicate,
+  });
+  const summaries: SessionSummary[] = items.map((meta) => ({
+    id: meta.id,
+    title: getSessionTitle(meta),
+    updatedAt: new Date(meta.updatedAt).toISOString(),
+    userMessageCount: meta.userMessageCount,
+  }));
+
+  const result = {
+    offset,
+    limit,
+    hasMore,
+    sessions: summaries,
     ...(summaries.length > 0
       ? {
         next: 'Choose a session id from sessions and call past_chats(sessionId: "...") to browse its user messages.',
       }
       : {}),
-    ...(query && summaries.length === 0
+    ...(query && summaries.length === 0 && !hasMore
       ? {
         hint: 'No matching past chats. Try broader keywords or browse all sessions.',
       }
@@ -243,35 +246,48 @@ async function loadSessionOrThrow(sessionId: string, currentSessionId: string | 
   return session;
 }
 
+async function loadSessionMetaOrThrow(sessionId: string, currentSessionId: string | null): Promise<SessionMeta> {
+  ensureSessionAllowed(sessionId, currentSessionId);
+  const meta = await getChatSessionMeta(sessionId);
+  if (!meta) {
+    throw new Error(`Session not found: ${sessionId}. Use past_chats() to browse available sessions.`);
+  }
+  return meta;
+}
+
 async function listUserMessagesInSession(
   sessionId: string,
   params: PastChatsToolParams,
   currentSessionId: string | null,
 ): Promise<AgentToolResult<unknown>> {
-  const session = await loadSessionOrThrow(sessionId, currentSessionId);
+  const sessionMeta = await loadSessionMetaOrThrow(sessionId, currentSessionId);
   const { limit, offset } = getListPagingParams(params);
   const query = normalizeQuery(params.query);
-
-  const messages: UserMessageSummary[] = getVisibleUserMessages(session)
-    .filter(({ text }) => matchesQuery(text, query))
-    .map(({ node, text }) => ({
-      id: node.id,
-      text: truncatePreview(text, USER_MESSAGE_PREVIEW_CHARS),
-      createdAt: toIsoString(node.message?.timestamp),
-    }));
-
-  const result = {
-    title: session.title?.trim() || '',
-    total: messages.length,
+  const predicate = query ? (message: { text: string }) => matchesQuery(message.text, query) : undefined;
+  const { items, hasMore } = await listChatSessionUserMessageMetasPage({
+    sessionId,
     offset,
     limit,
-    userMessages: messages.slice(offset, offset + limit),
+    predicate,
+  });
+  const messages: UserMessageSummary[] = items.map((message) => ({
+    id: message.messageId,
+    text: truncatePreview(message.text, USER_MESSAGE_PREVIEW_CHARS),
+    createdAt: toIsoString(message.createdAt),
+  }));
+
+  const result = {
+    title: getSessionTitle(sessionMeta),
+    offset,
+    limit,
+    hasMore,
+    userMessages: messages,
     ...(messages.length > 0
       ? {
         next: 'Choose a message id from userMessages and call past_chats(sessionId: "...", messageId: "...") to read the full exchange.',
       }
       : {}),
-    ...(query && messages.length === 0
+    ...(query && messages.length === 0 && !hasMore
       ? {
         hint: 'No matching user messages in this session. Try broader keywords or browse the session without query.',
       }
@@ -391,6 +407,7 @@ export function createPastChatsTool(runtime: PastChatsToolRuntime = {}): AgentTo
       '',
       'Defaults and limits:',
       '- limit defaults to 10 and maxes at 20.',
+      '- Session and message browsing return hasMore instead of exact totals so pagination can stop early.',
       '- Assistant response pagination uses maxChars (default 2000) and textOffset.',
       '- Invalid parameter combinations fail fast instead of being silently ignored.',
       '',

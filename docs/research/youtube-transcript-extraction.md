@@ -586,6 +586,18 @@ Our page-capture extractor runs at the time of web clip creation (user action). 
 4. **Proven at scale** — Immersive Translate (millions of users), Brave browser AI, and dozens of userscripts use this technique
 5. **Lower breakage surface** — uses the same data YouTube itself uses to render captions
 
+### Appendix: Server-side verification (2026-03-19)
+
+实际验证了 3 种服务器端方案的可行性：
+
+| 方案 | 结果 | 说明 |
+|------|------|------|
+| **Page HTML 抓取** | ⚠️ 不稳定 | `ytInitialPlayerResponse` 在部分视频可提取到 captionTracks（Rick Astley: 6 tracks），但多数视频返回 `LOGIN_REQUIRED` 或 0 tracks |
+| **baseUrl fetch** | ❌ 失败 | 即使拿到 baseUrl，从服务器端 fetch 返回 200 但 0 bytes（URL 含签名 + `ip=0.0.0.0`，需同源上下文） |
+| **InnerTube API** | ❌ 失败 | 返回 `UNPLAYABLE` 或 `LOGIN_REQUIRED`，无 captionTracks |
+
+**结论**：所有服务器端方案都不可靠。YouTube 日益严格的反爬措施使得外部请求无法稳定获取字幕数据。唯一可靠路径是 MAIN world 本地提取——运行在用户浏览器的 youtube.com 上下文中，继承完整的 cookies/session/auth，规避所有限制。
+
 ## References
 
 ### APIs & Official Docs

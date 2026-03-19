@@ -22,7 +22,7 @@ _(空)_
 
 | 工作区 | 分支 | 任务 | 状态 |
 |--------|------|------|------|
-| nodex-claude | — | 空闲 | — |
+| nodex-claude | claude/chat-node-display | Chat 节点展示改造 (#158) | 进行中 |
 | nodex-gemini | — | 空闲 | — |
 | nodex-codex | — | 空闲 | — |
 
@@ -30,7 +30,7 @@ _(空)_
 
 ## 进行中
 
-_(空)_
+- [ ] **Chat 节点展示改造** (#158, Claude Dev) — ref/cite 浮窗 + `<node />` 内嵌 outliner + 首屏 Chat + 已提及节点编辑感知
 
 ---
 
@@ -122,6 +122,11 @@ _(空)_
 - [x] **Chat 分支消息审计** — regenerate 改用 `agent.continue()` 替代 `agent.prompt()`，修复重复 user 消息 + switchBranch 持久化 + toolResult 续接 (#148)
 - [x] **⌘K Chat 融合** — Chat 历史搜索 + AI 模式 Tab 切换 + Ask AI 始终可见 + New Chat 命令 (#150, nodex-claude)
 - [x] **Chat 持久化 Phase 4** — 跨设备同步（D1 + R2 + SyncManager 集成 + LWW 冲突处理）
+- [x] **past_chats 跨会话记忆工具** — 三层渐进探索（sessions → user messages → detail with pagination）+ prompt 架构重构（built-in prompt 代码管理 + 用户指令分离）(#157, Codex)
+- [ ] **Chat 节点展示改造** (#158, Claude Dev) — ref/cite 浮窗 + `<node />` 内嵌 outliner + 首屏 Chat + 已提及节点编辑感知
+- [ ] **AI 行为调优** — system prompt 沉淀行为指导 + 三种 markup 使用规范（等 #157 完成）
+- [ ] **上下文注入丰富** — system reminder 注入常用标签 + 已提及节点编辑状态（等 #158 完成）
+- [ ] **@ 引用节点** — Chat 输入框 `@` 触发节点选择器，精确注入上下文
 
 **Track B: 阅读环** — 设计：`phase-2-reading-ring.md`
 
@@ -212,6 +217,7 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-19 | past_chats 跨会话记忆工具 + prompt 架构重构 | codex | #157 |
 | 2026-03-19 | 自定义 Provider Models 字段 | claude | #151 |
 | 2026-03-19 | FieldRow Ctrl+I description 编辑 | claude | #152 |
 | 2026-03-19 | KaTeX 数学公式渲染调研 | claude | #153 |

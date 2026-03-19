@@ -22,7 +22,7 @@ _(空)_
 
 | 工作区 | 分支 | 任务 | 状态 |
 |--------|------|------|------|
-| nodex-claude | 多个 | 6 个任务（见下方进行中） | 待开始 |
+| nodex-claude | — | 空闲 | — |
 | nodex-gemini | — | 空闲 | — |
 | nodex-codex | — | 空闲 | — |
 
@@ -30,14 +30,7 @@ _(空)_
 
 ## 进行中
 
-| PR | 任务 | 类型 | Agent |
-|----|------|------|-------|
-| #151 | 自定义 Provider Models 字段 | 编码 | claude |
-| #152 | FieldRow Ctrl+I description 编辑 | 编码 | claude |
-| #153 | KaTeX 数学公式渲染 | **调研优先** | claude |
-| #154 | YouTube transcript 抓取 | **调研优先** | claude |
-| #155 | Trash 交互优化 | 编码 | claude |
-| #156 | 节点选中增强 (Cmd+Shift+D) | 编码 | claude |
+_(空)_
 
 ---
 
@@ -151,13 +144,13 @@ _(空)_
 
 > 设计方向：ChatBox 模式。`#ai-provider` 新增 "Models" 字段，用户手填模型名，合并到 Chat 模型选择器。支持 Qwen/DeepSeek/Ollama 等 OpenAI 兼容 API。
 
-- [ ] **Phase 1: 自定义模型字段** — `#ai-provider` 新增 Models 字段（PLAIN, list），`getAvailableModels()` 合并自定义模型，Chat 选择器展示
+- [x] ~~**Phase 1: 自定义模型字段**~~ (#151)
 - [ ] **Phase 2: 模型自动发现** — "Fetch Models" 调用 `/v1/models` 端点自动填充 Models 字段
 - [ ] **Phase 3: 内置 Provider 预设** — Qwen/DeepSeek/Ollama 等预填 Base URL，用户只需填 API Key
 
 **其他 AI**
 
-- [ ] YouTube 抓取增强 — 获取视频 transcript
+- [ ] YouTube 抓取增强 — 获取视频 transcript，调研完成见 `docs/research/youtube-transcript-extraction.md`
 - [ ] 上下文感知 Sidebar — URL 匹配 → 关键词匹配 → 共读模式
 
 ---
@@ -176,10 +169,10 @@ _(空)_
 
 ### 编辑器增强 & 交互完善
 
-- [ ] FieldRow Ctrl+I 编辑 description — 在 FieldRow 中支持 Ctrl+I 快捷键编辑 fieldDef 的 description（当前只在 OutlinerItem 中生效）
-- [ ] 节点选中增强 (#47) — Cmd+Shift+D 批量复制、拖动选择优化
+- [x] ~~FieldRow Ctrl+I 编辑 description~~ (#152)
+- [x] ~~节点选中增强~~ — Cmd+Shift+D 批量复制 (#156)
 - [ ] 合并节点 — 选中多个重复节点 → 合并为一个（保留第一个，合并 children/tags）
-- [ ] **数学公式渲染** — 支持 LaTeX/KaTeX 公式在节点中展示（行内 `$...$` + 块级 `$$...$$`）
+- [ ] **数学公式渲染** — KaTeX 公式（行内 `$...$` + 块级 `$$...$$`），调研完成见 `docs/research/katex-formula-rendering.md`
 - [ ] Floating Toolbar: @ Reference 按钮 (#46)
 - [ ] Slash Command 后续 (#48) — Paste / Search node / Checklist
 - [ ] 性能基线测量
@@ -205,7 +198,7 @@ _(空)_
 
 - [ ] Supertags 完善 — Convert to supertag / Title expression / Pinned fields / Optional fields
 - [ ] 日期增强 — 自然语言日期解析 / 日记模板 / 日期字段链接到日节点 (#22)
-- [ ] Trash 交互优化 — 批量选中删除、右键菜单、自动清理策略（30 天）
+- [x] ~~Trash 交互优化~~ — 批量选中删除、右键菜单、自动清理策略（30 天）(#155)
 
 #### 视图类型（需要独立窗口 / Web 版）
 
@@ -219,6 +212,13 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-19 | 自定义 Provider Models 字段 | claude | #151 |
+| 2026-03-19 | FieldRow Ctrl+I description 编辑 | claude | #152 |
+| 2026-03-19 | KaTeX 数学公式渲染调研 | claude | #153 |
+| 2026-03-19 | YouTube transcript 抓取调研 | claude | #154 |
+| 2026-03-19 | Trash 交互优化 — 右键恢复/永久删除 + 批量删除 + 30 天自动清理 | claude | #155 |
+| 2026-03-19 | 节点选中增强 — Cmd+Shift+D 批量深拷贝 | claude | #156 |
+| 2026-03-19 | AI UX 改进 — 图标刷新 + 工具标题三态 + 流式延迟修复 + Model 配置清理 + 行间距统一 + Chat 面板保护 + pi-ai 升级 + createSibling 根因修复 | nodex | main |
 | 2026-03-18 | ⌘K Chat 融合 — Chat 历史搜索 + AI 模式 Tab 切换 + Ask AI 始终可见 + New Chat 命令 | claude | #150 |
 | 2026-03-18 | Chat Phase 4 跨设备同步 — D1/R2 后端 + SyncManager 集成 + LWW 冲突 + Codex review 6 项修复 | nodex | main |
 | 2026-03-18 | ⌘K Chat 融合计划 + 图片节点计划 v3 合并 + 窄屏单面板布局修复 + NodeReference inline 修复 + ChatInput 圆角对齐 | nodex | main |

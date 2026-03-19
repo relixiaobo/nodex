@@ -428,7 +428,7 @@ export function OutlinerRow({ config, children }: OutlinerRowProps) {
     onSelectionKeydown, onBatchDelete, onBatchIndent, onBatchOutdent,
     setSelectedNodes, clearSelection, setFocusedNode, clearFocus,
     setPendingInputChar, enterEdit,
-    trashNode, batchHardDelete, indentNode, outdentNode, createSibling, duplicateNodes, cycleNodeCheckbox,
+    trashNode, batchHardDelete, indentNode, outdentNode, duplicateNodes, cycleNodeCheckbox,
     setExpanded,
   ]);
 

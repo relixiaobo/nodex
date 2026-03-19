@@ -172,6 +172,7 @@ export {
 export {
   Camera,
   Clock,
+  History,
   Keyboard,
   MousePointer,
   Move,

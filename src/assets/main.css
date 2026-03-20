@@ -774,11 +774,6 @@ html, body {
   margin: 12px 0;
 }
 
-/* Streaming cursor: when the last block is a paragraph, make it inline so the
-   cursor span sits at the end of text. :first-child ensures we only match when
-   the <p> leads (not when a code block or list comes first). The cursor <span>
-   is always a sibling, so :only-child would never match. For non-paragraph
-   blocks (code, table, list), no <p> is first-child — cursor appears below. */
-.chat-prose [data-streaming] > p:first-child {
-  display: inline;
-}
+/* Legacy streaming cursor inline hack — no longer needed.
+   The streaming indicator is now a fixed element at the bottom of the message list,
+   not an inline sibling of the last text block. */

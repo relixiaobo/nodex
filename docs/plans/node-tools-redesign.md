@@ -22,6 +22,8 @@ LLM 在同一对话中交替调用两个工具时，容易混淆格式。
 2. **格式一致** — create 和 edit 用同一套"语言"描述节点内容
 3. **复用已有格式** — Tana Paste 是成熟的文本格式，LLM 训练数据中已大量存在
 4. **纯 ID 引用** — soma 与 Tana 一样"一切皆节点"，引用通过 ID 而非名字，使用 `[[name^id]]` 格式
+5. **统一顶层 verb，区分底层 payload** — 创建动作统一在 `node_create`，通过 `type` 区分 content node 与 search node，但不强制共享同一个 payload 结构
+6. **读写分离** — `node_search` 保持纯 read-only，不混入写副作用
 
 ---
 
@@ -74,6 +76,10 @@ soma 采用 **Tana/Notion 路线**：纯 ID 引用，允许重名。AI 工具使
 
 ### node_create — 创建节点
 
+通过 `type` 参数区分创建模式。省略 `type` 时默认创建 content node。
+
+#### Content node（默认）
+
 | 参数 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | `text` | string | 否* | Tana Paste 格式。第一行=节点名，后续行=子节点/字段 |
@@ -82,9 +88,40 @@ soma 采用 **Tana/Notion 路线**：纯 ID 引用，允许重名。AI 工具使
 
 \* `text` 是主要参数，几乎所有场景都需要。
 
+#### Search node（`type: "search"`）
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `type` | `"search"` | 是 | 创建搜索节点 |
+| `name` | string | 是 | 搜索节点名称 |
+| `rules` | object | 是 | 搜索规则（可持久化的查询定义） |
+| `parentId` | string | 否 | 父节点 ID。省略=今日日记 |
+| `afterId` | string | 否 | 插入位置 |
+
+`rules` 对象包含**可持久化**的查询条件（不含 `limit`/`offset`/`count` 等执行态参数）：
+
+```ts
+rules: {
+  searchTags?: string[];    // 标签过滤（AND 逻辑）
+  fields?: Record<string, string>;  // 字段值过滤
+  linkedTo?: string;        // 反向链接
+  parentId?: string;        // 子树作用域
+  after?: string;           // 日期下限
+  before?: string;          // 日期上限
+  sortBy?: string;          // 默认排序，如 "created:desc"
+}
+```
+
+#### 为什么 search node 不用 `text`
+
+- Content `text` 是"把人类表达解析成节点树"——适合 Tana Paste
+- Search `rules` 是"持久化的结构化查询定义"——适合 JSON 对象
+- 二者不是同一种信息，硬塞进同一个 `text` 会变成"一字段两种语言"
+- Search rules 最终落为 queryCondition 节点树，创建入口就应该承认它是结构化定义
+
 #### 示例
 
-**创建简单节点**
+**创建简单节点**（content，省略 type）
 ```json
 { "text": "买菜 #task" }
 ```
@@ -118,6 +155,33 @@ soma 采用 **Tana/Notion 路线**：纯 ID 引用，允许重名。AI 工具使
   "text": "新任务 #task",
   "parentId": "projectId",
   "afterId": "task3Id"
+}
+```
+
+**创建搜索节点**
+```json
+{
+  "type": "search",
+  "name": "未完成的任务",
+  "rules": {
+    "searchTags": ["task"],
+    "fields": { "Status": "Todo" }
+  }
+}
+```
+
+**创建带日期范围的搜索节点**
+```json
+{
+  "type": "search",
+  "name": "本月研究笔记",
+  "rules": {
+    "searchTags": ["research"],
+    "after": "2026-03-01",
+    "before": "2026-03-31",
+    "sortBy": "created:desc"
+  },
+  "parentId": "projectId"
 }
 ```
 
@@ -202,7 +266,7 @@ soma 采用 **Tana/Notion 路线**：纯 ID 引用，允许重名。AI 工具使
 
 ---
 
-### node_search — 搜索节点（小幅简化）
+### node_search — 搜索节点（纯 read-only，小幅简化）
 
 | 参数 | 类型 | 必填 | 说明 |
 |------|------|------|------|
@@ -217,12 +281,11 @@ soma 采用 **Tana/Notion 路线**：纯 ID 引用，允许重名。AI 工具使
 | `limit` | integer | 否 | 每页结果数 1-50，默认 20 |
 | `offset` | integer | 否 | 分页偏移，默认 0 |
 | `count` | boolean | 否 | `true`=只返回总数 |
-| `saveName` | string | 否 | 提供名称时，将搜索保存为搜索节点（live query） |
 
 **变化**：
 - `dateRange: {from, to}` → `after` + `before`（消除 JSON 对象，与 past_chats 一致）
 - `sort: {field, order}` → `sortBy` 单个字符串（如 `"created:desc"`）
-- 新增 `saveName`：保存为搜索节点
+- **移除 `saveName`** — `node_search` 保持纯 read-only，search node 创建统一走 `node_create(type: "search")`
 - `fields` 保留 JSON 对象（搜索过滤是 query 语义，扁平 map 可接受）
 
 ---
@@ -241,11 +304,11 @@ soma 采用 **Tana/Notion 路线**：纯 ID 引用，允许重名。AI 工具使
 
 | 工具 | 现状 | 新方案 | 参数数 |
 |------|------|--------|--------|
-| **node_create** | 10 参数，含递归 JSON 数组 | 3 参数，Tana Paste 文本 | 10 → 3 |
+| **node_create** | 10 参数，含递归 JSON 数组 | content: 3 参数 (Tana Paste) / search: 5 参数 (structured rules) | 10 → 3~5 |
 | **node_edit** | 9 参数，JSON 对象，与 create 格式不一致 | 5 参数，Tana Paste 文本，与 create 一致 | 9 → 5 |
 | **node_read** | 4 参数 | 不变 | 4 |
 | **node_delete** | 2 参数 | 不变 | 2 |
-| **node_search** | 10 参数，3 个 JSON 对象 | 12 参数，1 个 JSON 对象 | 消除 2 个对象 |
+| **node_search** | 10 参数，3 个 JSON 对象 | 11 参数，1 个 JSON 对象，纯 read-only | 消除 2 个对象 |
 | **undo** | 1 参数 | 不变 | 1 |
 
 ### 核心收益
@@ -254,28 +317,36 @@ soma 采用 **Tana/Notion 路线**：纯 ID 引用，允许重名。AI 工具使
 2. **消除嵌套 JSON** — node_create 不再有 `children` 递归数组
 3. **LLM 友好** — 文本格式比 JSON 结构更可靠，且 LLM 对 Tana Paste 有训练数据
 4. **减少认知负担** — 标签始终是 `#tag`，字段始终是 `field:: value`，引用始终是 `[[name^id]]`
+5. **读写分离** — `node_search` 纯 read-only，search node 创建统一在 `node_create`
+6. **统一创建入口** — content node 和 search node 都通过 `node_create`，用 `type` 区分
 
 ---
 
 ## 实施计划
 
-### Phase 1：node_create 重写
+### Phase 1：Tana Paste 解析器 + node_create content
 - 新建 Tana Paste 解析器（`text` → 节点树）
 - 替换现有 `children` 递归逻辑
 - 保留 `parentId` / `afterId`
 - 测试覆盖：简单节点、多层级、标签、字段、引用、checkbox
 
-### Phase 2：node_edit 统一
+### Phase 2：node_create search
+- 新增 `type: "search"` 分支
+- 实现 `rules` → queryCondition 节点树转换
+- 测试覆盖：各种 rules 组合
+
+### Phase 3：node_edit 统一
 - 替换 `name`/`addTags`/`fields`/`checked`/`data` 为 `text` 参数
 - 保留 `removeTags`（Tana Paste 无法表达删除）
 - 保留 `parentId`/`afterId`（移动功能）
 - 移除 `position`（改用 `afterId`）
 
-### Phase 3：node_search 简化
+### Phase 4：node_search 简化
 - `dateRange` → `after` + `before`
 - `sort` → `sortBy`
-- 新增 `saveName`
+- 移除 `saveName`
 
-### Phase 4：更新 system prompt
+### Phase 5：更新 system prompt
 - 工具描述中加入 Tana Paste 格式说明和示例
+- 加入 search node 创建示例
 - 移除旧参数文档

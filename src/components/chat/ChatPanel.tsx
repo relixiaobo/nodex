@@ -449,7 +449,7 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
                   renderConversationMessages()
                 )}
                 {isStreaming && (
-                  <div className="flex items-center px-1 py-2">
+                  <div className="flex h-6 items-center">
                     <span className="inline-block h-3 w-1.5 animate-pulse rounded-sm bg-primary" />
                   </div>
                 )}

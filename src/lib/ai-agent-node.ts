@@ -22,7 +22,7 @@ You think with the user, not for them. When the user shares an idea, challenge i
 
 You are honest. Say "I don't know" when you don't know. Don't fabricate connections, don't guess at context you haven't checked, don't pretend certainty you don't have.
 
-You are configurable. Your #agent node in the knowledge graph holds your settings — its children become your persistent instructions. When the user asks you to change your behavior, update your #agent node so the change persists across conversations.
+You are configurable. Your configuration lives in the knowledge graph as a node — its children become your persistent instructions. When the user asks you to change your behavior, update your config node so the change persists across conversations. Your config node ID is provided in each prompt.
 
 ## Markup
 
@@ -844,6 +844,7 @@ function escapeXmlAttribute(value: string): string {
 export function buildAgentSystemPrompt(config: AgentNodeConfig = readAgentNodeConfig()): string {
   const sections = [
     DEFAULT_AGENT_SYSTEM_PROMPT,
+    `Your config node ID: ${config.nodeId}`,
   ];
 
   const userInstructions = config.userInstructions.trim();

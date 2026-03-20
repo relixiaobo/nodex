@@ -15,6 +15,7 @@ import { SYSTEM_SCHEMA_NODE_IDS } from '../../src/lib/system-schema-presets.js';
 import { NDX_F, NDX_T } from '../../src/types/index.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
 import { NodePanel } from '../../src/components/panel/NodePanel.js';
+import { SETTINGS_AI_GROUP_NODE_IDS } from '../../src/lib/ai-agent-node.js';
 
 class MockIntersectionObserver {
   constructor(private readonly callback: IntersectionObserverCallback) {}
@@ -109,7 +110,10 @@ describe('settings system', () => {
     expect(loroDoc.getParentId(NDX_F.PROVIDER_API_KEY)).toBe(NDX_T.AI_PROVIDER);
     expect(loroDoc.getParentId(NDX_F.PROVIDER_BASE_URL)).toBe(NDX_T.AI_PROVIDER);
     expect(loroDoc.getParentId(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_HIGHLIGHT_FIELD_ENTRY)).toBe(SYSTEM_NODE_IDS.SETTINGS);
-    expect(loroDoc.getParentId(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDERS_FIELD_ENTRY)).toBe(SYSTEM_NODE_IDS.SETTINGS);
+    expect(loroDoc.getParentId(SETTINGS_AI_GROUP_NODE_IDS.AI)).toBe(SYSTEM_NODE_IDS.SETTINGS);
+    expect(loroDoc.toNodexNode(SETTINGS_AI_GROUP_NODE_IDS.AI)?.locked).toBe(true);
+    expect(loroDoc.getParentId(SETTINGS_AI_GROUP_NODE_IDS.DEFAULT_AGENTS)).toBe(SETTINGS_AI_GROUP_NODE_IDS.AI);
+    expect(loroDoc.getParentId(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDERS_FIELD_ENTRY)).toBe(SETTINGS_AI_GROUP_NODE_IDS.AI);
   });
 
   it('highlightEnabled defaults to true', () => {
@@ -132,10 +136,8 @@ describe('settings system', () => {
     }).not.toThrow();
 
     expect(container.textContent).toContain('Settings');
+    expect(container.textContent).toContain('AI');
     expect(container.textContent).toContain('Highlight & Comment');
-    expect(container.textContent).toContain('AI Providers');
-    // Default Anthropic provider is no longer auto-created on bootstrap;
-    // the AI Providers field entry starts empty for new workspaces.
     expect(container.querySelector('[role="switch"]')?.getAttribute('aria-checked')).toBe('true');
     expect(container.querySelector('[data-field-row]')?.className).toContain('@md:grid-cols-[clamp(10rem,32%,15rem)_minmax(0,1fr)]');
   });

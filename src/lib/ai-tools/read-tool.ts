@@ -12,6 +12,8 @@ import { computeNodeFields } from '../../hooks/use-node-fields.js';
 import { resolveDataType } from '../field-utils.js';
 import { getAncestorChain, getNavigableParentId } from '../tree-utils.js';
 import { useNodeStore } from '../../stores/node-store.js';
+import { getSystemNodePreset } from '../system-node-presets.js';
+import { SYSTEM_NODE_IDS } from '../../types/index.js';
 import {
   MAX_READ_DEPTH,
   MAX_PAGE_SIZE,
@@ -22,7 +24,9 @@ import {
 } from './shared.js';
 
 const readToolParameters = Type.Object({
-  nodeId: Type.String({ description: 'ID of the node to read.' }),
+  nodeId: Type.Optional(Type.String({
+    description: 'ID of the node to read. Omit to browse from the workspace root. Shortcuts: "journal" for the Journal node, "schema" for the Schema node.',
+  })),
   depth: Type.Optional(Type.Integer({ minimum: 0, maximum: MAX_READ_DEPTH, default: 1, description: 'Recursion depth for children (0 = no children, 1 = direct children, max 3).' })),
   childOffset: Type.Optional(Type.Integer({ minimum: 0, default: 0, description: 'Pagination offset for children list.' })),
   childLimit: Type.Optional(Type.Integer({ minimum: 1, maximum: MAX_PAGE_SIZE, default: DEFAULT_PAGE_SIZE, description: 'Max children per page (default 20, max 50).' })),
@@ -93,16 +97,58 @@ function isContentChild(childId: string): boolean {
   return !!child && isOutlinerContentNodeType(child.type);
 }
 
+function shouldIncludeRootBrowseChild(childId: string): boolean {
+  if (childId === SYSTEM_NODE_IDS.JOURNAL || childId === SYSTEM_NODE_IDS.SCHEMA) {
+    return true;
+  }
+
+  return getSystemNodePreset(childId) === undefined;
+}
+
+function getReadableChildIds(nodeId: string, options?: { rootBrowse?: boolean }): string[] {
+  const childIds = loroDoc.getChildren(nodeId).filter(isContentChild);
+  if (options?.rootBrowse) {
+    return childIds.filter(shouldIncludeRootBrowseChild);
+  }
+  return childIds;
+}
+
+function resolveReadTargetId(nodeId: string | undefined): { nodeId: string; isRootBrowse: boolean } {
+  if (nodeId == null || nodeId.trim().length === 0) {
+    const workspaceId = loroDoc.getCurrentWorkspaceId();
+    if (!workspaceId) {
+      throw new Error('Workspace not ready. Try again after the workspace loads.');
+    }
+    return { nodeId: workspaceId, isRootBrowse: true };
+  }
+
+  const normalized = nodeId.trim().toLowerCase();
+  if (normalized === 'journal') {
+    return { nodeId: SYSTEM_NODE_IDS.JOURNAL, isRootBrowse: false };
+  }
+  if (normalized === 'schema') {
+    return { nodeId: SYSTEM_NODE_IDS.SCHEMA, isRootBrowse: false };
+  }
+
+  return { nodeId: nodeId.trim(), isRootBrowse: false };
+}
+
 /**
  * Build the children summary, filtering out fieldEntry nodes and marking references.
  */
-function summarizeChildren(nodeId: string, depth: number, offset: number, limit: number): {
+function summarizeChildren(
+  nodeId: string,
+  depth: number,
+  offset: number,
+  limit: number,
+  options?: { rootBrowse?: boolean },
+): {
   total: number;
   offset: number;
   limit: number;
   items: ChildSummary[];
 } {
-  const childIds = loroDoc.getChildren(nodeId).filter(isContentChild);
+  const childIds = getReadableChildIds(nodeId, options);
   const pagedIds = childIds.slice(offset, offset + limit);
 
   const items = pagedIds.map((childId) => {
@@ -182,15 +228,16 @@ function buildNodeData(nodeId: string): Record<string, unknown> {
 }
 
 async function executeReadTool(params: ReadToolParams): Promise<AgentToolResult<unknown>> {
-  const node = loroDoc.toNodexNode(params.nodeId);
-  if (!node) throw new Error(`Node not found: ${params.nodeId}. Use node_search to find the correct ID.`);
+  const resolved = resolveReadTargetId(params.nodeId);
+  const node = loroDoc.toNodexNode(resolved.nodeId);
+  if (!node) throw new Error(`Node not found: ${resolved.nodeId}. Use node_search to find the correct ID.`);
 
   const depth = Math.min(params.depth ?? 1, MAX_READ_DEPTH);
   const childOffset = params.childOffset ?? 0;
   const childLimit = Math.min(params.childLimit ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
-  const parentId = getNavigableParentId(params.nodeId);
+  const parentId = getNavigableParentId(resolved.nodeId);
   const parentNode = parentId ? loroDoc.toNodexNode(parentId) : null;
-  const { ancestors, workspaceRootId } = getAncestorChain(params.nodeId);
+  const { ancestors, workspaceRootId } = getAncestorChain(resolved.nodeId);
 
   const result = {
     id: node.id,
@@ -200,14 +247,14 @@ async function executeReadTool(params: ReadToolParams): Promise<AgentToolResult<
     createdAt: node.createdAt,
     updatedAt: node.updatedAt,
     tags: getTagDisplayNames(node.tags),
-    nodeData: buildNodeData(params.nodeId),
-    fields: buildEnhancedFields(params.nodeId),
+    nodeData: buildNodeData(resolved.nodeId),
+    fields: buildEnhancedFields(resolved.nodeId),
     checked: toCheckedValue(node.id),
     parent: parentNode ? { id: parentNode.id, name: parentNode.name ?? parentNode.id } : null,
     breadcrumb: ancestors
       .filter((ancestor) => ancestor.id !== workspaceRootId)
       .map((ancestor) => ancestor.name),
-    children: summarizeChildren(params.nodeId, depth, childOffset, childLimit),
+    children: summarizeChildren(resolved.nodeId, depth, childOffset, childLimit, { rootBrowse: resolved.isRootBrowse }),
   };
 
   return {
@@ -223,6 +270,13 @@ export const readTool: AgentTool<typeof readToolParameters, unknown> = {
     'Read a node\'s raw type/data, content, fields, and children. Fields show type',
     'and available options. Field entries are in the fields array, not in children',
     '— children only lists content nodes and references.',
+    '',
+    'Quick patterns:',
+    '- Browse from root: node_read()',
+    '- Browse journal: node_read(nodeId: "journal")',
+    '- Browse tags: node_read(nodeId: "schema")',
+    '- Read specific node: node_read(nodeId: "abc123")',
+    '- Read with children: node_read(nodeId: "abc123", depth: 2)',
     '',
     'Use node_read to inspect raw nodeData like fieldType/color/cardinality before',
     'editing, or to discover field entry IDs for direct manipulation.',

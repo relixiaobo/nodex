@@ -70,6 +70,7 @@ describe('PanelLayout notes dropdown', () => {
 
   beforeEach(() => {
     resetAndSeed();
+    MockResizeObserver.width = 400;
     originalResizeObserver = globalThis.ResizeObserver;
     originalIntersectionObserver = globalThis.IntersectionObserver;
     globalThis.ResizeObserver = MockResizeObserver as typeof ResizeObserver;
@@ -217,5 +218,19 @@ describe('PanelLayout notes dropdown', () => {
     const chatRow = getMenuRow('Chat');
     expect(chatRow).toBeDefined();
     expect(chatRow?.querySelector('svg')).not.toBeNull();
+  });
+
+  it('uses the same chat header chrome for every chat panel in wide mode', async () => {
+    MockResizeObserver.width = 900;
+    setPanels([
+      { id: 'chat-left', nodeId: 'chat:sess_left' },
+      { id: 'chat-right', nodeId: 'chat:sess_right' },
+    ], 'chat-left');
+
+    await renderLayout();
+
+    expect(container.querySelectorAll('button[title="Edit title"]')).toHaveLength(2);
+    expect(container.querySelectorAll('button[aria-label="Close chat"]')).toHaveLength(2);
+    expect(container.querySelector('[data-testid="toolbar"]')?.textContent).toBe('Tools');
   });
 });

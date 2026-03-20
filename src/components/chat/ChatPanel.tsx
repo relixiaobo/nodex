@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { MessageCircle, Pencil, Trash2, X } from '../../lib/icons.js';
+import { Pencil, Trash2 } from '../../lib/icons.js';
 import { useAgent } from '../../hooks/use-agent.js';
 import type { ThinkingLevel } from '@mariozechner/pi-ai';
 import { readChatDebugEnabled } from '../../lib/ai-debug.js';
@@ -8,8 +8,9 @@ import { getAvailableModelsWithMeta } from '../../lib/ai-provider-config.js';
 import { getAgentForSession, selectChatModel, selectThinkingLevel } from '../../lib/ai-service.js';
 import { useNodeStore } from '../../stores/node-store.js';
 import { useUIStore } from '../../stores/ui-store.js';
-import { SYSTEM_NODE_IDS } from '../../types/index.js';
+import { CHAT_PANEL_PREFIX, SYSTEM_NODE_IDS } from '../../types/index.js';
 import { ChatDebugPanel } from './ChatDebugPanel.js';
+import { ChatPanelHeader } from './ChatPanelHeader.js';
 import { ChatInput, type ChatInputHandle } from './ChatInput.js';
 import { ChatMessage } from './ChatMessage.js';
 
@@ -18,7 +19,7 @@ const AUTO_SCROLL_THRESHOLD = 48;
 export interface ChatPanelProps {
   panelId: string;
   sessionId: string;
-  /** When true, hide the full header (title + close). Action buttons remain visible. */
+  /** When true, hide the panel-level header because the surrounding layout already renders it. */
   hideHeader?: boolean;
 }
 
@@ -234,27 +235,20 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
   return (
     <div className="relative flex flex-1 flex-col overflow-hidden bg-background">
       {!hideHeader && (
-        <div className="flex items-center justify-between px-3 h-12 border-b border-border">
-          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-            <MessageCircle size={14} strokeWidth={1.75} className="text-foreground-tertiary" />
-            Chat
-          </div>
-          <button
-            type="button"
-            onClick={() => useUIStore.getState().closePanel(panelId)}
-            className="inline-flex h-7 w-7 items-center justify-center rounded-full text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground"
-            aria-label="Close chat"
-          >
-            <X size={15} strokeWidth={1.6} />
-          </button>
-        </div>
+        <ChatPanelHeader
+          nodeId={`${CHAT_PANEL_PREFIX}${sessionId}`}
+          onClose={(e) => {
+            e.stopPropagation();
+            useUIStore.getState().closePanel(panelId);
+          }}
+        />
       )}
 
       {debugEnabled && (
         <button
           type="button"
           onClick={() => setDebugOpen((v) => !v)}
-          className={`absolute right-3 top-2 z-10 inline-flex h-7 min-w-8 items-center justify-center rounded-full px-2 font-mono text-[11px] transition-colors ${
+          className={`absolute right-3 ${hideHeader ? 'top-2' : 'top-10'} z-10 inline-flex h-7 min-w-8 items-center justify-center rounded-full px-2 font-mono text-[11px] transition-colors ${
             debugOpen
               ? 'bg-foreground/8 text-foreground'
               : 'text-foreground-tertiary hover:bg-foreground/4 hover:text-foreground'

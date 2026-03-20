@@ -1,8 +1,17 @@
-# soma 产品方法论
+# soma 产品方法论 (v4)
 
 > Think where you read.
 
-> 注：本文记录的是 v4 方法论。当前正在演进到 v5「Think with your AI」阶段，核心变化是从"三步循环"走向"对话即思考"，并明确认知摩擦的目标是放大思考，而不是确认操作。
+> **注意**：本文档是 v4 版本，记录了 "Think → Connect → Emerge" 的产品方法论和三条认知工作流。
+> 产品方向已演进到 **v6（批判性思考伙伴 + 模块化能力 + 自我进化）**，核心变化包括：
+> - AI 从"照亮你的思考"升级为"批判性思考伙伴"
+> - 能力模块化（is/has 框架：system prompt 定义身份，skill 定义能力）
+> - AI 通过 #agent 节点跟用户一起成长
+> - 用户选择体验模式（Chat-first 或 Outliner-first）
+>
+> v6 文档见 [`docs/plans/ai-first-product-vision.md`](plans/ai-first-product-vision.md)。
+> 本文档中的核心信念（让人变强、正反馈、知识组织没有正确答案）在 v6 中保留不变。
+> 三条认知工作流（阅读环 / 碰撞环 / 回顾环）和市场定位分析仍有参考价值。
 
 ---
 

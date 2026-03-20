@@ -148,7 +148,7 @@ const SYSTEM_SCHEMA_NODE_PRESETS: ReadonlyArray<FixedSchemaNodePreset> = [
   {
     id: NDX_F.SETTING_AI_PROVIDERS,
     parentId: NDX_T.WORKSPACE_SETTINGS,
-    name: 'AI Providers',
+    name: 'Providers',
     data: {
       type: 'fieldDef',
       fieldType: FIELD_TYPES.OPTIONS_FROM_SUPERTAG,

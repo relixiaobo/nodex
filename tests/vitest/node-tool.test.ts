@@ -6,6 +6,7 @@ import { deleteTool } from '../../src/lib/ai-tools/delete-tool.js';
 import { searchTool } from '../../src/lib/ai-tools/search-tool.js';
 import { ensureTodayNode } from '../../src/lib/journal.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
+import { useNodeStore } from '../../src/stores/node-store.js';
 import { SYSTEM_NODE_IDS } from '../../src/types/index.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
@@ -78,6 +79,39 @@ describe('node tools (Phase 1.5)', () => {
     expect(details.children.limit).toBe(2);
     expect(details.children.items).toHaveLength(2);
     expect(details.children.items[0].id).toBe('note_1a');
+  });
+
+  it('browses from the workspace root without exposing system config nodes', async () => {
+    const topLevel = useNodeStore.getState().createChild('ws_default', undefined, { name: 'Top-level idea' });
+
+    const details = await executeRead({}) as {
+      id: string;
+      children: {
+        items: Array<{ id: string; name: string }>;
+      };
+    };
+
+    expect(details.id).toBe('ws_default');
+    expect(details.children.items.map((item) => item.id)).toEqual([
+      SYSTEM_NODE_IDS.JOURNAL,
+      SYSTEM_NODE_IDS.SCHEMA,
+      topLevel.id,
+    ]);
+    expect(details.children.items.map((item) => item.id)).not.toContain(SYSTEM_NODE_IDS.SETTINGS);
+    expect(details.children.items.map((item) => item.id)).not.toContain(SYSTEM_NODE_IDS.TRASH);
+    expect(details.children.items.map((item) => item.id)).not.toContain(SYSTEM_NODE_IDS.SEARCHES);
+  });
+
+  it('resolves journal and schema shortcuts for node_read', async () => {
+    const journal = await executeRead({
+      nodeId: 'journal',
+    }) as { id: string };
+    const schema = await executeRead({
+      nodeId: 'schema',
+    }) as { id: string };
+
+    expect(journal.id).toBe(SYSTEM_NODE_IDS.JOURNAL);
+    expect(schema.id).toBe(SYSTEM_NODE_IDS.SCHEMA);
   });
 
   it('returns raw type, epoch timestamps, and nodeData for schema nodes', async () => {

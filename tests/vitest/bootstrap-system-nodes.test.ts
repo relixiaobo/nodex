@@ -16,7 +16,7 @@ import { SYSTEM_NODE_IDS, NDX_F, NDX_T, SYS_T, SYS_V } from '../../src/types/ind
 import { SYSTEM_SCHEMA_NODE_IDS } from '../../src/lib/system-schema-presets.js';
 import { useNodeStore } from '../../src/stores/node-store.js';
 import { isOutlinerContentNodeType } from '../../src/lib/node-type-utils.js';
-import { ensureSparkAgentNode } from '../../src/lib/ai-agent-node.js';
+import { ensureSparkAgentNode, SETTINGS_AI_GROUP_NODE_IDS } from '../../src/lib/ai-agent-node.js';
 
 describe('ensureSystemNodes', () => {
   beforeEach(() => {
@@ -24,7 +24,7 @@ describe('ensureSystemNodes', () => {
     initLoroDocForTest('ws_bootstrap');
   });
 
-  it('bootstraps only Journal, Trash, Schema, and Settings as locked system nodes', () => {
+  it('bootstraps root system nodes while grouping AI settings under Settings', () => {
     ensureSystemNodes('ws_bootstrap');
 
     expect(hasNode(SYSTEM_NODE_IDS.JOURNAL)).toBe(true);
@@ -47,7 +47,11 @@ describe('ensureSystemNodes', () => {
       expect(toNodexNode(nodeId)?.locked).toBe(true);
     }
 
-    expect(getParentId(SYSTEM_NODE_IDS.AGENT)).toBe('ws_bootstrap');
+    expect(getParentId(SETTINGS_AI_GROUP_NODE_IDS.AI)).toBe(SYSTEM_NODE_IDS.SETTINGS);
+    expect(toNodexNode(SETTINGS_AI_GROUP_NODE_IDS.AI)?.locked).toBe(true);
+    expect(getParentId(SETTINGS_AI_GROUP_NODE_IDS.DEFAULT_AGENTS)).toBe(SETTINGS_AI_GROUP_NODE_IDS.AI);
+    expect(toNodexNode(SETTINGS_AI_GROUP_NODE_IDS.DEFAULT_AGENTS)?.locked).toBe(true);
+    expect(getParentId(SYSTEM_NODE_IDS.AGENT)).toBe(SETTINGS_AI_GROUP_NODE_IDS.DEFAULT_AGENTS);
     expect(toNodexNode(SYSTEM_NODE_IDS.AGENT)?.locked).toBeUndefined();
   });
 
@@ -67,7 +71,7 @@ describe('ensureSystemNodes', () => {
     expect(getParentId(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_HIGHLIGHT_FIELD_ENTRY)).toBe(SYSTEM_NODE_IDS.SETTINGS);
     expect(getParentId(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_HIGHLIGHT_VALUE)).toBe(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_HIGHLIGHT_FIELD_ENTRY);
     expect(toNodexNode(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_HIGHLIGHT_VALUE)?.name).toBe(SYS_V.YES);
-    expect(getParentId(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDERS_FIELD_ENTRY)).toBe(SYSTEM_NODE_IDS.SETTINGS);
+    expect(getParentId(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDERS_FIELD_ENTRY)).toBe(SETTINGS_AI_GROUP_NODE_IDS.AI);
     // Default Anthropic provider is no longer auto-created on bootstrap;
     // the providers field entry starts empty for new workspaces.
     expect(toNodexNode(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDERS_FIELD_ENTRY)?.children?.length ?? 0).toBe(0);
@@ -150,6 +154,8 @@ describe('ensureSystemNodes', () => {
   it('ensureSparkAgentNode keeps built-in prompt out of node children on repeated calls', () => {
     ensureSystemNodes('ws_bootstrap');
     ensureSparkAgentNode('ws_bootstrap');
+
+    expect(getParentId(SYSTEM_NODE_IDS.SPARK_AGENT)).toBe(SETTINGS_AI_GROUP_NODE_IDS.DEFAULT_AGENTS);
 
     const contentChildrenBefore = getChildren(SYSTEM_NODE_IDS.SPARK_AGENT)
       .filter((id) => {

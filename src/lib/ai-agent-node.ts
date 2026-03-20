@@ -1,6 +1,7 @@
 import { FIELD_TYPES, NDX_F, SYSTEM_NODE_IDS, SYS_T } from '../types/index.js';
 import { isOutlinerContentNodeType } from './node-type-utils.js';
 import * as loroDoc from './loro-doc.js';
+import { SYSTEM_SCHEMA_NODE_IDS } from './system-schema-presets.js';
 
 export const DEFAULT_AGENT_MODEL_ID = '';
 export const DEFAULT_AGENT_TEMPERATURE = 0.2;
@@ -66,6 +67,11 @@ export const SKILL_NODE_IDS = {
   SKILL_CREATOR_RULE_3: 'NDX_N43',
   SKILL_CREATOR_RULE_4: 'NDX_N44',
   SKILL_CREATOR_RULE_5: 'NDX_N45',
+} as const;
+
+export const SETTINGS_AI_GROUP_NODE_IDS = {
+  AI: 'NDX_N70',
+  DEFAULT_AGENTS: 'NDX_N71',
 } as const;
 
 // ─── Spark agent defaults ───
@@ -393,20 +399,66 @@ function cleanupSeededPromptPresetNodes(
   }
 }
 
+function moveNodeToIndex(nodeId: string, parentId: string, index: number): void {
+  if (!loroDoc.hasNode(nodeId)) return;
+  loroDoc.moveNode(nodeId, parentId, index);
+}
+
+function ensureSettingsAIGrouping(): void {
+  ensureNode({
+    id: SETTINGS_AI_GROUP_NODE_IDS.AI,
+    parentId: SYSTEM_NODE_IDS.SETTINGS,
+    name: 'AI',
+    data: {
+      locked: true,
+    },
+  });
+  moveNodeToIndex(SETTINGS_AI_GROUP_NODE_IDS.AI, SYSTEM_NODE_IDS.SETTINGS, 0);
+
+  if (loroDoc.hasNode(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDERS_FIELD_ENTRY)) {
+    moveNodeToIndex(
+      SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDERS_FIELD_ENTRY,
+      SETTINGS_AI_GROUP_NODE_IDS.AI,
+      0,
+    );
+  }
+
+  ensureNode({
+    id: SETTINGS_AI_GROUP_NODE_IDS.DEFAULT_AGENTS,
+    parentId: SETTINGS_AI_GROUP_NODE_IDS.AI,
+    name: 'Default Agents',
+    data: {
+      locked: true,
+    },
+  });
+  moveNodeToIndex(SETTINGS_AI_GROUP_NODE_IDS.DEFAULT_AGENTS, SETTINGS_AI_GROUP_NODE_IDS.AI, 1);
+}
+
+function ensureAgentParent(agentNodeId: string, index: number): void {
+  ensureSettingsAIGrouping();
+
+  if (!loroDoc.hasNode(agentNodeId)) return;
+  moveNodeToIndex(agentNodeId, SETTINGS_AI_GROUP_NODE_IDS.DEFAULT_AGENTS, index);
+}
+
 // ─── Bootstrap ───
 
 export function ensureAgentNode(workspaceId = loroDoc.getCurrentWorkspaceId() ?? 'ws_default'): string {
+  void workspaceId;
+
   // Schema presets (tagDefs + fieldDefs)
   for (const preset of AGENT_SCHEMA_PRESETS) {
     ensureNode(preset);
   }
+  ensureSettingsAIGrouping();
 
   // Agent node itself
   ensureNode({
     id: SYSTEM_NODE_IDS.AGENT,
-    parentId: workspaceId,
+    parentId: SETTINGS_AI_GROUP_NODE_IDS.DEFAULT_AGENTS,
     name: 'soma',
   });
+  ensureAgentParent(SYSTEM_NODE_IDS.AGENT, 0);
   if (!loroDoc.toNodexNode(SYSTEM_NODE_IDS.AGENT)?.tags.includes(SYS_T.AGENT)) {
     loroDoc.addTag(SYSTEM_NODE_IDS.AGENT, SYS_T.AGENT);
   }
@@ -578,17 +630,21 @@ export function readAgentNodeConfig(): AgentNodeConfig {
 // ─── Spark agent bootstrap ───
 
 export function ensureSparkAgentNode(workspaceId = loroDoc.getCurrentWorkspaceId() ?? 'ws_default'): string {
+  void workspaceId;
+
   // Schema presets (shared with main agent — tagDefs + fieldDefs)
   for (const preset of AGENT_SCHEMA_PRESETS) {
     ensureNode(preset);
   }
+  ensureSettingsAIGrouping();
 
   // Spark agent node
   ensureNode({
     id: SYSTEM_NODE_IDS.SPARK_AGENT,
-    parentId: workspaceId,
+    parentId: SETTINGS_AI_GROUP_NODE_IDS.DEFAULT_AGENTS,
     name: 'Spark',
   });
+  ensureAgentParent(SYSTEM_NODE_IDS.SPARK_AGENT, 1);
   if (!loroDoc.toNodexNode(SYSTEM_NODE_IDS.SPARK_AGENT)?.tags.includes(SYS_T.AGENT)) {
     loroDoc.addTag(SYSTEM_NODE_IDS.SPARK_AGENT, SYS_T.AGENT);
   }

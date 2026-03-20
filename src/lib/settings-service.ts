@@ -1,7 +1,7 @@
 /**
  * Settings service — LoroDoc as source of truth + chrome.storage projection.
  *
- * Settings are stored as field entries on the SETTINGS system node.
+ * Settings are stored as fixed nodes/field entries under the SETTINGS tree.
  * Changes are projected to chrome.storage['soma-settings'] so that
  * content scripts (which cannot access LoroDoc) can read them.
  */

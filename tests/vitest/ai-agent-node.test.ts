@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
-  AGENT_PAST_CHATS_GUIDANCE,
   AI_AGENT_NODE_IDS,
   buildAgentSystemPrompt,
   DEFAULT_AGENT_SYSTEM_PROMPT,
@@ -117,7 +116,7 @@ describe('ai agent skill bootstrap and prompt rendering', () => {
     });
 
     expect(prompt).toContain(DEFAULT_AGENT_SYSTEM_PROMPT);
-    expect(prompt).toContain(AGENT_PAST_CHATS_GUIDANCE);
+    expect(prompt).toContain('Who you are');
     expect(prompt).toContain('<user-instructions>');
     expect(prompt).toContain('Base prompt');
     expect(prompt).toContain('<available-skills>');
@@ -131,7 +130,7 @@ describe('ai agent skill bootstrap and prompt rendering', () => {
     const prompt = buildAgentSystemPrompt(BASE_CONFIG);
 
     expect(prompt).toContain(DEFAULT_AGENT_SYSTEM_PROMPT);
-    expect(prompt).toContain(AGENT_PAST_CHATS_GUIDANCE);
+    expect(prompt).toContain('Who you are');
     expect(prompt).toContain('<user-instructions>\nBase prompt\n</user-instructions>');
     expect(prompt).not.toContain('<available-skills>');
   });

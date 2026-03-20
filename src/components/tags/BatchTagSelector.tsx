@@ -121,7 +121,7 @@ export function BatchTagSelector() {
         }
       }}
     >
-      <div data-preserve-selection className="w-64 rounded-lg bg-background shadow-paper border border-border overflow-hidden">
+      <div data-preserve-selection className="w-64 rounded-lg bg-background shadow-paper overflow-hidden">
         <div className="px-3 py-2 border-b border-border">
           <div className="text-xs text-foreground-secondary mb-1">
             {t('tag.batch.title', { count: String(nodeCount) })}

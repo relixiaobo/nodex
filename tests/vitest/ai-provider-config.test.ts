@@ -6,7 +6,9 @@ import {
   getAvailableModelsWithMeta,
   getEnabledProviderConfigs,
   getProviderConfigs,
+  guessProviderFromApiKey,
   hasAnyEnabledProvider,
+  saveProviderApiKey,
 } from '../../src/lib/ai-provider-config.js';
 import { ensureSystemNodes } from '../../src/lib/bootstrap-system-nodes.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
@@ -217,6 +219,28 @@ describe('ai-provider-config', () => {
     useNodeStore.getState().setFieldValue(openAiNodeId, NDX_F.PROVIDER_API_KEY, ['sk-openai-primary']);
 
     expect(hasAnyEnabledProvider()).toBe(true);
+  });
+
+  it('auto-detects provider from common API key prefixes', () => {
+    expect(guessProviderFromApiKey('sk-ant-test')).toBe('anthropic');
+    expect(guessProviderFromApiKey('sk-openai-test')).toBe('openai');
+    expect(guessProviderFromApiKey(' bearer token ')).toBeNull();
+  });
+
+  it('saveProviderApiKey creates or updates the provider config in Settings', () => {
+    saveProviderApiKey('openai', '  sk-openai-primary  ');
+
+    expect(getApiKeyForProvider('openai')).toBe('sk-openai-primary');
+    expect(hasAnyEnabledProvider()).toBe(true);
+
+    saveProviderApiKey('openai', 'sk-openai-updated');
+
+    const configs = getProviderConfigs().filter((config) => config.provider === 'openai');
+    expect(configs[0]).toMatchObject({
+      provider: 'openai',
+      enabled: true,
+      apiKey: 'sk-openai-updated',
+    });
   });
 
   describe('custom provider models', () => {

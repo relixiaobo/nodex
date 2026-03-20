@@ -7,14 +7,15 @@ import { usePanelKeyboard } from '../../hooks/use-panel-keyboard.js';
 import { useChatShortcut } from '../../hooks/use-chat-shortcut.js';
 import { useTodayShortcut } from '../../hooks/use-today-shortcut';
 import { useGlobalSelectionDismiss } from '../../hooks/use-global-selection-dismiss.js';
+import { LoginScreen } from '../../components/auth/LoginScreen.js';
 import { DeskLayout } from '../../components/layout/DeskLayout.js';
 import { CommandPalette } from '../../components/search/CommandPalette';
 import { BatchTagSelector } from '../../components/tags/BatchTagSelector';
 import { initLoroDoc } from '../../lib/loro-doc.js';
 import * as loroDoc from '../../lib/loro-doc.js';
-import { getOrCreateDefaultWorkspaceId } from '../../lib/workspace-id.js';
 import { findUnexpectedShortcutConflicts } from '../../lib/shortcut-registry.js';
 import { ensureTodayNode } from '../../lib/journal.js';
+import { getStartupPagePreference, STARTUP_PAGE } from '../../lib/startup-page-preference.js';
 import { ensureHighlightTagDef, ensureNoteTagDef, getClipNodeIdForHighlight, type HighlightNodeStore } from '../../lib/highlight-service.js';
 import {
   createHighlightFromPayload,
@@ -100,53 +101,36 @@ async function seedWorkspace(wsId: string): Promise<{ hadSnapshot: boolean }> {
 
 interface BootstrapResult {
  ready: boolean;
+ requireLogin: boolean;
 }
 
 function useBootstrap(skip: boolean): BootstrapResult {
  const [ready, setReady] = useState(skip);
- const setWorkspace = useWorkspaceStore((s) => s.setWorkspace);
- const setUser = useWorkspaceStore((s) => s.setUser);
+ const [requireLogin, setRequireLogin] = useState(false);
+ const isAuthenticated = useWorkspaceStore((s) => s.isAuthenticated);
  const replacePanel = useUIStore((s) => s.replacePanel);
 
- const initCalled = useRef(false);
+ const authInitCalled = useRef(false);
+ const workspaceBootstrapInFlight = useRef(false);
 
- useEffect(() => {
-  if (skip) {
-   setReady(true);
-   return;
-  }
-  if (initCalled.current) return;
-  initCalled.current = true;
+ async function bootstrapWorkspace() {
+  if (workspaceBootstrapInFlight.current) return;
+  workspaceBootstrapInFlight.current = true;
 
-  async function init() {
-   // Wait for WorkspaceStore persist hydration so we read the correct
-   // persisted currentWorkspaceId (e.g. the user's ID from a previous session).
-   // Without this, chrome.storage.local async hydration may not have completed,
-   // causing wsId to be null → wrong local workspace ID → sync push mismatch.
-   if (!useWorkspaceStore.persist.hasHydrated()) {
-    await new Promise<void>((resolve) => {
-     useWorkspaceStore.persist.onFinishHydration(() => resolve());
-    });
-   }
-
-   // Re-read after hydration (the React hook value `wsId` was captured before hydration)
+  try {
    let currentWsId = useWorkspaceStore.getState().currentWorkspaceId;
    if (!currentWsId) {
-    currentWsId = await getOrCreateDefaultWorkspaceId();
-    setWorkspace(currentWsId);
-    setUser('user_default');
+    const authUser = useWorkspaceStore.getState().authUser;
+    currentWsId = authUser?.id ?? null;
+    if (!currentWsId) {
+     setRequireLogin(true);
+     setReady(false);
+     return;
+    }
+    useWorkspaceStore.setState({ currentWorkspaceId: currentWsId });
    }
 
-   // Bootstrap LoroDoc + seed fixed system nodes
    const { hadSnapshot } = await seedWorkspace(currentWsId);
-
-   // Restore auth session from stored Bearer token (validates against server).
-   // Must run after initLoroDoc so getPeerIdStr() is available for sync start.
-   const { initAuth } = useWorkspaceStore.getState();
-   // Both paths: start auth + sync in background, never block UI rendering.
-   // When sync pulls data, importUpdatesBatch() → notifySubscribers() triggers
-   // React re-render via node-store's _version increment.
-   void initAuth();
 
    // Wait for UIStore persist hydration before checking panel validity
    // (persist.getItem is async, so the initial render may have stale default state)
@@ -177,8 +161,11 @@ function useBootstrap(skip: boolean): BootstrapResult {
     && !loroDoc.hasNode(currentPanelNodeId);
 
    if (uiState.panels.length === 0) {
-    // Chat-first: open a new Chat panel on fresh start
-    void openChatPanel();
+    if (getStartupPagePreference() === STARTUP_PAGE.TODAY) {
+     replacePanel(ensureTodayNode());
+    } else {
+     void openChatPanel();
+    }
    } else if (
     hasInvalidActiveNode
     || (
@@ -226,6 +213,7 @@ function useBootstrap(skip: boolean): BootstrapResult {
     // Queue read failed — not critical, skip
    }
 
+   setRequireLogin(false);
    setReady(true);
 
    if (pendingFailCount > 0) {
@@ -257,12 +245,49 @@ function useBootstrap(skip: boolean): BootstrapResult {
      }
     });
    }
+  } finally {
+   workspaceBootstrapInFlight.current = false;
+  }
+ }
+
+ useEffect(() => {
+  if (skip) {
+   setReady(true);
+   setRequireLogin(false);
+   return;
+  }
+  if (authInitCalled.current) return;
+  authInitCalled.current = true;
+
+  async function init() {
+   // Wait for WorkspaceStore persist hydration so we read the correct
+   // persisted currentWorkspaceId (e.g. the user's ID from a previous session).
+   if (!useWorkspaceStore.persist.hasHydrated()) {
+    await new Promise<void>((resolve) => {
+     useWorkspaceStore.persist.onFinishHydration(() => resolve());
+    });
+   }
+
+   await useWorkspaceStore.getState().initAuth();
+
+   if (!useWorkspaceStore.getState().isAuthenticated) {
+    setRequireLogin(true);
+    setReady(false);
+    return;
+   }
+
+   await bootstrapWorkspace();
   }
 
-  init();
+  void init();
  }, [skip]); // eslint-disable-line react-hooks/exhaustive-deps
 
- return { ready };
+ useEffect(() => {
+  if (skip || !requireLogin || !isAuthenticated) return;
+  void bootstrapWorkspace();
+ }, [isAuthenticated, requireLogin, skip]); // eslint-disable-line react-hooks/exhaustive-deps
+
+ return { ready, requireLogin };
 }
 
 interface AppProps {
@@ -270,7 +295,7 @@ interface AppProps {
 }
 
 export function App({ skipBootstrap = false }: AppProps) {
- const { ready } = useBootstrap(skipBootstrap);
+ const { ready, requireLogin } = useBootstrap(skipBootstrap);
  const selectionDismissHandlers = useGlobalSelectionDismiss();
 
  useEffect(() => {
@@ -461,6 +486,10 @@ export function App({ skipBootstrap = false }: AppProps) {
  useChatShortcut();
  // Global Cmd+Shift+D for go to today
  useTodayShortcut();
+
+ if (requireLogin) {
+  return <LoginScreen />;
+ }
 
  if (!ready) {
   return (

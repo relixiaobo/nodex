@@ -4,12 +4,13 @@ import { Pencil, Trash2 } from '../../lib/icons.js';
 import { useAgent } from '../../hooks/use-agent.js';
 import type { ThinkingLevel } from '@mariozechner/pi-ai';
 import { readChatDebugEnabled } from '../../lib/ai-debug.js';
-import { getAvailableModelsWithMeta } from '../../lib/ai-provider-config.js';
+import { getAvailableModelsWithMeta, hasAnyEnabledProvider } from '../../lib/ai-provider-config.js';
 import { getAgentForSession, selectChatModel, selectThinkingLevel } from '../../lib/ai-service.js';
 import { useNodeStore } from '../../stores/node-store.js';
 import { useUIStore } from '../../stores/ui-store.js';
 import { SYSTEM_NODE_IDS } from '../../types/index.js';
 import { ChatDebugPanel } from './ChatDebugPanel.js';
+import { ChatOnboarding } from './ChatOnboarding.js';
 import { ChatPanelHeader } from './ChatPanelHeader.js';
 import { ChatInput, type ChatInputHandle } from './ChatInput.js';
 import { ChatMessage } from './ChatMessage.js';
@@ -75,6 +76,15 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
     return getAvailableModelsWithMeta();
   }, [settingsVersion]);
   const hasAvailableModels = availableModels.length > 0;
+  const hasConfiguredProvider = useMemo(() => {
+    void settingsVersion;
+    return hasAnyEnabledProvider();
+  }, [settingsVersion]);
+  const chatState = !hasConfiguredProvider
+    ? 'onboarding'
+    : hasAvailableModels
+      ? 'ready'
+      : 'no-models';
 
   const currentModel = useMemo(() => {
     const key = selectedModelKey ?? { id: debug.modelId, provider: debug.provider };
@@ -125,7 +135,7 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
   }, [hasSteering]);
 
   useEffect(() => {
-    if (!hasAvailableModels) return;
+    if (chatState !== 'ready') return;
     const scroller = scrollRef.current;
     if (!scroller) return;
     if (!shouldStickToBottomRef.current) return;
@@ -134,22 +144,22 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
       scroller.scrollTop = scroller.scrollHeight;
       shouldStickToBottomRef.current = true;
     });
-  }, [messages, isStreaming, hasAvailableModels, steeringNote]);
+  }, [chatState, isStreaming, messages, steeringNote]);
 
   useEffect(() => {
     if (!isActive || !pendingChatPrompt || pendingChatPrompt.panelId !== panelId) return;
-    if (!hasAvailableModels || chatBusy || !ready) return;
+    if (chatState !== 'ready' || chatBusy || !ready) return;
 
     setPendingChatPrompt(null);
     void handleSendMessage(pendingChatPrompt.prompt);
   }, [
     chatBusy,
-    hasAvailableModels,
     isActive,
     panelId,
     pendingChatPrompt,
     ready,
     setPendingChatPrompt,
+    chatState,
   ]);
 
   function handleSteerMessage(text: string) {
@@ -265,12 +275,21 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
           <div className="flex flex-1 items-center justify-center text-sm text-foreground-tertiary">
             Loading chat…
           </div>
-        ) : !hasAvailableModels ? (
+        ) : chatState === 'onboarding' ? (
+          <div className="flex flex-1 overflow-hidden">
+            <ChatOnboarding panelId={panelId} />
+            {debugEnabled && debugOpen && (
+              <div className="w-1/2 shrink-0 overflow-y-auto overflow-x-hidden border-l border-border px-3 py-3">
+                <ChatDebugPanel debug={debug} />
+              </div>
+            )}
+          </div>
+        ) : chatState === 'no-models' ? (
           <div className="flex flex-1 overflow-hidden">
             <div className="flex flex-1 flex-col justify-center gap-4 px-6">
               <div className="flex flex-col items-center gap-4 text-center">
-                <div className="max-w-[260px] text-sm text-foreground-tertiary">
-                  Configure an AI provider to start chatting
+                <div className="max-w-[280px] text-sm text-foreground-tertiary">
+                  Your enabled provider does not expose any chat models yet. Check the provider settings or add custom model IDs.
                 </div>
                 <button
                   type="button"

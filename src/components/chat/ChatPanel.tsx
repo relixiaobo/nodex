@@ -62,6 +62,9 @@ export function isToolCallOnlyMessage(message: ChatConversationMessage): message
       continue;
     }
 
+    if (import.meta.env.DEV && block.type === 'text') {
+      console.log('[tool-group] non-empty text block prevents grouping:', JSON.stringify(block.text.slice(0, 50)));
+    }
     return false;
   }
 

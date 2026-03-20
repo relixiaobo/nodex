@@ -5,6 +5,7 @@ import type { ChatConversationMessage, ChatMessageEntry } from '../../hooks/use-
 import { Brain, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, Pencil, RefreshCw } from '../../lib/icons.js';
 import { MarkdownContent } from './MarkdownRenderer.js';
 import { ToolCallBlock } from './ToolCallBlock.js';
+import { ToolCallGroup } from './ToolCallGroup.js';
 
 interface ChatMessageProps {
   entry: ChatMessageEntry;
@@ -84,49 +85,83 @@ function ThinkingBlock({ text, streaming }: { text: string; streaming: boolean }
 }
 
 function renderAssistantBlocks(message: AssistantMessage, streaming: boolean, toolResults?: Map<string, ToolResultMessage>): ReactNode[] {
-  return message.content.flatMap((block, index) => {
+  const result: ReactNode[] = [];
+  const blocks = message.content;
+  let i = 0;
+
+  while (i < blocks.length) {
+    const block = blocks[i];
+
     if (block.type === 'thinking') {
-      if (block.redacted || (!block.thinking && !streaming)) return [];
-      const hasLaterContent = message.content.slice(index + 1).some((b) => b.type === 'text' || b.type === 'toolCall');
-      return (
-        <ThinkingBlock
-          key={`thinking-${index}`}
-          text={block.thinking}
-          streaming={streaming && !hasLaterContent}
-        />
-      );
+      if (!block.redacted && (block.thinking || streaming)) {
+        const hasLaterContent = blocks.slice(i + 1).some((b) => b.type === 'text' || b.type === 'toolCall');
+        result.push(
+          <ThinkingBlock
+            key={`thinking-${i}`}
+            text={block.thinking}
+            streaming={streaming && !hasLaterContent}
+          />,
+        );
+      }
+      i++;
+      continue;
     }
 
     if (block.type === 'toolCall') {
-      return (
-        <ToolCallBlock
-          key={`${block.id}-${index}`}
-          toolCall={block}
-          result={toolResults?.get(block.id)}
-        />
-      );
+      // Collect consecutive toolCall blocks
+      const runStart = i;
+      const run: typeof blocks = [];
+      while (i < blocks.length && blocks[i].type === 'toolCall') {
+        run.push(blocks[i]);
+        i++;
+      }
+
+      if (run.length >= 2) {
+        const toolCalls = run.filter((b): b is import('@mariozechner/pi-ai').ToolCall => b.type === 'toolCall');
+        result.push(
+          <ToolCallGroup
+            key={`toolgroup-${runStart}`}
+            toolCalls={toolCalls}
+            results={toolResults}
+          />,
+        );
+      } else {
+        const tc = run[0] as import('@mariozechner/pi-ai').ToolCall;
+        result.push(
+          <ToolCallBlock
+            key={`${tc.id}-${runStart}`}
+            toolCall={tc}
+            result={toolResults?.get(tc.id)}
+          />,
+        );
+      }
+      continue;
     }
 
-    const hasLaterText = message.content.slice(index + 1).some((candidate) => candidate.type === 'text');
+    // Text block
+    const hasLaterText = blocks.slice(i + 1).some((candidate) => candidate.type === 'text');
     const isError = message.errorMessage && message.stopReason !== 'aborted';
 
     if (isError) {
-      return (
-        <div key={`text-${index}`} className="whitespace-pre-wrap text-base leading-6 text-destructive">
+      result.push(
+        <div key={`text-${i}`} className="whitespace-pre-wrap text-base leading-6 text-destructive">
           {block.text}
-        </div>
+        </div>,
+      );
+    } else {
+      result.push(
+        <MarkdownContent
+          key={`text-${i}`}
+          text={block.text}
+          streaming={streaming && !hasLaterText}
+          keyPrefix={`assistant-${i}`}
+        />,
       );
     }
+    i++;
+  }
 
-    return (
-      <MarkdownContent
-        key={`text-${index}`}
-        text={block.text}
-        streaming={streaming && !hasLaterText}
-        keyPrefix={`assistant-${index}`}
-      />
-    );
-  });
+  return result;
 }
 
 export function ChatMessage({

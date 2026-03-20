@@ -116,7 +116,13 @@ export function streamProxyWithApiKey(
           const data = line.slice(6).trim();
           if (!data) continue;
 
-          const proxyEvent = JSON.parse(data) as ProxyAssistantMessageEvent;
+          let proxyEvent: ProxyAssistantMessageEvent;
+          try {
+            proxyEvent = JSON.parse(data) as ProxyAssistantMessageEvent;
+          } catch (sseParseError) {
+            console.error('[ai-proxy] SSE event JSON.parse failed:', (sseParseError as Error).message?.slice(0, 80), 'data:', data.slice(0, 100));
+            continue;
+          }
           const event = processProxyEvent(proxyEvent, partial);
           if (event) {
             stream.push(event);
@@ -247,7 +253,12 @@ function processProxyEvent(
         throw new Error('Received toolcall_delta for non-toolCall content');
       }
       content.partialJson += proxyEvent.delta;
-      content.arguments = parseStreamingJson(content.partialJson) || {};
+      try {
+        content.arguments = parseStreamingJson(content.partialJson) || {};
+      } catch {
+        // parseStreamingJson can throw on severely malformed JSON during streaming.
+        // Keep current arguments and let toolcall_end attempt repair.
+      }
       partial.content[proxyEvent.contentIndex] = { ...content };
       return {
         type: 'toolcall_delta',

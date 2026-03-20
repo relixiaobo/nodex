@@ -170,7 +170,7 @@ export function TagSelectorPopover({ anchorTop, anchorLeft, onSelect, onClose }:
     <div
       data-tag-selector
       data-testid="tag-selector-popover"
-      className="fixed z-[60] flex flex-col rounded-lg bg-background shadow-paper border border-border/50 overflow-hidden"
+      className="fixed z-[60] flex flex-col rounded-lg bg-background shadow-paper overflow-hidden"
       style={{
         ...style,
         width: `${POPOVER_WIDTH}px`,

@@ -184,6 +184,12 @@ _(空)_
 
 ---
 
+### 账号与数据管理
+
+- [ ] **删除账号数据** — 后端 `DELETE /api/user/data` 清除用户在 D1/R2 的所有数据（LoroDoc snapshots + updates + chat sessions + sync cursors）；前端在 Settings 用户菜单中提供"Delete all data"入口，二次确认后调用；用户重装扩展即全新开始
+
+---
+
 ### 多工作区 & 协作
 
 > 每个工作区 = 独立 LoroDoc，隔离存储/同步/权限。官方工作区是第一个用例。

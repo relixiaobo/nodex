@@ -17,11 +17,12 @@ import { useUIStore } from '../../stores/ui-store.js';
 import { useNodeStore } from '../../stores/node-store.js';
 import { chatPanelSessionId, isAppPanel, isChatPanel } from '../../types/index.js';
 import type { AppPanelId } from '../../types/index.js';
+import { ChatPanelHeader, ChatTitleInput, useChatTitleEdit } from '../chat/ChatPanelHeader.js';
 import { NodePanel } from './NodePanel';
 import { AppPanel } from './AppPanel';
 import { Breadcrumb } from './Breadcrumb';
 import { ChevronDown, MessageCircle, Pencil, X } from '../../lib/icons.js';
-import { getChatTitle, subscribeChatTitles, getAgentForSession, updateSessionTitle } from '../../lib/ai-service.js';
+import { getChatTitle, subscribeChatTitles } from '../../lib/ai-service.js';
 import { DeskLanding } from './DeskLanding';
 
 const ChatPanel = lazy(async () => ({
@@ -66,19 +67,16 @@ function renderPanelContent(nodeId: string, panelId: string, options?: { hideHea
  */
 const PANEL_CLOSE_BTN = 'flex h-5 w-5 mr-2.5 shrink-0 items-center justify-center rounded-md text-foreground-tertiary opacity-0 transition-opacity hover:bg-foreground/4 hover:text-foreground group-hover/panel:opacity-100';
 
-/** Icon button that appears on hover via group-hover. Same visual as PANEL_CLOSE_BTN but no margin. */
-const PANEL_ICON_BTN = 'flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-foreground-tertiary opacity-0 transition-opacity hover:bg-foreground/4 hover:text-foreground group-hover/panel:opacity-100';
-
 /**
- * Panel header: breadcrumb + close (node), close-only (app/chat-non-hasTab).
- * Returns null for chat panels (ChatPanel renders its own header internally).
- * In hasTab mode, chat gets an inline header directly in PanelLayout.
+ * Panel header: breadcrumb + close (node), chat title + close (chat), close-only (app).
  */
 function renderPanelHeader(
   nodeId: string,
   opts: { isActive: boolean; titleVisible: boolean; onClose: (e: React.MouseEvent) => void },
 ): React.ReactNode {
-  if (isChatPanel(nodeId)) return null;
+  if (isChatPanel(nodeId)) {
+    return <ChatPanelHeader sessionId={chatPanelSessionId(nodeId)} onClose={opts.onClose} />;
+  }
   if (isAppPanel(nodeId)) {
     return (
       <div className="flex items-center justify-end shrink-0 h-8 mt-1">
@@ -94,95 +92,6 @@ function renderPanelHeader(
       <button type="button" className={PANEL_CLOSE_BTN} onClick={opts.onClose} title="Close panel">
         <X size={12} />
       </button>
-    </div>
-  );
-}
-
-// ── Chat title editing ───────────────────────────────────────────
-
-function useChatTitleEdit(nodeId: string) {
-  const sessionId = chatPanelSessionId(nodeId);
-  const title = useSyncExternalStore(
-    subscribeChatTitles,
-    () => getChatTitle(sessionId),
-  );
-  const displayTitle = title || 'Chat';
-
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  const startEdit = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    setDraft(displayTitle);
-    setEditing(true);
-    requestAnimationFrame(() => inputRef.current?.select());
-  }, [displayTitle]);
-
-  const saveEdit = useCallback(() => {
-    const trimmed = draft.trim();
-    if (trimmed && trimmed !== displayTitle) {
-      const agent = getAgentForSession(sessionId);
-      updateSessionTitle(agent, trimmed);
-    }
-    setEditing(false);
-  }, [draft, displayTitle, sessionId]);
-
-  const cancelEdit = useCallback(() => {
-    setEditing(false);
-  }, []);
-
-  return { editing, draft, setDraft, displayTitle, inputRef, startEdit, saveEdit, cancelEdit };
-}
-
-/** Inline input used when editing a chat title. */
-function ChatTitleInput({ edit }: { edit: ReturnType<typeof useChatTitleEdit> }) {
-  return (
-    <input
-      ref={edit.inputRef}
-      value={edit.draft}
-      onChange={(e) => edit.setDraft(e.target.value)}
-      onBlur={edit.saveEdit}
-      onClick={(e) => e.stopPropagation()}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') edit.saveEdit();
-        if (e.key === 'Escape') edit.cancelEdit();
-        e.stopPropagation();
-      }}
-      className="min-w-0 flex-1 bg-transparent text-[13px] text-foreground outline-none"
-      placeholder="Chat"
-    />
-  );
-}
-
-// ── Chat tab header (wide hasTab mode) ───────────────────────────
-//
-// Layout: [💬 title] [✏️ ×]
-// Title truncates when container is narrow. Pencil + close are shrink-0.
-
-function ChatTabHeader({ nodeId, onClose }: { nodeId: string; onClose: (e: React.MouseEvent) => void }) {
-  const edit = useChatTitleEdit(nodeId);
-
-  return (
-    <div className="group/panel flex items-center shrink-0 mt-1 h-8">
-      <div className="flex flex-1 min-w-0 items-center gap-1.5 pl-4 text-[13px] text-foreground-tertiary">
-        <MessageCircle size={12} strokeWidth={1.6} className="shrink-0" />
-        {edit.editing ? (
-          <ChatTitleInput edit={edit} />
-        ) : (
-          <span className="min-w-0 truncate">{edit.displayTitle}</span>
-        )}
-      </div>
-      <div className="flex shrink-0 items-center mr-2.5">
-        {!edit.editing && (
-          <button type="button" onClick={edit.startEdit} title="Edit title" className={PANEL_ICON_BTN}>
-            <Pencil size={10} strokeWidth={1.8} />
-          </button>
-        )}
-        <button type="button" onClick={onClose} title="Close panel" className={PANEL_ICON_BTN}>
-          <X size={12} />
-        </button>
-      </div>
     </div>
   );
 }
@@ -228,7 +137,6 @@ function TabHead({ nodeId, onClickBody, onClose, menuOpen, tabRef, children }: T
             className={`shrink-0 mr-1.5 text-foreground-tertiary transition-all ${menuOpen ? 'opacity-100 rotate-180' : 'opacity-0 group-hover/name:opacity-100'}`}
           />
         )}
-        {children}
       </div>
       {/* Close button */}
       {onClose && (
@@ -241,6 +149,7 @@ function TabHead({ nodeId, onClickBody, onClose, menuOpen, tabRef, children }: T
           <X size={12} />
         </button>
       )}
+      {children}
     </div>
   );
 }
@@ -261,7 +170,7 @@ function ChatDropdownRow({
   onSelect: () => void;
   onClose: (e: React.MouseEvent) => void;
 }) {
-  const edit = useChatTitleEdit(nodeId);
+  const edit = useChatTitleEdit(chatPanelSessionId(nodeId));
 
   return (
     <div
@@ -467,11 +376,7 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
                   className="tab-connector-right relative z-10 flex-1 min-w-0 self-stretch bg-background rounded-t-xl"
                   onClick={() => setActivePanel(panel.id)}
                 >
-                  {isChat ? (
-                    <ChatTabHeader nodeId={nodeId} onClose={headerOpts.onClose} />
-                  ) : (
-                    renderPanelHeader(nodeId, headerOpts)
-                  )}
+                  {renderPanelHeader(nodeId, headerOpts)}
                 </div>
                 <div className="flex shrink-0 justify-end">
                   {toolbar}
@@ -495,7 +400,7 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
               onClick={() => setActivePanel(panel.id)}
             >
               {renderPanelHeader(nodeId, headerOpts)}
-              {renderPanelContent(nodeId, panel.id)}
+              {renderPanelContent(nodeId, panel.id, { hideHeader: isChat })}
             </div>
           </div>
         );
@@ -509,6 +414,7 @@ function PanelLabel({ nodeId }: { nodeId: string }) {
   const isChat = isChatPanel(nodeId);
   const chatTitle = useSyncExternalStore(
     subscribeChatTitles,
+    () => isChat ? getChatTitle(chatPanelSessionId(nodeId)) : null,
     () => isChat ? getChatTitle(chatPanelSessionId(nodeId)) : null,
   );
 

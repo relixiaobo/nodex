@@ -1,13 +1,11 @@
 import { useCallback, useRef, useState, useSyncExternalStore, type MouseEvent as ReactMouseEvent } from 'react';
 import { getAgentForSession, getChatTitle, subscribeChatTitles, updateSessionTitle } from '../../lib/ai-service.js';
 import { MessageCircle, Pencil, X } from '../../lib/icons.js';
-import { chatPanelSessionId } from '../../types/index.js';
 
 const CHAT_HEADER_EDIT_BTN = 'flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-foreground-tertiary opacity-0 transition-opacity hover:bg-foreground/4 hover:text-foreground group-hover/chat-header:opacity-100';
 const CHAT_HEADER_CLOSE_BTN = 'flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground';
 
-export function useChatTitleEdit(nodeId: string) {
-  const sessionId = chatPanelSessionId(nodeId);
+export function useChatTitleEdit(sessionId: string) {
   const title = useSyncExternalStore(
     subscribeChatTitles,
     () => getChatTitle(sessionId),
@@ -62,13 +60,13 @@ export function ChatTitleInput({ edit }: { edit: ReturnType<typeof useChatTitleE
 }
 
 interface ChatPanelHeaderProps {
-  nodeId: string;
+  sessionId: string;
   onClose: (e: ReactMouseEvent<HTMLButtonElement>) => void;
   className?: string;
 }
 
-export function ChatPanelHeader({ nodeId, onClose, className = '' }: ChatPanelHeaderProps) {
-  const edit = useChatTitleEdit(nodeId);
+export function ChatPanelHeader({ sessionId, onClose, className = '' }: ChatPanelHeaderProps) {
+  const edit = useChatTitleEdit(sessionId);
 
   return (
     <div className={`group/chat-header flex h-8 shrink-0 items-center mt-1 ${className}`.trim()}>

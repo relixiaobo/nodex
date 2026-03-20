@@ -418,7 +418,7 @@ describe('chat ui', () => {
   it('renders the compact chat header chrome', () => {
     const html = renderToStaticMarkup(
       React.createElement(ChatPanelHeader, {
-        nodeId: 'chat:session-empty',
+        sessionId: 'session-empty',
         onClose: () => {},
       }),
     );

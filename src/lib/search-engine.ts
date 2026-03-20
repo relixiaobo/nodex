@@ -194,11 +194,18 @@ export function materializeSearchResults(searchNodeId: string): void {
 
   const matchedIds = runSearch(searchNodeId);
 
+  // Build map of existing references, deduplicating along the way.
+  // Sync + local bootstrap can create duplicate references with the same targetId
+  // but different node IDs. Keep the first, delete the rest.
   const existingRefs = new Map<string, string>();
   for (const childId of searchNode.children) {
     const child = loroDoc.toNodexNode(childId);
     if (child?.type === 'reference' && child.targetId) {
-      existingRefs.set(child.targetId, childId);
+      if (existingRefs.has(child.targetId)) {
+        loroDoc.deleteNode(childId);
+      } else {
+        existingRefs.set(child.targetId, childId);
+      }
     }
   }
 

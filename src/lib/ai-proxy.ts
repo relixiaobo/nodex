@@ -1,3 +1,4 @@
+import { jsonrepair } from 'jsonrepair';
 import {
   createAssistantMessageEventStream,
   parseStreamingJson,
@@ -260,24 +261,14 @@ function processProxyEvent(
       if (content?.type !== 'toolCall') {
         return undefined;
       }
-      // Ensure arguments are valid JSON before finalizing.
       // Models sometimes produce malformed JSON (unclosed strings, trailing commas).
-      // Try to re-parse the accumulated partialJson; if it fails, attempt repair.
+      // Use jsonrepair to fix common issues before the agent processes arguments.
       if (content.partialJson) {
         try {
           content.arguments = JSON.parse(content.partialJson);
         } catch {
           try {
-            // Common repairs: remove trailing commas, close unclosed braces/brackets
-            const repaired = content.partialJson
-              .replace(/,\s*([\]}])/g, '$1')  // trailing commas
-              .replace(/([^\\])"([^"]*$)/, '$1"$2"');  // unclosed trailing string
-            const openBraces = (repaired.match(/{/g) || []).length;
-            const closeBraces = (repaired.match(/}/g) || []).length;
-            const openBrackets = (repaired.match(/\[/g) || []).length;
-            const closeBrackets = (repaired.match(/]/g) || []).length;
-            const fixed = repaired + ']'.repeat(Math.max(0, openBrackets - closeBrackets)) + '}'.repeat(Math.max(0, openBraces - closeBraces));
-            content.arguments = JSON.parse(fixed);
+            content.arguments = JSON.parse(jsonrepair(content.partialJson));
           } catch {
             // Repair failed — keep whatever parseStreamingJson produced
           }

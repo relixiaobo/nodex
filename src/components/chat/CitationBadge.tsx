@@ -11,7 +11,7 @@ interface CitationBadgeProps {
 }
 
 export function CitationBadge({ id, label, type = 'node' }: CitationBadgeProps) {
-  const triggerRef = useRef<HTMLButtonElement>(null);
+  const triggerRef = useRef<HTMLSpanElement>(null);
   const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
 
   // Only load node data for node-type citations
@@ -37,21 +37,22 @@ export function CitationBadge({ id, label, type = 'node' }: CitationBadgeProps) 
 
   return (
     <>
-      <button
+      <span
         ref={triggerRef}
-        type="button"
-        onClick={open}
-        disabled={isDisabled}
+        role="button"
+        tabIndex={isDisabled ? undefined : 0}
+        onClick={isDisabled ? undefined : open}
+        onKeyDown={isDisabled ? undefined : (e) => { if (e.key === 'Enter') open(); }}
         title={title}
         className={[
-          'ml-0.5 inline-flex min-w-4 items-center justify-center rounded px-1 py-px text-[11px] leading-normal align-baseline',
+          'mx-0.5 rounded bg-foreground/[0.06] px-1 text-[0.75em]',
           isDisabled
-            ? 'cursor-default bg-foreground/[0.06] text-foreground-tertiary line-through'
-            : 'bg-foreground/[0.06] text-foreground-secondary transition-colors hover:bg-foreground/[0.1] hover:text-foreground',
+            ? 'cursor-default text-foreground-tertiary line-through'
+            : 'cursor-pointer text-foreground-secondary transition-colors hover:bg-foreground/[0.1] hover:text-foreground',
         ].join(' ')}
       >
         {label}
-      </button>
+      </span>
       {anchorRect && (
         type === 'node' ? <NodePopover nodeId={id} anchorRect={anchorRect} onClose={close} />
         : type === 'chat' ? <ChatCitePopover sessionId={id} anchorRect={anchorRect} onClose={close} />

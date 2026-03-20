@@ -331,7 +331,9 @@ function ConversationRow({
       })}
       {entry.usageMeta && (
         <div className="pl-[60px] pr-2 py-0.5 font-mono text-[10px] text-foreground-tertiary" data-testid="chat-debug-usage-meta">
-          {'↳ '}in:{entry.usageMeta.input} out:{entry.usageMeta.output} cache:{entry.usageMeta.cacheRead}
+          {'↳ '}in:{entry.usageMeta.input} out:{entry.usageMeta.output}
+          {entry.usageMeta.cacheWrite > 0 && ` cw:${entry.usageMeta.cacheWrite}`}
+          {entry.usageMeta.cacheRead > 0 && ` cr:${entry.usageMeta.cacheRead}`}
           {' · '}{formatCost(entry.usageMeta.cost)}
           {' · '}{entry.usageMeta.stopReason}
         </div>

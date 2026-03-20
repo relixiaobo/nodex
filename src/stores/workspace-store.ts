@@ -23,6 +23,7 @@ interface WorkspaceStore {
   logout(): void;
 
   // Google Auth actions
+  continueInOfflineMode(): Promise<void>;
   signInWithGoogle(): Promise<void>;
   signOut(): Promise<void>;
   /**
@@ -86,6 +87,20 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         });
       },
 
+      continueInOfflineMode: async () => {
+        const { getOrCreateDefaultWorkspaceId } = await import('../lib/workspace-id.js');
+        const workspaceId = await getOrCreateDefaultWorkspaceId();
+        set({
+          currentWorkspaceId: workspaceId,
+          userId: 'user_default',
+          isAuthenticated: true,
+          authUser: {
+            id: 'user_default',
+            name: 'Offline mode',
+          },
+        });
+      },
+
       signInWithGoogle: async () => {
         const { signInWithGoogle: authSignIn } = await import('../lib/auth.js');
         const user = await authSignIn();
@@ -123,6 +138,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           // tree move operations don't conflict with server CRDT data during merge.
           const { ensureSystemNodes } = await import('../lib/bootstrap-system-nodes.js');
           const { ensureTodayNode } = await import('../lib/journal.js');
+          const { getStartupPagePreference, STARTUP_PAGE } = await import('../lib/startup-page-preference.js');
           const { useUIStore } = await import('./ui-store.js');
           const targetWsId = user.id;
           const unsub = syncManager.onStateChange((state) => {
@@ -135,8 +151,10 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
               unsub();
               try {
                 ensureSystemNodes(targetWsId);
-                const todayId = ensureTodayNode();
-                useUIStore.getState().replacePanel(todayId);
+                if (getStartupPagePreference() === STARTUP_PAGE.TODAY) {
+                  const todayId = ensureTodayNode();
+                  useUIStore.getState().replacePanel(todayId);
+                }
               } catch (e) {
                 console.warn('[workspace-store] post-sync setup failed:', e);
               }
@@ -148,8 +166,10 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
               // Sync failed for non-fatal reason — try ensureSystemNodes for offline functionality
               try {
                 ensureSystemNodes(targetWsId);
-                const todayId = ensureTodayNode();
-                useUIStore.getState().replacePanel(todayId);
+                if (getStartupPagePreference() === STARTUP_PAGE.TODAY) {
+                  const todayId = ensureTodayNode();
+                  useUIStore.getState().replacePanel(todayId);
+                }
               } catch (e) {
                 console.warn('[workspace-store] post-error setup failed:', e);
               }
@@ -220,6 +240,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           const loroDocMod = await import('../lib/loro-doc.js');
           if (!loroDocMod.wasLoadedFromSnapshot()) {
             const { ensureTodayNode } = await import('../lib/journal.js');
+            const { getStartupPagePreference, STARTUP_PAGE } = await import('../lib/startup-page-preference.js');
             const { useUIStore } = await import('./ui-store.js');
             const targetWsId = useWorkspaceStore.getState().currentWorkspaceId;
             const unsub = syncManager.onStateChange((state) => {
@@ -231,8 +252,10 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
               if (state.status === 'synced') {
                 unsub();
                 try {
-                  const todayId = ensureTodayNode();
-                  useUIStore.getState().replacePanel(todayId);
+                  if (getStartupPagePreference() === STARTUP_PAGE.TODAY) {
+                    const todayId = ensureTodayNode();
+                    useUIStore.getState().replacePanel(todayId);
+                  }
                 } catch (e) {
                   console.warn('[workspace-store] deferred today navigation failed:', e);
                 }

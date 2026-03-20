@@ -6,7 +6,7 @@ import { getStoredToken } from './auth.js';
 import { buildAgentSystemPrompt, DEFAULT_AGENT_MODEL_ID, DEFAULT_AGENT_MAX_TOKENS, DEFAULT_AGENT_TEMPERATURE, readAgentNodeConfig, writeAgentModelSelection, type AgentNodeConfig } from './ai-agent-node.js';
 import type { ChatTurnDebugRecord, DebugTurnStatus } from './ai-debug.js';
 import { createChatTurnDebugRecord, finalizeChatTurnDebugRecord, normalizeRestoredDebugTurns, readChatDebugEnabled } from './ai-debug.js';
-import { findProviderOptionNodeId, getApiKeyForProvider, getAvailableModels, getFeaturedModelIds, getProviderConfigs, normalizeProviderId } from './ai-provider-config.js';
+import { getApiKeyForProvider, getAvailableModels, getFeaturedModelIds, getProviderConfigs, normalizeProviderId, saveProviderApiKey } from './ai-provider-config.js';
 import {
   createSession,
   editMessage as editTreeMessage,
@@ -22,9 +22,7 @@ import { getChatDebugTurns, type ChatSession, getChatSession, getLatestChatSessi
 import { getAITools } from './ai-tools/index.js';
 import * as loroDoc from './loro-doc.js';
 import { withCommitOrigin } from './loro-doc.js';
-import { SYSTEM_SCHEMA_NODE_IDS } from './system-schema-presets.js';
-import { useNodeStore } from '../stores/node-store.js';
-import { NDX_F, SYSTEM_NODE_IDS, SYS_V } from '../types/index.js';
+import { SYSTEM_NODE_IDS } from '../types/index.js';
 import { scanAndTrackMentionedNodes, clearMentionedNodes } from './ai-mentioned-nodes.js';
 
 const AI_SETTINGS_KEY = 'soma-ai-settings';
@@ -230,21 +228,7 @@ async function ensureAISettingsMigrated(): Promise<void> {
     }
 
     withCommitOrigin('system:ai-settings-migration', () => {
-      const store = useNodeStore.getState();
-      const anthropicConfig = existingConfigs.find((config) => config.provider === 'anthropic');
-      const targetNodeId = anthropicConfig?.nodeId
-        ?? store.createChild(
-          SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDERS_FIELD_ENTRY,
-          undefined,
-          { name: 'Anthropic' },
-          { commit: false },
-        ).id;
-      const providerOptionNodeId = findProviderOptionNodeId(legacySettings.provider);
-      if (providerOptionNodeId) {
-        store.setOptionsFieldValue(targetNodeId, NDX_F.PROVIDER_ID, providerOptionNodeId);
-      }
-      store.setFieldValue(targetNodeId, NDX_F.PROVIDER_ENABLED, [SYS_V.YES]);
-      store.setFieldValue(targetNodeId, NDX_F.PROVIDER_API_KEY, [legacySettings.apiKey]);
+      saveProviderApiKey(legacySettings.provider, legacySettings.apiKey);
     });
 
     await writeSettings(null);

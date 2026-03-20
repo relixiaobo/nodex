@@ -257,10 +257,11 @@ describe('SyncManager', () => {
       mgr.onStateChange((s) => states.push(s.status));
 
       await mgr.start('ws_1', 'tok_1', 'dev_1');
-      await flushAsync();
+      await vi.waitFor(() => {
+        expect(mgr.getState().status).toBe('synced');
+      });
 
       // Should have gone through: pending/synced (from start), syncing (from syncOnce), synced
-      expect(mgr.getState().status).toBe('synced');
       expect(states).toContain('syncing');
       expect(states).toContain('synced');
     });

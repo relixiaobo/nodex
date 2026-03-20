@@ -4,12 +4,13 @@ import { Pencil, Trash2 } from '../../lib/icons.js';
 import { useAgent } from '../../hooks/use-agent.js';
 import type { ThinkingLevel } from '@mariozechner/pi-ai';
 import { readChatDebugEnabled } from '../../lib/ai-debug.js';
-import { getAvailableModelsWithMeta } from '../../lib/ai-provider-config.js';
+import { getAvailableModelsWithMeta, hasAnyEnabledProvider } from '../../lib/ai-provider-config.js';
 import { getAgentForSession, selectChatModel, selectThinkingLevel } from '../../lib/ai-service.js';
 import { useNodeStore } from '../../stores/node-store.js';
 import { useUIStore } from '../../stores/ui-store.js';
 import { SYSTEM_NODE_IDS } from '../../types/index.js';
 import { ChatDebugPanel } from './ChatDebugPanel.js';
+import { ChatOnboarding } from './ChatOnboarding.js';
 import { ChatPanelHeader } from './ChatPanelHeader.js';
 import { ChatInput, type ChatInputHandle } from './ChatInput.js';
 import { ChatMessage } from './ChatMessage.js';
@@ -75,6 +76,10 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
     return getAvailableModelsWithMeta();
   }, [settingsVersion]);
   const hasAvailableModels = availableModels.length > 0;
+  const hasConfiguredProvider = useMemo(() => {
+    void settingsVersion;
+    return hasAnyEnabledProvider();
+  }, [settingsVersion]);
 
   const currentModel = useMemo(() => {
     const key = selectedModelKey ?? { id: debug.modelId, provider: debug.provider };
@@ -125,7 +130,7 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
   }, [hasSteering]);
 
   useEffect(() => {
-    if (!hasAvailableModels) return;
+    if (!hasConfiguredProvider || !hasAvailableModels) return;
     const scroller = scrollRef.current;
     if (!scroller) return;
     if (!shouldStickToBottomRef.current) return;
@@ -134,17 +139,18 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
       scroller.scrollTop = scroller.scrollHeight;
       shouldStickToBottomRef.current = true;
     });
-  }, [messages, isStreaming, hasAvailableModels, steeringNote]);
+  }, [hasAvailableModels, hasConfiguredProvider, isStreaming, messages, steeringNote]);
 
   useEffect(() => {
     if (!isActive || !pendingChatPrompt || pendingChatPrompt.panelId !== panelId) return;
-    if (!hasAvailableModels || chatBusy || !ready) return;
+    if (!hasConfiguredProvider || !hasAvailableModels || chatBusy || !ready) return;
 
     setPendingChatPrompt(null);
     void handleSendMessage(pendingChatPrompt.prompt);
   }, [
     chatBusy,
     hasAvailableModels,
+    hasConfiguredProvider,
     isActive,
     panelId,
     pendingChatPrompt,
@@ -265,22 +271,9 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
           <div className="flex flex-1 items-center justify-center text-sm text-foreground-tertiary">
             Loading chat…
           </div>
-        ) : !hasAvailableModels ? (
+        ) : !hasConfiguredProvider ? (
           <div className="flex flex-1 overflow-hidden">
-            <div className="flex flex-1 flex-col justify-center gap-4 px-6">
-              <div className="flex flex-col items-center gap-4 text-center">
-                <div className="max-w-[260px] text-sm text-foreground-tertiary">
-                  Configure an AI provider to start chatting
-                </div>
-                <button
-                  type="button"
-                  onClick={handleOpenSettings}
-                  className="inline-flex h-9 items-center rounded-full border border-border px-4 text-sm font-medium text-foreground transition-colors hover:bg-foreground/4"
-                >
-                  Open Settings
-                </button>
-              </div>
-            </div>
+            <ChatOnboarding panelId={panelId} />
             {debugEnabled && debugOpen && (
               <div className="w-1/2 shrink-0 overflow-y-auto overflow-x-hidden border-l border-border px-3 py-3">
                 <ChatDebugPanel debug={debug} />

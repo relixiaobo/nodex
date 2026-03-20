@@ -338,6 +338,8 @@ export const NDX_F = {
   SETTING_AI_DEBUG: 'NDX_F22',
   /** #ai-provider: custom model IDs */
   PROVIDER_MODELS: 'NDX_F23',
+  /** Settings: startup page preference (Chat or Today) */
+  SETTING_STARTUP_PAGE: 'NDX_F24',
 } as const;
 
 export type NdxFieldDef = typeof NDX_F[keyof typeof NDX_F];

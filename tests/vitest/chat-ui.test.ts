@@ -13,7 +13,9 @@ import { DeskLayout } from '../../src/components/layout/DeskLayout.js';
 import { appendMessage, editMessage, getLinearPath, linearToTree, switchBranch as switchChatBranch } from '../../src/lib/ai-chat-tree.js';
 import { resetChatPersistenceForTests, saveChatSession } from '../../src/lib/ai-persistence.js';
 import { resetAIAgentForTests } from '../../src/lib/ai-service.js';
-import { findProviderOptionNodeId } from '../../src/lib/ai-provider-config.js';
+import { findProviderOptionNodeId, getApiKeyForProvider } from '../../src/lib/ai-provider-config.js';
+import { ensureTodayNode } from '../../src/lib/journal.js';
+import { getStartupPagePreference, STARTUP_PAGE } from '../../src/lib/settings-service.js';
 import { SYSTEM_SCHEMA_NODE_IDS } from '../../src/lib/system-schema-presets.js';
 import { useNodeStore } from '../../src/stores/node-store.js';
 import { useUIStore } from '../../src/stores/ui-store.js';
@@ -402,7 +404,7 @@ describe('chat ui', () => {
     expect(html).toContain('Sonnet 4.5');
   });
 
-  it('renders an empty state when no enabled provider is configured', async () => {
+  it('renders onboarding when no enabled provider with an API key is configured', async () => {
     resetAndSeed();
 
     flushSync(() => {
@@ -410,8 +412,9 @@ describe('chat ui', () => {
     });
 
     await vi.waitFor(() => {
-      expect(container.textContent).toContain('Configure an AI provider to start chatting');
-      expect(container.textContent).toContain('Open Settings');
+      expect(container.textContent).toContain('Welcome to soma');
+      expect(container.textContent).toContain('Save API key');
+      expect(container.textContent).toContain('Start with outliner');
     });
   });
 
@@ -427,25 +430,61 @@ describe('chat ui', () => {
     expect(html).toContain('aria-label="Close chat"');
   });
 
-  it('keeps the chat composer visible when a provider is enabled without an API key', async () => {
+  it('saves an API key from onboarding and unlocks the normal chat empty state', async () => {
     resetAndSeed();
-    // Default Anthropic provider is no longer auto-created; seed one explicitly.
-    seedProviderConfig({
-      provider: 'anthropic',
-      enabled: true,
-      apiKey: '',
-      name: 'Anthropic',
-    });
 
     flushSync(() => {
       root.render(React.createElement(ChatPanel, { panelId: 'chat-panel', sessionId: 'session-keyless-enabled' }));
     });
 
     await vi.waitFor(() => {
-      expect(container.textContent).toContain('Ask about your notes, clips, or the page you\'re reading.');
+      expect(container.textContent).toContain('Save API key');
     });
 
-    expect(container.textContent).not.toContain('Configure an AI provider to start chatting');
+    const apiKeyInput = container.querySelector('input[aria-label="API key"]') as HTMLInputElement;
+    const submitButton = container.querySelector('button[type="submit"]') as HTMLButtonElement;
+
+    flushSync(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(apiKeyInput, 'sk-ant-primary');
+      apiKeyInput.dispatchEvent(new Event('input', { bubbles: true }));
+      apiKeyInput.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    flushSync(() => {
+      submitButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    await vi.waitFor(() => {
+      expect(getApiKeyForProvider('anthropic')).toBe('sk-ant-primary');
+      expect(container.textContent).toContain('Ask about your notes, clips, or the page you\'re reading.');
+    });
+  });
+
+  it('lets onboarding switch the current panel to Today and persist the startup preference', async () => {
+    resetAndSeed();
+    await deleteDB(DB_NAME);
+    resetChatPersistenceForTests();
+    useUIStore.getState().replacePanel('chat:session-startup');
+
+    flushSync(() => {
+      root.render(React.createElement(ChatPanel, { panelId: 'main', sessionId: 'session-startup' }));
+    });
+
+    await vi.waitFor(() => {
+      expect(container.textContent).toContain('Start with outliner');
+    });
+
+    const outlinerButton = Array.from(container.querySelectorAll('button'))
+      .find((button) => button.textContent?.includes('Start with outliner'));
+
+    flushSync(() => {
+      outlinerButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    await vi.waitFor(() => {
+      expect(getStartupPagePreference()).toBe(STARTUP_PAGE.TODAY);
+      expect(useUIStore.getState().panels[0]?.nodeId).toBe(ensureTodayNode());
+    });
   });
 
   it('updates the rendered conversation when switching chat branches', async () => {
@@ -454,6 +493,7 @@ describe('chat ui', () => {
     seedProviderConfig({
       provider: 'anthropic',
       enabled: true,
+      apiKey: 'sk-ant-branch-test',
       name: 'Anthropic',
     });
 

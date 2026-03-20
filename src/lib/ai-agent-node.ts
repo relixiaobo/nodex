@@ -824,6 +824,18 @@ export function buildAgentSystemPrompt(config: AgentNodeConfig = readAgentNodeCo
   return sections.filter(Boolean).join('\n\n');
 }
 
+/**
+ * Write the selected model ID back to the #agent node's Model field.
+ * Called when user picks a model in the Chat UI — persists across new chats.
+ */
+export function writeAgentModelSelection(modelId: string): void {
+  const valueNode = loroDoc.toNodexNode(AI_AGENT_NODE_IDS.MODEL_VALUE);
+  if (!valueNode) return;
+  if (valueNode.name === modelId) return;
+  loroDoc.setNodeRichTextContent(AI_AGENT_NODE_IDS.MODEL_VALUE, modelId, [], []);
+  loroDoc.commitDoc();
+}
+
 export function buildSparkSystemPrompt(config: AgentNodeConfig = readSparkAgentConfig()): string {
   const sections = [SPARK_DEFAULT_SYSTEM_PROMPT];
   const userInstructions = config.userInstructions.trim();

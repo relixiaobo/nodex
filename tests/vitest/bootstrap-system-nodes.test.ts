@@ -16,7 +16,7 @@ import { SYSTEM_NODE_IDS, NDX_F, NDX_T, SYS_T, SYS_V } from '../../src/types/ind
 import { SYSTEM_SCHEMA_NODE_IDS } from '../../src/lib/system-schema-presets.js';
 import { useNodeStore } from '../../src/stores/node-store.js';
 import { isOutlinerContentNodeType } from '../../src/lib/node-type-utils.js';
-import { ensureSparkAgentNode, SETTINGS_AI_GROUP_NODE_IDS, SKILL_NODE_IDS } from '../../src/lib/ai-agent-node.js';
+import { ensureSparkAgentNode, SETTINGS_AI_NODE_IDS, SKILL_NODE_IDS } from '../../src/lib/ai-agent-node.js';
 
 describe('ensureSystemNodes', () => {
   beforeEach(() => {
@@ -28,34 +28,33 @@ describe('ensureSystemNodes', () => {
     ensureSystemNodes('ws_bootstrap');
 
     expect(hasNode(SYSTEM_NODE_IDS.JOURNAL)).toBe(true);
+    expect(hasNode(SYSTEM_NODE_IDS.LIBRARY)).toBe(true);
     expect(hasNode(SYSTEM_NODE_IDS.TRASH)).toBe(true);
     expect(hasNode(SYSTEM_NODE_IDS.SCHEMA)).toBe(true);
     expect(hasNode(SYSTEM_NODE_IDS.SETTINGS)).toBe(true);
 
-    expect(hasNode(SYSTEM_NODE_IDS.LIBRARY)).toBe(false);
     expect(hasNode(SYSTEM_NODE_IDS.INBOX)).toBe(false);
     expect(hasNode(SYSTEM_NODE_IDS.SEARCHES)).toBe(false);
     expect(hasNode(SYSTEM_NODE_IDS.AGENT)).toBe(true);
 
-    for (const nodeId of [
-      SYSTEM_NODE_IDS.JOURNAL,
-      SYSTEM_NODE_IDS.TRASH,
-      SYSTEM_NODE_IDS.SCHEMA,
-      SYSTEM_NODE_IDS.SETTINGS,
-    ]) {
+    for (const nodeId of [SYSTEM_NODE_IDS.JOURNAL, SYSTEM_NODE_IDS.TRASH, SYSTEM_NODE_IDS.SCHEMA, SYSTEM_NODE_IDS.SETTINGS]) {
       expect(getParentId(nodeId)).toBe('ws_bootstrap');
       expect(toNodexNode(nodeId)?.locked).toBe(true);
     }
+    expect(getParentId(SYSTEM_NODE_IDS.LIBRARY)).toBe('ws_bootstrap');
+    expect(toNodexNode(SYSTEM_NODE_IDS.LIBRARY)?.locked).toBe(false);
 
-    expect(getParentId(SETTINGS_AI_GROUP_NODE_IDS.AI)).toBe(SYSTEM_NODE_IDS.SETTINGS);
-    expect(toNodexNode(SETTINGS_AI_GROUP_NODE_IDS.AI)?.locked).toBe(true);
-    expect(getParentId(SETTINGS_AI_GROUP_NODE_IDS.DEFAULT_AGENTS)).toBe(SETTINGS_AI_GROUP_NODE_IDS.AI);
-    expect(toNodexNode(SETTINGS_AI_GROUP_NODE_IDS.DEFAULT_AGENTS)?.locked).toBe(true);
-    expect(getParentId(SETTINGS_AI_GROUP_NODE_IDS.DEFAULT_SKILLS)).toBe(SETTINGS_AI_GROUP_NODE_IDS.AI);
-    expect(toNodexNode(SETTINGS_AI_GROUP_NODE_IDS.DEFAULT_SKILLS)?.locked).toBe(true);
-    expect(getParentId(SYSTEM_NODE_IDS.AGENT)).toBe(SETTINGS_AI_GROUP_NODE_IDS.DEFAULT_AGENTS);
+    expect(getParentId(SETTINGS_AI_NODE_IDS.AI)).toBe(SYSTEM_NODE_IDS.SETTINGS);
+    expect(toNodexNode(SETTINGS_AI_NODE_IDS.AI)?.locked).toBe(true);
+    expect(getParentId(SETTINGS_AI_NODE_IDS.AGENTS)).toBe(SETTINGS_AI_NODE_IDS.AI);
+    expect(toNodexNode(SETTINGS_AI_NODE_IDS.AGENTS)?.locked).toBe(true);
+    expect(toNodexNode(SETTINGS_AI_NODE_IDS.AGENTS)?.type).toBe('search');
+    expect(getParentId(SETTINGS_AI_NODE_IDS.SKILLS)).toBe(SETTINGS_AI_NODE_IDS.AI);
+    expect(toNodexNode(SETTINGS_AI_NODE_IDS.SKILLS)?.locked).toBe(true);
+    expect(toNodexNode(SETTINGS_AI_NODE_IDS.SKILLS)?.type).toBe('search');
+    expect(getParentId(SYSTEM_NODE_IDS.AGENT)).toBe(SYSTEM_NODE_IDS.LIBRARY);
     expect(toNodexNode(SYSTEM_NODE_IDS.AGENT)?.locked).toBeUndefined();
-    expect(getParentId(SKILL_NODE_IDS.SKILL_CREATOR)).toBe(SETTINGS_AI_GROUP_NODE_IDS.DEFAULT_SKILLS);
+    expect(getParentId(SKILL_NODE_IDS.SKILL_CREATOR)).toBe(SYSTEM_NODE_IDS.LIBRARY);
   });
 
   it('bootstraps fixed Settings schema and default provider config', () => {
@@ -74,7 +73,7 @@ describe('ensureSystemNodes', () => {
     expect(getParentId(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_HIGHLIGHT_FIELD_ENTRY)).toBe(SYSTEM_NODE_IDS.SETTINGS);
     expect(getParentId(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_HIGHLIGHT_VALUE)).toBe(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_HIGHLIGHT_FIELD_ENTRY);
     expect(toNodexNode(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_HIGHLIGHT_VALUE)?.name).toBe(SYS_V.YES);
-    expect(getParentId(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDERS_FIELD_ENTRY)).toBe(SETTINGS_AI_GROUP_NODE_IDS.AI);
+    expect(getParentId(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDERS_FIELD_ENTRY)).toBe(SETTINGS_AI_NODE_IDS.AI);
     // Default Anthropic provider is no longer auto-created on bootstrap;
     // the providers field entry starts empty for new workspaces.
     expect(toNodexNode(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDERS_FIELD_ENTRY)?.children?.length ?? 0).toBe(0);
@@ -93,20 +92,20 @@ describe('ensureSystemNodes', () => {
       }
       setNodeData(nodeId, 'locked', true);
     };
-    createLegacyNode(SYSTEM_NODE_IDS.LIBRARY, 'Library');
     createLegacyNode(SYSTEM_NODE_IDS.INBOX, 'Inbox');
+    createLegacyNode(SYSTEM_NODE_IDS.SEARCHES, 'Searches');
 
     ensureSystemNodes('ws_bootstrap');
 
     expect(toNodexNode('ws_bootstrap')?.systemBootstrapVersion).toBe(SYSTEM_BOOTSTRAP_VERSION);
-    expect(toNodexNode(SYSTEM_NODE_IDS.LIBRARY)?.locked).toBeUndefined();
     expect(toNodexNode(SYSTEM_NODE_IDS.INBOX)?.locked).toBeUndefined();
+    expect(toNodexNode(SYSTEM_NODE_IDS.SEARCHES)?.locked).toBeUndefined();
 
     // Re-introduce the stale flag; gated migration should no longer remove it.
-    setNodeData(SYSTEM_NODE_IDS.LIBRARY, 'locked', true);
+    setNodeData(SYSTEM_NODE_IDS.INBOX, 'locked', true);
     ensureSystemNodes('ws_bootstrap');
 
-    expect(toNodexNode(SYSTEM_NODE_IDS.LIBRARY)?.locked).toBe(true);
+    expect(toNodexNode(SYSTEM_NODE_IDS.INBOX)?.locked).toBe(true);
   });
 
   it('migrates legacy single-provider Settings fields into the default provider config', () => {
@@ -158,7 +157,7 @@ describe('ensureSystemNodes', () => {
     ensureSystemNodes('ws_bootstrap');
     ensureSparkAgentNode('ws_bootstrap');
 
-    expect(getParentId(SYSTEM_NODE_IDS.SPARK_AGENT)).toBe(SETTINGS_AI_GROUP_NODE_IDS.DEFAULT_AGENTS);
+    expect(getParentId(SYSTEM_NODE_IDS.SPARK_AGENT)).toBe(SYSTEM_NODE_IDS.LIBRARY);
 
     const contentChildrenBefore = getChildren(SYSTEM_NODE_IDS.SPARK_AGENT)
       .filter((id) => {

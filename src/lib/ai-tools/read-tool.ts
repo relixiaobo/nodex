@@ -98,7 +98,11 @@ function isContentChild(childId: string): boolean {
 }
 
 function shouldIncludeRootBrowseChild(childId: string): boolean {
-  if (childId === SYSTEM_NODE_IDS.JOURNAL || childId === SYSTEM_NODE_IDS.SCHEMA) {
+  if (
+    childId === SYSTEM_NODE_IDS.JOURNAL ||
+    childId === SYSTEM_NODE_IDS.LIBRARY ||
+    childId === SYSTEM_NODE_IDS.SCHEMA
+  ) {
     return true;
   }
 

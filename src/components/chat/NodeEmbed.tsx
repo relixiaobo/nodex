@@ -1,12 +1,14 @@
 /**
  * NodeEmbed — inline outliner for `<node id="xxx" />` markup in chat messages.
  *
- * Renders a full OutlinerView for the given node, embedded in the chat message flow.
- * Supports expand, edit, drag — same as the panel outliner.
+ * Renders the node itself as an OutlinerItem (with bullet, name, tags) and
+ * auto-expands it so children are visible. Supports editing and expand/collapse.
  */
+import { useEffect } from 'react';
 import { useNode } from '../../hooks/use-node.js';
-import { OutlinerView } from '../outliner/OutlinerView.js';
-import { CHAT_OUTLINER_PANEL_ID } from './NodePopover.js';
+import { useUIStore } from '../../stores/ui-store.js';
+import { OutlinerItem } from '../outliner/OutlinerItem.js';
+import { CHAT_OUTLINER_PANEL_ID, CHAT_ROOT_PARENT_ID } from './NodePopover.js';
 
 interface NodeEmbedProps {
   nodeId: string;
@@ -14,6 +16,15 @@ interface NodeEmbedProps {
 
 export function NodeEmbed({ nodeId }: NodeEmbedProps) {
   const node = useNode(nodeId);
+  const setExpanded = useUIStore((s) => s.setExpanded);
+  const hasChildren = (node?.children?.length ?? 0) > 0;
+
+  // Auto-expand on mount so children are visible
+  useEffect(() => {
+    if (hasChildren) {
+      setExpanded(`${CHAT_OUTLINER_PANEL_ID}:${CHAT_ROOT_PARENT_ID}:${nodeId}`, true, true);
+    }
+  }, [nodeId, hasChildren, setExpanded]);
 
   if (!node) {
     return (
@@ -24,8 +35,15 @@ export function NodeEmbed({ nodeId }: NodeEmbedProps) {
   }
 
   return (
-    <div className="chat-node-embed my-1 rounded-md border border-border bg-background">
-      <OutlinerView rootNodeId={nodeId} panelId={CHAT_OUTLINER_PANEL_ID} />
+    <div className="chat-node-embed my-1 rounded-md border border-border bg-background py-1">
+      <OutlinerItem
+        nodeId={nodeId}
+        depth={0}
+        rootChildIds={[nodeId]}
+        parentId={CHAT_ROOT_PARENT_ID}
+        rootNodeId={CHAT_ROOT_PARENT_ID}
+        panelId={CHAT_OUTLINER_PANEL_ID}
+      />
     </div>
   );
 }

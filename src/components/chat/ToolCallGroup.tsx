@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { ToolCall, ToolResultMessage } from '@mariozechner/pi-ai';
-import { Check, ChevronDown, Loader2 } from '../../lib/icons.js';
+import { ChevronDown, ListChecks, Loader2 } from '../../lib/icons.js';
 import { ToolCallBlock, getStatus, summarizeToolCall } from './ToolCallBlock.js';
 
 interface ToolCallGroupProps {
@@ -39,7 +39,7 @@ export function ToolCallGroup({ toolCalls, results }: ToolCallGroupProps) {
 
   // ── Icon ──────────────────────────────────────────────────────────────
 
-  const StatusIcon = isExecuting ? Loader2 : Check;
+  const StatusIcon = isExecuting ? Loader2 : ListChecks;
   const statusIconClass = isExecuting ? 'animate-spin' : '';
 
   return (
@@ -59,13 +59,13 @@ export function ToolCallGroup({ toolCalls, results }: ToolCallGroupProps) {
             </>
           )}
         </span>
-        <span className="min-w-0 truncate text-xs">
+        <span className="min-w-0 truncate text-xs font-medium">
           {titleText}
-          {failedSuffix && <span className="text-destructive">{failedSuffix}</span>}
+          {failedSuffix}
         </span>
       </button>
       {expanded && (
-        <div className="ml-5 mt-1 flex flex-col">
+        <div className="flex flex-col">
           {toolCalls.map((tc, i) => (
             <ToolCallBlock key={`${tc.id}-${i}`} toolCall={tc} result={results?.get(tc.id)} />
           ))}

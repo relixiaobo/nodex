@@ -280,7 +280,7 @@ export function ToolCallBlock({ toolCall, result }: ToolCallBlockProps) {
             <ChevronDown size={14} strokeWidth={1.8} className="rotate-180" />
           ) : (
             <>
-              <Icon size={14} strokeWidth={1.6} className="group-hover/tool:hidden" />
+              <Icon size={14} strokeWidth={1.6} className={`group-hover/tool:hidden ${status === 'error' ? 'text-destructive' : ''}`} />
               <ChevronDown size={14} strokeWidth={1.8} className="hidden group-hover/tool:block" />
             </>
           )}

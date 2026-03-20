@@ -374,7 +374,7 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
             tabRef={panels.length > 1 ? notesMenuRef : undefined}
           >
             {panels.length > 1 && notesMenuOpen && (
-              <div className="absolute left-0 right-0 top-full z-50 mt-0.5 min-w-[220px] rounded-lg bg-background p-1 shadow-paper">
+              <div className="absolute left-0 right-0 top-full z-50 mt-0.5 min-w-[220px] rounded-lg bg-background p-1 shadow-paper" onClick={(e) => e.stopPropagation()}>
                 {panels.map((panel) => {
                   const active = panel.id === activePanelId;
 

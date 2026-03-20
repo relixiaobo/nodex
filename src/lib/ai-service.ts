@@ -3,7 +3,7 @@ import { getModel, isContextOverflow } from '@mariozechner/pi-ai';
 import type { AssistantMessage, Message, Model, StopReason, ThinkingLevel, ToolResultMessage } from '@mariozechner/pi-ai';
 import { nanoid } from 'nanoid';
 import { getStoredToken } from './auth.js';
-import { buildAgentSystemPrompt, DEFAULT_AGENT_MODEL_ID, DEFAULT_AGENT_MAX_TOKENS, DEFAULT_AGENT_TEMPERATURE, readAgentNodeConfig, type AgentNodeConfig } from './ai-agent-node.js';
+import { buildAgentSystemPrompt, DEFAULT_AGENT_MODEL_ID, DEFAULT_AGENT_MAX_TOKENS, DEFAULT_AGENT_TEMPERATURE, readAgentNodeConfig, writeAgentModelSelection, type AgentNodeConfig } from './ai-agent-node.js';
 import type { ChatTurnDebugRecord, DebugTurnStatus } from './ai-debug.js';
 import { createChatTurnDebugRecord, finalizeChatTurnDebugRecord, normalizeRestoredDebugTurns, readChatDebugEnabled } from './ai-debug.js';
 import { findProviderOptionNodeId, getApiKeyForProvider, getAvailableModels, getFeaturedModelIds, getProviderConfigs, normalizeProviderId } from './ai-provider-config.js';
@@ -314,6 +314,7 @@ export async function selectChatModel(
 
   const agentConfig = readAgentConfigSafely();
   applyAgentConfiguration(agent, session, agentConfig, resolvedModel);
+  writeAgentModelSelection(resolvedModel.id);
   await persistChatSession(agent);
   return resolvedModel;
 }

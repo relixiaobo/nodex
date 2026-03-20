@@ -22,7 +22,6 @@ import { ensureSystemSchema } from './system-schema-presets.js';
 import { ensureAgentNode } from './ai-agent-node.js';
 
 const LEGACY_UNLOCKED_SYSTEM_NODE_IDS = [
-  SYSTEM_NODE_IDS.LIBRARY,
   SYSTEM_NODE_IDS.INBOX,
   SYSTEM_NODE_IDS.SEARCHES,
   SYSTEM_NODE_IDS.CLIPS,

@@ -1,8 +1,12 @@
-import { nanoid } from 'nanoid';
 import { FIELD_TYPES, NDX_F, SYSTEM_NODE_IDS, SYS_T } from '../types/index.js';
 import { isOutlinerContentNodeType } from './node-type-utils.js';
 import * as loroDoc from './loro-doc.js';
 import { SYSTEM_SCHEMA_NODE_IDS } from './system-schema-presets.js';
+import { materializeSearchResults } from './search-engine.js';
+import {
+  SETTINGS_AI_NODE_IDS,
+  SETTINGS_AI_QUERY_NODE_IDS,
+} from './ai-system-node-ids.js';
 
 export const DEFAULT_AGENT_MODEL_ID = '';
 export const DEFAULT_AGENT_TEMPERATURE = 0.2;
@@ -70,24 +74,11 @@ export const SKILL_NODE_IDS = {
   SKILL_CREATOR_RULE_5: 'NDX_N45',
 } as const;
 
-export const SETTINGS_AI_NODE_IDS = {
-  AI: 'NDX_N70',
-  AGENTS: 'NDX_N71',
-  SKILLS: 'NDX_N72',
-} as const;
-
-export const SETTINGS_AI_QUERY_NODE_IDS = {
-  AGENTS_GROUP: 'NDX_N73',
-  AGENTS_TAG: 'NDX_N74',
-  SKILLS_GROUP: 'NDX_N75',
-  SKILLS_TAG: 'NDX_N76',
-} as const;
-
-export const SETTINGS_AI_GROUP_NODE_IDS = {
-  AI: SETTINGS_AI_NODE_IDS.AI,
-  AGENTS: SETTINGS_AI_NODE_IDS.AGENTS,
-  SKILLS: SETTINGS_AI_NODE_IDS.SKILLS,
-} as const;
+export {
+  SETTINGS_AI_GROUP_NODE_IDS,
+  SETTINGS_AI_NODE_IDS,
+  SETTINGS_AI_QUERY_NODE_IDS,
+} from './ai-system-node-ids.js';
 
 // ─── Spark agent defaults ───
 
@@ -298,15 +289,6 @@ const DEFAULT_SKILL_PRESETS: ReadonlyArray<DefaultSkillPreset> = [
 const SKILL_INDEX_READ_INSTRUCTION =
   "When you need a skill's detailed rules, use node_read to read the skill node's children.";
 
-const SEARCH_RESULT_EXCLUDED_TYPES = new Set([
-  'queryCondition',
-  'fieldEntry',
-  'reference',
-  'tagDef',
-  'fieldDef',
-  'viewDef',
-]);
-
 // ─── Node helpers ───
 
 function ensureNode({ id, parentId, name, data }: FixedNodePreset): void {
@@ -348,6 +330,7 @@ function ensureLibraryNode(workspaceId: string): void {
   if (!loroDoc.hasNode(SYSTEM_NODE_IDS.LIBRARY)) {
     loroDoc.createNode(SYSTEM_NODE_IDS.LIBRARY, workspaceId);
     loroDoc.setNodeRichTextContent(SYSTEM_NODE_IDS.LIBRARY, 'Library', [], []);
+    loroDoc.setNodeData(SYSTEM_NODE_IDS.LIBRARY, 'locked', true);
     return;
   }
 
@@ -359,8 +342,8 @@ function ensureLibraryNode(workspaceId: string): void {
   if (!libraryNode?.name?.trim()) {
     loroDoc.setNodeRichTextContent(SYSTEM_NODE_IDS.LIBRARY, 'Library', [], []);
   }
-  if (libraryNode?.locked === true) {
-    loroDoc.deleteNodeData(SYSTEM_NODE_IDS.LIBRARY, 'locked');
+  if (libraryNode?.locked !== true) {
+    loroDoc.setNodeData(SYSTEM_NODE_IDS.LIBRARY, 'locked', true);
   }
 }
 
@@ -453,67 +436,6 @@ function moveNodeToIndex(nodeId: string, parentId: string, index: number): void 
   loroDoc.moveNode(nodeId, parentId, clampedIndex);
 }
 
-function isInTrash(nodeId: string): boolean {
-  let cursor: string | null = nodeId;
-  while (cursor) {
-    if (cursor === SYSTEM_NODE_IDS.TRASH) return true;
-    cursor = loroDoc.getParentId(cursor);
-  }
-  return false;
-}
-
-function isSearchResultCandidate(nodeId: string, excludeNodeId: string): boolean {
-  const node = loroDoc.toNodexNode(nodeId);
-  if (!node || node.id === excludeNodeId) return false;
-  if (node.type && SEARCH_RESULT_EXCLUDED_TYPES.has(node.type)) return false;
-  if (node.id === loroDoc.getCurrentWorkspaceId()) return false;
-  if (node.locked === true) return false;
-  if (isInTrash(node.id)) return false;
-  return true;
-}
-
-function refreshTaggedSearchNode(searchNodeId: string, tagId: string): void {
-  const searchNode = loroDoc.toNodexNode(searchNodeId);
-  if (!searchNode || searchNode.type !== 'search') return;
-
-  const matchedIds: string[] = [];
-  for (const nodeId of loroDoc.getAllNodeIds()) {
-    if (!isSearchResultCandidate(nodeId, searchNodeId)) continue;
-    const node = loroDoc.toNodexNode(nodeId);
-    if (node?.tags.includes(tagId)) {
-      matchedIds.push(nodeId);
-    }
-  }
-
-  const existingRefs = new Map<string, string>();
-  for (const childId of searchNode.children) {
-    const child = loroDoc.toNodexNode(childId);
-    if (child?.type === 'reference' && child.targetId) {
-      existingRefs.set(child.targetId, childId);
-    }
-  }
-
-  const matchedSet = new Set(matchedIds);
-  for (const [targetId, refNodeId] of existingRefs) {
-    if (!matchedSet.has(targetId)) {
-      loroDoc.deleteNode(refNodeId);
-    }
-  }
-
-  for (const targetId of matchedIds) {
-    if (existingRefs.has(targetId)) continue;
-    const refId = nanoid();
-    loroDoc.createNode(refId, searchNodeId);
-    loroDoc.setNodeDataBatch(refId, {
-      type: 'reference',
-      targetId,
-    });
-  }
-
-  loroDoc.setNodeData(searchNodeId, 'lastRefreshedAt', Date.now());
-  loroDoc.commitDoc('system:refresh');
-}
-
 function ensureTaggedSearchNode(
   searchNodeId: string,
   name: string,
@@ -591,8 +513,8 @@ function ensureSettingsAIGrouping(): void {
 }
 
 function refreshSettingsAISearches(): void {
-  refreshTaggedSearchNode(SETTINGS_AI_NODE_IDS.AGENTS, SYS_T.AGENT);
-  refreshTaggedSearchNode(SETTINGS_AI_NODE_IDS.SKILLS, SYS_T.SKILL);
+  materializeSearchResults(SETTINGS_AI_NODE_IDS.AGENTS);
+  materializeSearchResults(SETTINGS_AI_NODE_IDS.SKILLS);
 }
 
 function ensureLibraryChild(nodeId: string, index: number): void {
@@ -837,7 +759,7 @@ export function ensureSparkAgentNode(workspaceId = loroDoc.getCurrentWorkspaceId
     SPARK_AGENT_NODE_IDS.MAX_TOKENS_VALUE,
     String(SPARK_DEFAULT_MAX_TOKENS),
   );
-  refreshTaggedSearchNode(SETTINGS_AI_NODE_IDS.AGENTS, SYS_T.AGENT);
+  materializeSearchResults(SETTINGS_AI_NODE_IDS.AGENTS);
 
   return SYSTEM_NODE_IDS.SPARK_AGENT;
 }

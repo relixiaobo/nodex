@@ -85,7 +85,7 @@ export function PopoverShell({ anchorRect, onClose, width = POPOVER_WIDTH, child
   return createPortal(
     <div
       ref={popoverRef}
-      className="rounded-lg bg-background shadow-paper overflow-hidden"
+      className="rounded-lg border border-border bg-background shadow-paper overflow-hidden"
       style={{
         position: 'fixed',
         top: position?.top ?? -9999,

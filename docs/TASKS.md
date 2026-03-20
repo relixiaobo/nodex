@@ -18,13 +18,13 @@
 |--------|------|------|------|
 | nodex-claude | — | 空闲 | — |
 | nodex-gemini | — | 空闲 | — |
-| nodex-codex | codex/tool-group-cross-message | 工具调用跨消息分组 (#166) | 进行中 |
+| nodex-codex | codex/node-tools-redesign | Node 工具重构 — Tana Paste 统一格式 (#170) | 待启动 |
 
 ---
 
 ## 进行中
 
-- [ ] **工具调用跨消息分组** (#166, Codex) — ToolCallGroup 从单消息内提升到消息列表级别，合并连续 tool-call-only assistant messages
+- [ ] **Node 工具重构 — Tana Paste 统一格式** (#170, Codex) — node_create/edit 用 Tana Paste 文本替代嵌套 JSON，node_search 扁平化参数。设计：`docs/plans/node-tools-redesign.md`
 
 ---
 

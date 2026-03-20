@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { createRoot, type Root } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import { ChatInput } from '../../src/components/chat/ChatInput.js';
+import { ChatPanelHeader } from '../../src/components/chat/ChatPanelHeader.js';
 import { ChatMessage } from '../../src/components/chat/ChatMessage.js';
 import { ChatPanel, shouldStickChatScroll } from '../../src/components/chat/ChatPanel.js';
 import { extractInlineMarkup, splitMarkdownBlocks } from '../../src/components/chat/MarkdownRenderer.js';
@@ -412,6 +413,18 @@ describe('chat ui', () => {
       expect(container.textContent).toContain('Configure an AI provider to start chatting');
       expect(container.textContent).toContain('Open Settings');
     });
+  });
+
+  it('renders the compact chat header chrome', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(ChatPanelHeader, {
+        sessionId: 'session-empty',
+        onClose: () => {},
+      }),
+    );
+
+    expect(html).toContain('title="Edit title"');
+    expect(html).toContain('aria-label="Close chat"');
   });
 
   it('keeps the chat composer visible when a provider is enabled without an API key', async () => {

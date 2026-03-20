@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { MessageCircle, Pencil, Trash2, X } from '../../lib/icons.js';
+import { Pencil, Trash2 } from '../../lib/icons.js';
 import { useAgent } from '../../hooks/use-agent.js';
 import type { ThinkingLevel } from '@mariozechner/pi-ai';
 import { readChatDebugEnabled } from '../../lib/ai-debug.js';
@@ -10,6 +10,7 @@ import { useNodeStore } from '../../stores/node-store.js';
 import { useUIStore } from '../../stores/ui-store.js';
 import { SYSTEM_NODE_IDS } from '../../types/index.js';
 import { ChatDebugPanel } from './ChatDebugPanel.js';
+import { ChatPanelHeader } from './ChatPanelHeader.js';
 import { ChatInput, type ChatInputHandle } from './ChatInput.js';
 import { ChatMessage } from './ChatMessage.js';
 
@@ -18,7 +19,7 @@ const AUTO_SCROLL_THRESHOLD = 48;
 export interface ChatPanelProps {
   panelId: string;
   sessionId: string;
-  /** When true, hide the full header (title + close). Action buttons remain visible. */
+  /** When true, hide the panel-level header because the surrounding layout already renders it. */
   hideHeader?: boolean;
 }
 
@@ -232,171 +233,166 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
   }
 
   return (
-    <div className="relative flex flex-1 flex-col overflow-hidden bg-background">
+    <div className="flex flex-1 flex-col overflow-hidden bg-background">
       {!hideHeader && (
-        <div className="flex items-center justify-between px-3 h-12 border-b border-border">
-          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-            <MessageCircle size={14} strokeWidth={1.75} className="text-foreground-tertiary" />
-            Chat
-          </div>
+        <ChatPanelHeader
+          sessionId={sessionId}
+          onClose={(e) => {
+            e.stopPropagation();
+            useUIStore.getState().closePanel(panelId);
+          }}
+        />
+      )}
+
+      <div className="relative flex flex-1 flex-col overflow-hidden">
+        {debugEnabled && (
           <button
             type="button"
-            onClick={() => useUIStore.getState().closePanel(panelId)}
-            className="inline-flex h-7 w-7 items-center justify-center rounded-full text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground"
-            aria-label="Close chat"
+            onClick={() => setDebugOpen((v) => !v)}
+            className={`absolute right-3 top-2 z-10 inline-flex h-7 min-w-8 items-center justify-center rounded-full px-2 font-mono text-[11px] transition-colors ${
+              debugOpen
+                ? 'bg-foreground/8 text-foreground'
+                : 'text-foreground-tertiary hover:bg-foreground/4 hover:text-foreground'
+            }`}
+            aria-label={debugOpen ? 'Hide debug panel' : 'Show debug panel'}
+            aria-pressed={debugOpen}
           >
-            <X size={15} strokeWidth={1.6} />
+            {'</>'}
           </button>
-        </div>
-      )}
+        )}
 
-      {debugEnabled && (
-        <button
-          type="button"
-          onClick={() => setDebugOpen((v) => !v)}
-          className={`absolute right-3 top-2 z-10 inline-flex h-7 min-w-8 items-center justify-center rounded-full px-2 font-mono text-[11px] transition-colors ${
-            debugOpen
-              ? 'bg-foreground/8 text-foreground'
-              : 'text-foreground-tertiary hover:bg-foreground/4 hover:text-foreground'
-          }`}
-          aria-label={debugOpen ? 'Hide debug panel' : 'Show debug panel'}
-          aria-pressed={debugOpen}
-        >
-          {'</>'}
-        </button>
-      )}
-
-      {!ready ? (
-        <div className="flex flex-1 items-center justify-center text-sm text-foreground-tertiary">
-          Loading chat…
-        </div>
-      ) : !hasAvailableModels ? (
-        <div className="flex flex-1 overflow-hidden">
-          <div className="flex flex-1 flex-col justify-center gap-4 px-6">
-            <div className="flex flex-col items-center gap-4 text-center">
-              <div className="max-w-[260px] text-sm text-foreground-tertiary">
-                Configure an AI provider to start chatting
-              </div>
-              <button
-                type="button"
-                onClick={handleOpenSettings}
-                className="inline-flex h-9 items-center rounded-full border border-border px-4 text-sm font-medium text-foreground transition-colors hover:bg-foreground/4"
-              >
-                Open Settings
-              </button>
-            </div>
+        {!ready ? (
+          <div className="flex flex-1 items-center justify-center text-sm text-foreground-tertiary">
+            Loading chat…
           </div>
-          {debugEnabled && debugOpen && (
-            <div className="w-1/2 shrink-0 overflow-y-auto overflow-x-hidden border-l border-border px-3 py-3">
-              <ChatDebugPanel debug={debug} />
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="flex flex-1 overflow-hidden">
-          <div className="flex flex-1 flex-col overflow-hidden">
-            <div
-              ref={scrollRef}
-              className="flex flex-1 flex-col overflow-y-auto px-4 py-4"
-              onScroll={() => {
-                const scroller = scrollRef.current;
-                if (!scroller) return;
-                shouldStickToBottomRef.current = shouldStickChatScroll(scroller);
-              }}
-            >
-              {messages.length === 0 ? (
-                <div className="flex h-full min-h-40 flex-col items-center justify-center gap-4 px-6">
-                  <div className="text-center text-sm text-foreground-tertiary">
-                    Ask about your notes, clips, or the page you&apos;re reading.
-                  </div>
-                  <div className="flex w-full max-w-[260px] flex-col gap-2">
-                    {[
-                      'Summarize this page',
-                      'Organize my notes from today',
-                      'What did I clip this week?',
-                    ].map((suggestion) => (
-                      <button
-                        key={suggestion}
-                        type="button"
-                        onClick={() => void handleSendMessage(suggestion)}
-                        className="rounded-lg border border-border px-3 py-2 text-left text-sm text-foreground-secondary transition-colors hover:bg-foreground/4 hover:text-foreground"
-                      >
-                        {suggestion}
-                      </button>
-                    ))}
-                  </div>
+        ) : !hasAvailableModels ? (
+          <div className="flex flex-1 overflow-hidden">
+            <div className="flex flex-1 flex-col justify-center gap-4 px-6">
+              <div className="flex flex-col items-center gap-4 text-center">
+                <div className="max-w-[260px] text-sm text-foreground-tertiary">
+                  Configure an AI provider to start chatting
                 </div>
-              ) : (
-                messages.map((entry, index) => (
-                  <ChatMessage
-                    key={entry.nodeId ?? `stream-${entry.message.timestamp}-${index}`}
-                    entry={entry}
-                    toolResults={toolResults}
-                    streaming={isStreaming && index === messages.length - 1 && entry.message.role === 'assistant'}
-                    grouped={index > 0 && messages[index - 1].message.role === entry.message.role}
-                    busy={chatBusy}
-                    isLastInTurn={index === messages.length - 1 || messages[index + 1].message.role !== entry.message.role}
-                    onEdit={handleEditMessage}
-                    onRegenerate={handleRegenerateMessage}
-                    onSwitchBranch={switchBranch}
-                  />
-                ))
-              )}
+                <button
+                  type="button"
+                  onClick={handleOpenSettings}
+                  className="inline-flex h-9 items-center rounded-full border border-border px-4 text-sm font-medium text-foreground transition-colors hover:bg-foreground/4"
+                >
+                  Open Settings
+                </button>
+              </div>
             </div>
-            <div className="relative">
-              {steeringNote && (
-                <div className="pointer-events-none absolute inset-x-0 bottom-full px-4 pb-2">
-                  <div className="group/steer flex justify-end">
-                    <div className="pointer-events-auto flex max-w-[88%] flex-col gap-1 items-end">
-                      <div className="flex items-center gap-0.5 justify-end opacity-0 transition-opacity group-hover/steer:opacity-100">
+            {debugEnabled && debugOpen && (
+              <div className="w-1/2 shrink-0 overflow-y-auto overflow-x-hidden border-l border-border px-3 py-3">
+                <ChatDebugPanel debug={debug} />
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex flex-1 overflow-hidden">
+            <div className="flex flex-1 flex-col overflow-hidden">
+              <div
+                ref={scrollRef}
+                className="flex flex-1 flex-col overflow-y-auto px-4 py-4"
+                onScroll={() => {
+                  const scroller = scrollRef.current;
+                  if (!scroller) return;
+                  shouldStickToBottomRef.current = shouldStickChatScroll(scroller);
+                }}
+              >
+                {messages.length === 0 ? (
+                  <div className="flex h-full min-h-40 flex-col items-center justify-center gap-4 px-6">
+                    <div className="text-center text-sm text-foreground-tertiary">
+                      Ask about your notes, clips, or the page you&apos;re reading.
+                    </div>
+                    <div className="flex w-full max-w-[260px] flex-col gap-2">
+                      {[
+                        'Summarize this page',
+                        'Organize my notes from today',
+                        'What did I clip this week?',
+                      ].map((suggestion) => (
                         <button
+                          key={suggestion}
                           type="button"
-                          onClick={handleEditSteerNote}
-                          className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground"
-                          aria-label="Edit queued message"
+                          onClick={() => void handleSendMessage(suggestion)}
+                          className="rounded-lg border border-border px-3 py-2 text-left text-sm text-foreground-secondary transition-colors hover:bg-foreground/4 hover:text-foreground"
                         >
-                          <Pencil size={14} strokeWidth={1.8} />
+                          {suggestion}
                         </button>
-                        <button
-                          type="button"
-                          onClick={handleClearSteering}
-                          className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground"
-                          aria-label="Cancel queued message"
-                        >
-                          <Trash2 size={14} strokeWidth={1.8} />
-                        </button>
-                      </div>
-                      <div className="steer-note-pending max-h-32 overflow-y-auto whitespace-pre-wrap rounded-lg bg-background px-3 py-2 text-base leading-6 text-foreground">
-                        {steeringNote}
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  messages.map((entry, index) => (
+                    <ChatMessage
+                      key={entry.nodeId ?? `stream-${entry.message.timestamp}-${index}`}
+                      entry={entry}
+                      toolResults={toolResults}
+                      streaming={isStreaming && index === messages.length - 1 && entry.message.role === 'assistant'}
+                      grouped={index > 0 && messages[index - 1].message.role === entry.message.role}
+                      busy={chatBusy}
+                      isLastInTurn={index === messages.length - 1 || messages[index + 1].message.role !== entry.message.role}
+                      onEdit={handleEditMessage}
+                      onRegenerate={handleRegenerateMessage}
+                      onSwitchBranch={switchBranch}
+                    />
+                  ))
+                )}
+              </div>
+              <div className="relative">
+                {steeringNote && (
+                  <div className="pointer-events-none absolute inset-x-0 bottom-full px-4 pb-2">
+                    <div className="group/steer flex justify-end">
+                      <div className="pointer-events-auto flex max-w-[88%] flex-col gap-1 items-end">
+                        <div className="flex items-center gap-0.5 justify-end opacity-0 transition-opacity group-hover/steer:opacity-100">
+                          <button
+                            type="button"
+                            onClick={handleEditSteerNote}
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground"
+                            aria-label="Edit queued message"
+                          >
+                            <Pencil size={14} strokeWidth={1.8} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleClearSteering}
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground"
+                            aria-label="Cancel queued message"
+                          >
+                            <Trash2 size={14} strokeWidth={1.8} />
+                          </button>
+                        </div>
+                        <div className="steer-note-pending max-h-32 overflow-y-auto whitespace-pre-wrap rounded-lg bg-background px-3 py-2 text-base leading-6 text-foreground">
+                          {steeringNote}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              )}
-              <ChatInput
-                ref={chatInputRef}
-                disabled={isStreaming}
-                busy={pendingMessageActionId !== null}
-                error={error}
-                currentModel={currentModel}
-                availableModels={availableModels}
-                thinkingLevel={thinkingLevel}
-                onSend={handleSendMessage}
-                onStop={stopStreaming}
-                onSteer={handleSteerMessage}
-                onOpenSettings={handleOpenSettings}
-                onModelChange={handleModelChange}
-                onThinkingChange={handleThinkingChange}
-              />
+                )}
+                <ChatInput
+                  ref={chatInputRef}
+                  disabled={isStreaming}
+                  busy={pendingMessageActionId !== null}
+                  error={error}
+                  currentModel={currentModel}
+                  availableModels={availableModels}
+                  thinkingLevel={thinkingLevel}
+                  onSend={handleSendMessage}
+                  onStop={stopStreaming}
+                  onSteer={handleSteerMessage}
+                  onOpenSettings={handleOpenSettings}
+                  onModelChange={handleModelChange}
+                  onThinkingChange={handleThinkingChange}
+                />
+              </div>
             </div>
+            {debugEnabled && debugOpen && (
+              <div className="w-1/2 shrink-0 overflow-y-auto overflow-x-hidden border-l border-border px-3 py-3">
+                <ChatDebugPanel debug={debug} />
+              </div>
+            )}
           </div>
-          {debugEnabled && debugOpen && (
-            <div className="w-1/2 shrink-0 overflow-y-auto overflow-x-hidden border-l border-border px-3 py-3">
-              <ChatDebugPanel debug={debug} />
-            </div>
-          )}
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

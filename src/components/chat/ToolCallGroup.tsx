@@ -12,39 +12,32 @@ export function ToolCallGroup({ toolCalls, results }: ToolCallGroupProps) {
   const [expanded, setExpanded] = useState(false);
 
   const total = toolCalls.length;
-  let done = 0;
   let failed = 0;
-  let pending = 0;
+  let isExecuting = false;
 
   for (const tc of toolCalls) {
-    const status = getStatus(results?.get(tc.id));
-    if (status === 'done') done++;
-    else if (status === 'error') { done++; failed++; }
-    else pending++;
+    const s = getStatus(results?.get(tc.id));
+    if (s === 'pending') isExecuting = true;
+    else if (s === 'error') failed++;
   }
 
-  const isExecuting = pending > 0;
   const latestToolCall = toolCalls[total - 1];
   const latestStatus = getStatus(results?.get(latestToolCall.id));
 
-  // ── Title text ──────────────────────────────────────────────────────────
+  // ── Title ─────────────────────────────────────────────────────────────
 
   let titleText: string;
-  if (expanded) {
-    titleText = isExecuting
-      ? `${total} steps`
-      : `Completed ${total} steps`;
+  if (!isExecuting) {
+    titleText = `Completed ${total} steps`;
+  } else if (expanded) {
+    titleText = `${total} steps`;
   } else {
-    if (isExecuting) {
-      titleText = `${summarizeToolCall(latestToolCall, latestStatus)} \u00b7 step ${total}`;
-    } else {
-      titleText = `Completed ${total} steps`;
-    }
+    titleText = `${summarizeToolCall(latestToolCall, latestStatus)} · step ${total}`;
   }
 
-  const failedSuffix = !isExecuting && failed > 0 ? ` \u00b7 ${failed} failed` : '';
+  const failedSuffix = !isExecuting && failed > 0 ? ` · ${failed} failed` : '';
 
-  // ── Status icon ─────────────────────────────────────────────────────────
+  // ── Icon ──────────────────────────────────────────────────────────────
 
   const StatusIcon = isExecuting ? Loader2 : Check;
   const statusIconClass = isExecuting ? 'animate-spin' : '';

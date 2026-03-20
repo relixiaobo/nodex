@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import type { AssistantMessage, ToolResultMessage } from '@mariozechner/pi-ai';
+import type { AssistantMessage, ToolCall, ToolResultMessage } from '@mariozechner/pi-ai';
 import { toast } from 'sonner';
 import type { ChatConversationMessage, ChatMessageEntry } from '../../hooks/use-agent.js';
 import { Brain, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, Pencil, RefreshCw } from '../../lib/icons.js';
@@ -108,31 +108,21 @@ function renderAssistantBlocks(message: AssistantMessage, streaming: boolean, to
     }
 
     if (block.type === 'toolCall') {
-      // Collect consecutive toolCall blocks
+      // Collect consecutive toolCall blocks into a run
       const runStart = i;
-      const run: typeof blocks = [];
+      const run: ToolCall[] = [];
       while (i < blocks.length && blocks[i].type === 'toolCall') {
-        run.push(blocks[i]);
+        run.push(blocks[i] as ToolCall);
         i++;
       }
 
       if (run.length >= 2) {
-        const toolCalls = run.filter((b): b is import('@mariozechner/pi-ai').ToolCall => b.type === 'toolCall');
         result.push(
-          <ToolCallGroup
-            key={`toolgroup-${runStart}`}
-            toolCalls={toolCalls}
-            results={toolResults}
-          />,
+          <ToolCallGroup key={`toolgroup-${runStart}`} toolCalls={run} results={toolResults} />,
         );
       } else {
-        const tc = run[0] as import('@mariozechner/pi-ai').ToolCall;
         result.push(
-          <ToolCallBlock
-            key={`${tc.id}-${runStart}`}
-            toolCall={tc}
-            result={toolResults?.get(tc.id)}
-          />,
+          <ToolCallBlock key={`${run[0].id}-${runStart}`} toolCall={run[0]} result={toolResults?.get(run[0].id)} />,
         );
       }
       continue;

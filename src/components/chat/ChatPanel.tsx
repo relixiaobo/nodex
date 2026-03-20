@@ -62,9 +62,6 @@ export function isToolCallOnlyMessage(message: ChatConversationMessage): message
       continue;
     }
 
-    if (import.meta.env.DEV && block.type === 'text') {
-      console.log('[tool-group] non-empty text block prevents grouping:', JSON.stringify(block.text.slice(0, 50)));
-    }
     return false;
   }
 
@@ -314,10 +311,6 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
         />,
       );
     };
-
-    if (import.meta.env.DEV && messages.length > 0) {
-      console.log('[tool-group] message scan:', messages.map((m, i) => `${i}:${m.message.role}:${isToolCallOnlyMessage(m.message) ? 'TOOL' : 'TEXT'}:${m.message.role === 'assistant' ? (m.message as AssistantMessage).content.map((b: { type: string }) => b.type).join('+') : ''}`).join(' | '));
-    }
 
     let index = 0;
     while (index < messages.length) {

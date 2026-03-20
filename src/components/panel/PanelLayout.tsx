@@ -234,7 +234,7 @@ function TabHead({ nodeId, onClickBody, onClose, menuOpen, tabRef, children }: T
       {onClose && (
         <button
           type="button"
-          className="flex h-7 w-7 mr-1 shrink-0 items-center justify-center rounded-md text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground"
+          className="flex h-7 w-7 ml-1 mr-1 shrink-0 items-center justify-center rounded-lg text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground"
           onClick={onClose}
           title="Close panel"
         >

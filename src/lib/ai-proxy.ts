@@ -173,6 +173,63 @@ export function buildProxyStreamRequestPayload(
   };
 }
 
+function parseCompletedToolCallArguments(partialJson: string): ToolCall['arguments'] | null {
+  if (partialJson.trim().length === 0) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(partialJson) as ToolCall['arguments'];
+  } catch {
+    try {
+      return JSON.parse(jsonrepair(partialJson)) as ToolCall['arguments'];
+    } catch {
+      return null;
+    }
+  }
+}
+
+function isRecoverableToolCallParseError(errorMessage?: string): boolean {
+  if (!errorMessage) return false;
+
+  return /Expected .+ in JSON at position|Unexpected token .+ is not valid JSON/i.test(errorMessage);
+}
+
+function recoverToolCallFromProxyError(
+  proxyEvent: Extract<ProxyAssistantMessageEvent, { type: 'error' }>,
+  partial: AssistantMessage,
+): AssistantMessageEvent | null {
+  if (proxyEvent.reason !== 'error' || !isRecoverableToolCallParseError(proxyEvent.errorMessage)) {
+    return null;
+  }
+
+  for (let index = partial.content.length - 1; index >= 0; index -= 1) {
+    const content = partial.content[index] as StreamingToolCall | undefined;
+    if (content?.type !== 'toolCall' || !content.partialJson) {
+      continue;
+    }
+
+    const repairedArguments = parseCompletedToolCallArguments(content.partialJson);
+    if (!repairedArguments) {
+      continue;
+    }
+
+    content.arguments = repairedArguments;
+    delete content.partialJson;
+    partial.stopReason = 'toolUse';
+    partial.errorMessage = undefined;
+    partial.usage = proxyEvent.usage;
+
+    return {
+      type: 'done',
+      reason: 'toolUse',
+      message: partial,
+    };
+  }
+
+  return null;
+}
+
 function processProxyEvent(
   proxyEvent: ProxyAssistantMessageEvent,
   partial: AssistantMessage,
@@ -272,19 +329,10 @@ function processProxyEvent(
       if (content?.type !== 'toolCall') {
         return undefined;
       }
-      // Models sometimes produce malformed JSON (unclosed strings, trailing commas).
-      // Use jsonrepair to fix common issues before the agent processes arguments.
       if (content.partialJson) {
-        try {
-          content.arguments = JSON.parse(content.partialJson);
-        } catch (parseError) {
-          console.warn('[ai-proxy] toolcall_end JSON.parse failed, attempting jsonrepair:', (parseError as Error).message?.slice(0, 80));
-          try {
-            content.arguments = JSON.parse(jsonrepair(content.partialJson));
-            console.log('[ai-proxy] jsonrepair succeeded for tool:', content.name);
-          } catch (repairError) {
-            console.error('[ai-proxy] jsonrepair also failed:', (repairError as Error).message?.slice(0, 80));
-          }
+        const parsedArguments = parseCompletedToolCallArguments(content.partialJson);
+        if (parsedArguments) {
+          content.arguments = parsedArguments;
         }
       }
       delete content.partialJson;
@@ -299,10 +347,16 @@ function processProxyEvent(
       partial.stopReason = proxyEvent.reason;
       partial.usage = proxyEvent.usage;
       return { type: 'done', reason: proxyEvent.reason, message: partial };
-    case 'error':
+    case 'error': {
+      const recoveredEvent = recoverToolCallFromProxyError(proxyEvent, partial);
+      if (recoveredEvent) {
+        return recoveredEvent;
+      }
+
       partial.stopReason = proxyEvent.reason;
       partial.errorMessage = proxyEvent.errorMessage;
       partial.usage = proxyEvent.usage;
       return { type: 'error', reason: proxyEvent.reason, error: partial };
+    }
   }
 }

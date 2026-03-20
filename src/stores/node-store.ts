@@ -21,7 +21,7 @@ import * as loroDoc from '../lib/loro-doc.js';
 import { getTreeReferenceBlockReason } from '../lib/reference-rules.js';
 import { resolveCheckboxClick, resolveCmdEnterCycle, resolveForwardDoneMapping, resolveReverseDoneMapping } from '../lib/checkbox-utils.js';
 import { nextAutoColorKey } from '../lib/tag-colors.js';
-import { runSearch } from '../lib/search-engine.js';
+import { materializeSearchResults } from '../lib/search-engine.js';
 import { resolveAutoInit } from '../lib/field-auto-init.js';
 import { ensureTodayNode } from '../lib/journal.js';
 import { getWorkspaceHomeNodeId } from '../lib/system-node-presets.js';
@@ -1934,57 +1934,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
 
     refreshSearchResults: (searchNodeId) => {
       if (!canMutate('refreshSearchResults')) return;
-
-      const searchNode = loroDoc.toNodexNode(searchNodeId);
-      if (!searchNode || searchNode.type !== 'search') return;
-
-      // Run the search query
-      const matchedIds = runSearch(searchNodeId);
-
-      // Read existing reference children
-      const existingRefs = new Map<string, string>(); // targetId → refNodeId
-      for (const childId of searchNode.children) {
-        const child = loroDoc.toNodexNode(childId);
-        if (child?.type === 'reference' && child.targetId) {
-          existingRefs.set(child.targetId, childId);
-        }
-      }
-
-      // Determine additions and removals
-      const toAdd = new Set<string>();
-      for (const id of matchedIds) {
-        if (!existingRefs.has(id)) {
-          toAdd.add(id);
-        }
-      }
-
-      const toRemove: string[] = [];
-      for (const [targetId, refNodeId] of existingRefs) {
-        if (!matchedIds.has(targetId)) {
-          toRemove.push(refNodeId);
-        }
-      }
-
-      // Apply changes: remove stale references
-      for (const refNodeId of toRemove) {
-        loroDoc.deleteNode(refNodeId);
-      }
-
-      // Apply changes: add new references
-      for (const targetId of toAdd) {
-        const refId = nanoid();
-        loroDoc.createNode(refId, searchNodeId);
-        loroDoc.setNodeDataBatch(refId, {
-          type: 'reference',
-          targetId,
-        });
-      }
-
-      // Update lastRefreshedAt
-      loroDoc.setNodeData(searchNodeId, 'lastRefreshedAt', Date.now());
-
-      // Single commit with system:refresh origin (excluded from undo stack)
-      loroDoc.commitDoc('system:refresh');
+      materializeSearchResults(searchNodeId);
     },
 
     // ─── View 操作 ───

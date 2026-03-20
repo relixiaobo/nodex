@@ -42,7 +42,7 @@ describe('ensureSystemNodes', () => {
       expect(toNodexNode(nodeId)?.locked).toBe(true);
     }
     expect(getParentId(SYSTEM_NODE_IDS.LIBRARY)).toBe('ws_bootstrap');
-    expect(toNodexNode(SYSTEM_NODE_IDS.LIBRARY)?.locked).toBe(false);
+    expect(toNodexNode(SYSTEM_NODE_IDS.LIBRARY)?.locked).toBe(true);
 
     expect(getParentId(SETTINGS_AI_NODE_IDS.AI)).toBe(SYSTEM_NODE_IDS.SETTINGS);
     expect(toNodexNode(SETTINGS_AI_NODE_IDS.AI)?.locked).toBe(true);

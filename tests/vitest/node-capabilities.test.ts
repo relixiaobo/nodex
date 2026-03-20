@@ -58,20 +58,21 @@ describe('node capabilities', () => {
     expect(canCreateChildrenUnder(SYSTEM_NODE_IDS.SCHEMA)).toBe(true);
   });
 
-  it('treats Library as an editable system home node and Inbox as a legacy editable node', () => {
+  it('treats Library as a locked system home with editable contents, and Inbox as a legacy editable node', () => {
     loroDoc.createNode(SYSTEM_NODE_IDS.INBOX, 'ws_default');
     loroDoc.setNodeDataBatch(SYSTEM_NODE_IDS.INBOX, { name: 'Inbox' });
     loroDoc.commitDoc('__seed__');
 
-    expect(isLockedNode(SYSTEM_NODE_IDS.LIBRARY)).toBe(false);
+    expect(isLockedNode(SYSTEM_NODE_IDS.LIBRARY)).toBe(true);
     expect(getNodeCapabilities(SYSTEM_NODE_IDS.LIBRARY)).toEqual({
-      role: 'general',
-      canEditNode: true,
+      role: 'system',
+      canEditNode: false,
       canEditStructure: true,
       canEditFieldValues: true,
-      canMove: true,
-      canDelete: true,
+      canMove: false,
+      canDelete: false,
     });
+    expect(canCreateChildrenUnder(SYSTEM_NODE_IDS.LIBRARY)).toBe(true);
 
     expect(isLockedNode(SYSTEM_NODE_IDS.INBOX)).toBe(false);
     expect(getNodeCapabilities(SYSTEM_NODE_IDS.INBOX)).toEqual({

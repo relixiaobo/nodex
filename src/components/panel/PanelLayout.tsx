@@ -211,7 +211,7 @@ function TabHead({ nodeId, onClickBody, onClose, menuOpen, tabRef, children }: T
     >
       {/* Name area — interactive only when onClickBody is provided */}
       <div
-        className={`group/name relative flex min-w-0 flex-1 ml-1 h-7 items-center rounded-md transition-colors ${onClickBody ? 'cursor-pointer hover:bg-foreground/4' : ''}`}
+        className={`group/name relative flex min-w-0 flex-1 ml-1 h-7 items-center rounded-lg transition-colors ${onClickBody ? 'cursor-pointer hover:bg-foreground/4' : ''}`}
         onClick={onClickBody}
         role={menuOpen !== undefined ? 'button' : undefined}
         aria-haspopup={menuOpen !== undefined ? 'menu' : undefined}

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { ToolCall, ToolResultMessage } from '@mariozechner/pi-ai';
-import { Check, ChevronDown, Loader2, XCircle } from '../../lib/icons.js';
+import { Check, Loader2, XCircle } from '../../lib/icons.js';
+import { DisclosureIcon } from './DisclosureIcon.js';
 import { ToolCallBlock, getStatus, summarizeToolCall } from './ToolCallBlock.js';
 
 interface ToolCallGroupProps {
@@ -39,26 +40,17 @@ export function ToolCallGroup({ toolCalls, results }: ToolCallGroupProps) {
 
   // ── Icon ──────────────────────────────────────────────────────────────
 
-  const StatusIcon = isExecuting ? Loader2 : Check;
-  const statusIconClass = isExecuting ? 'animate-spin' : '';
+  const statusIcon = isExecuting ? Loader2 : Check;
+  const statusIconClass = isExecuting ? 'animate-spin' : undefined;
 
   return (
     <div className="max-w-full">
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
-        className="group/toolgroup flex max-w-full items-center gap-1.5 py-0.5 text-foreground-tertiary transition-colors hover:text-foreground-secondary"
+        className="group/disc flex max-w-full items-center gap-1.5 py-0.5 text-foreground-tertiary transition-colors hover:text-foreground-secondary"
       >
-        <span className="flex h-4 w-3.5 shrink-0 items-center justify-center">
-          {expanded ? (
-            <ChevronDown size={14} strokeWidth={1.8} className="rotate-180" />
-          ) : (
-            <>
-              <StatusIcon size={14} strokeWidth={1.6} className={`group-hover/toolgroup:hidden ${statusIconClass}`} />
-              <ChevronDown size={14} strokeWidth={1.8} className="hidden group-hover/toolgroup:block" />
-            </>
-          )}
-        </span>
+        <DisclosureIcon expanded={expanded} icon={statusIcon} iconClass={statusIconClass} />
         <span className="min-w-0 truncate text-xs">
           {titleText}
           {failedSuffix && <span className="text-destructive">{failedSuffix}</span>}

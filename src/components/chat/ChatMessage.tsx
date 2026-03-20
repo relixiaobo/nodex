@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { AssistantMessage, ToolCall, ToolResultMessage } from '@mariozechner/pi-ai';
 import { toast } from 'sonner';
 import type { ChatConversationMessage, ChatMessageEntry } from '../../hooks/use-agent.js';
-import { Brain, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, Pencil, RefreshCw } from '../../lib/icons.js';
+import { Brain, Check, ChevronLeft, ChevronRight, Copy, Pencil, RefreshCw } from '../../lib/icons.js';
+import { DisclosureIcon } from './DisclosureIcon.js';
 import { MarkdownContent } from './MarkdownRenderer.js';
 import { ToolCallBlock } from './ToolCallBlock.js';
 import { ToolCallGroup } from './ToolCallGroup.js';
@@ -59,18 +60,9 @@ function ThinkingBlock({ text, streaming }: { text: string; streaming: boolean }
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
-        className="group/thinking flex max-w-full items-center gap-1.5 py-0.5 text-foreground-tertiary transition-colors hover:text-foreground-secondary"
+        className="group/disc flex max-w-full items-center gap-1.5 py-0.5 text-foreground-tertiary transition-colors hover:text-foreground-secondary"
       >
-        <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center">
-          {expanded ? (
-            <ChevronDown size={14} strokeWidth={1.8} className="rotate-180" />
-          ) : (
-            <>
-              <Brain size={14} strokeWidth={1.5} className="group-hover/thinking:hidden" />
-              <ChevronDown size={14} strokeWidth={1.8} className="hidden group-hover/thinking:block" />
-            </>
-          )}
-        </span>
+        <DisclosureIcon expanded={expanded} icon={Brain} />
         <span className="text-xs">
           {streaming && !text ? 'Thinking…' : 'Thought'}
         </span>

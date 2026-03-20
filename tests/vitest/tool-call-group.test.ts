@@ -115,9 +115,9 @@ describe('ToolCallGroup', () => {
       React.createElement(ToolCallGroup, { toolCalls }),
     );
 
-    // Icon hidden on hover, chevron shown on hover
-    expect(html).toContain('group-hover/toolgroup:hidden');
-    expect(html).toContain('group-hover/toolgroup:block');
+    // Icon hidden on hover, chevron shown on hover (DisclosureIcon uses group/disc)
+    expect(html).toContain('group-hover/disc:hidden');
+    expect(html).toContain('group-hover/disc:block');
   });
 });
 

@@ -47,7 +47,7 @@ function makeAssistantEntry(content: (ToolCall | { type: 'text'; text: string })
 // ---------------------------------------------------------------------------
 
 describe('ToolCallGroup', () => {
-  it('renders collapsed title with current step and count while executing', () => {
+  it('renders expanded with step count while executing', () => {
     const toolCalls = [
       makeToolCall('tc1', 'browser', { action: 'navigate', url: 'https://google.com' }),
       makeToolCall('tc2', 'browser', { action: 'click', elementDescription: 'Search' }),
@@ -63,9 +63,10 @@ describe('ToolCallGroup', () => {
       React.createElement(ToolCallGroup, { toolCalls, results }),
     );
 
-    // Should show latest step summary + step count
-    expect(html).toContain('Reading page text');
-    expect(html).toContain('step 3');
+    // Auto-expanded during execution — title shows step count, children visible
+    expect(html).toContain('3 steps');
+    // Individual tool calls should be rendered (expanded)
+    expect(html).toContain('Navigated to');
   });
 
   it('renders completed title when all have results', () => {
@@ -105,17 +106,20 @@ describe('ToolCallGroup', () => {
     expect(html).toContain('2 failed');
   });
 
-  it('renders hover interaction (chevron on group hover)', () => {
+  it('renders hover interaction (chevron on group hover) when completed', () => {
     const toolCalls = [
       makeToolCall('tc1', 'node_read'),
       makeToolCall('tc2', 'node_read'),
     ];
+    const results = new Map<string, ToolResultMessage>();
+    results.set('tc1', makeResult('tc1', 'node_read'));
+    results.set('tc2', makeResult('tc2', 'node_read'));
 
     const html = renderToStaticMarkup(
-      React.createElement(ToolCallGroup, { toolCalls }),
+      React.createElement(ToolCallGroup, { toolCalls, results }),
     );
 
-    // Icon hidden on hover, chevron shown on hover
+    // Completed → collapsed → icon hidden on hover, chevron shown on hover
     expect(html).toContain('group-hover/toolgroup:hidden');
     expect(html).toContain('group-hover/toolgroup:block');
   });
@@ -133,10 +137,10 @@ describe('ChatMessage tool call grouping', () => {
       React.createElement(ChatMessage, { entry }),
     );
 
-    // Should contain group indicator (step count)
-    expect(html).toContain('step 3');
-    // Should NOT contain 3 separate top-level tool call items
-    // (the group renders as one block)
+    // Should contain group indicator (auto-expanded during execution)
+    expect(html).toContain('3 steps');
+    // Individual steps should be visible (expanded)
+    expect(html).toContain('Navigating to');
   });
 
   it('does not group a single toolCall', () => {
@@ -167,8 +171,8 @@ describe('ChatMessage tool call grouping', () => {
 
     // Text block should break groups — two groups of 2
     expect(html).toContain('Found some info.');
-    // Both groups should show "step 2"
-    const stepMatches = html.match(/step 2/g);
+    // Both groups should show "2 steps" (auto-expanded during execution)
+    const stepMatches = html.match(/2 steps/g);
     expect(stepMatches).not.toBeNull();
     expect(stepMatches!.length).toBe(2);
   });

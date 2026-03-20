@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ToolCall, ToolResultMessage } from '@mariozechner/pi-ai';
 import { ChevronDown, ListChecks, Loader2 } from '../../lib/icons.js';
 import { ToolCallBlock, getStatus, summarizeToolCall } from './ToolCallBlock.js';
@@ -9,8 +9,6 @@ interface ToolCallGroupProps {
 }
 
 export function ToolCallGroup({ toolCalls, results }: ToolCallGroupProps) {
-  const [expanded, setExpanded] = useState(false);
-
   const total = toolCalls.length;
   let failed = 0;
   let isExecuting = false;
@@ -19,6 +17,29 @@ export function ToolCallGroup({ toolCalls, results }: ToolCallGroupProps) {
     const s = getStatus(results?.get(tc.id));
     if (s === 'pending') isExecuting = true;
     else if (s === 'error') failed++;
+  }
+
+  // Auto-expand while executing, auto-collapse when done.
+  // User manual toggle overrides auto behavior.
+  const [userToggled, setUserToggled] = useState(false);
+  const [expanded, setExpanded] = useState(isExecuting);
+  const wasExecuting = useRef(isExecuting);
+
+  useEffect(() => {
+    if (wasExecuting.current && !isExecuting && !userToggled) {
+      // Just finished executing → auto-collapse
+      setExpanded(false);
+    }
+    if (!wasExecuting.current && isExecuting && !userToggled) {
+      // Just started executing → auto-expand
+      setExpanded(true);
+    }
+    wasExecuting.current = isExecuting;
+  }, [isExecuting, userToggled]);
+
+  function handleToggle() {
+    setUserToggled(true);
+    setExpanded((v) => !v);
   }
 
   const latestToolCall = toolCalls[total - 1];
@@ -46,7 +67,7 @@ export function ToolCallGroup({ toolCalls, results }: ToolCallGroupProps) {
     <div className="max-w-full">
       <button
         type="button"
-        onClick={() => setExpanded((v) => !v)}
+        onClick={handleToggle}
         className="group/toolgroup flex max-w-full items-center gap-1.5 py-0.5 text-foreground-tertiary transition-colors hover:text-foreground-secondary"
       >
         <span className="flex h-4 w-3.5 shrink-0 items-center justify-center">

@@ -211,7 +211,7 @@ function TabHead({ nodeId, onClickBody, onClose, menuOpen, tabRef, children }: T
     >
       {/* Name area — interactive only when onClickBody is provided */}
       <div
-        className={`group/name flex min-w-0 flex-1 ml-1 h-7 items-center rounded-md transition-colors ${onClickBody ? 'cursor-pointer hover:bg-foreground/4' : ''}`}
+        className={`group/name relative flex min-w-0 flex-1 ml-1 h-7 items-center rounded-md transition-colors ${onClickBody ? 'cursor-pointer hover:bg-foreground/4' : ''}`}
         onClick={onClickBody}
         role={menuOpen !== undefined ? 'button' : undefined}
         aria-haspopup={menuOpen !== undefined ? 'menu' : undefined}
@@ -228,6 +228,7 @@ function TabHead({ nodeId, onClickBody, onClose, menuOpen, tabRef, children }: T
             className={`shrink-0 mr-1.5 text-foreground-tertiary transition-all ${menuOpen ? 'opacity-100 rotate-180' : 'opacity-0 group-hover/name:opacity-100'}`}
           />
         )}
+        {children}
       </div>
       {/* Close button */}
       {onClose && (
@@ -240,7 +241,6 @@ function TabHead({ nodeId, onClickBody, onClose, menuOpen, tabRef, children }: T
           <X size={12} />
         </button>
       )}
-      {children}
     </div>
   );
 }
@@ -374,7 +374,7 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
             tabRef={panels.length > 1 ? notesMenuRef : undefined}
           >
             {panels.length > 1 && notesMenuOpen && (
-              <div className="absolute left-1 right-1 top-full z-50 mt-1 min-w-[220px] rounded-lg bg-background p-1 shadow-paper">
+              <div className="absolute left-0 right-0 top-full z-50 mt-0.5 min-w-[220px] rounded-lg bg-background p-1 shadow-paper">
                 {panels.map((panel) => {
                   const active = panel.id === activePanelId;
 

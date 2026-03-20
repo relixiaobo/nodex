@@ -332,7 +332,6 @@ export function MarkdownContent({ text, streaming = false, keyPrefix }: Markdown
               <Markdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={components}>
                 {block}
               </Markdown>
-              <span className="ml-1 inline-block h-3 w-1.5 animate-pulse rounded-sm bg-primary align-[-2px]" />
             </div>
           );
         }

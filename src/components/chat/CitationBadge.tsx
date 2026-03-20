@@ -35,9 +35,15 @@ export function CitationBadge({ id, label, type = 'node' }: CitationBadgeProps) 
       ? 'Past conversation'
       : id; // url — show the URL itself
 
+  const typeColor = type === 'chat'
+    ? 'border-secondary/40 hover:border-secondary/60 hover:text-secondary-foreground'
+    : type === 'url'
+      ? 'border-primary/30 hover:border-primary/50 hover:text-primary'
+      : 'border-border hover:border-primary/30 hover:text-foreground';
+
   return (
     <>
-      <sup className="mx-0.5 align-[0.3em]">
+      <sup className="mx-px align-[0.4em]">
         <button
           ref={triggerRef}
           type="button"
@@ -45,10 +51,10 @@ export function CitationBadge({ id, label, type = 'node' }: CitationBadgeProps) 
           disabled={isDisabled}
           title={title}
           className={[
-            'inline-flex min-w-4 items-center justify-center rounded-full border px-1 text-xs leading-4',
+            'inline-flex min-w-3 items-center justify-center rounded-full border px-0.5 text-[9px] leading-3',
             isDisabled
               ? 'cursor-default border-border bg-background text-foreground-tertiary line-through'
-              : 'border-border bg-background text-foreground-secondary transition-colors hover:border-primary/30 hover:text-foreground',
+              : `bg-background text-foreground-tertiary transition-colors ${typeColor}`,
           ].join(' ')}
         >
           {label}

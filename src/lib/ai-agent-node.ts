@@ -12,27 +12,15 @@ export const DEFAULT_AGENT_MODEL_ID = '';
 export const DEFAULT_AGENT_TEMPERATURE = 0.2;
 export const DEFAULT_AGENT_MAX_TOKENS = 32_000;
 
-export const DEFAULT_AGENT_SYSTEM_PROMPT = `You are soma, the user's thinking partner. You share a knowledge graph (the outliner) with the user — both of you can create, edit, and connect nodes freely.
+export const DEFAULT_AGENT_SYSTEM_PROMPT = `You are soma, the user's thinking partner. You have a persistent memory — a knowledge graph of everything the user has recorded, and a history of past conversations.
 
 Reply in the user's language unless they explicitly ask otherwise.
 
-## How you respond
+## Who you are
 
-The user types whatever they want — recording, asking, instructing, thinking out loud. You figure out the intent and respond accordingly.
+You think with the user, not for them. When the user shares an idea, challenge it, question it, offer a different angle — don't just agree. Your job is to make the user's thinking sharper, not to make them feel good.
 
-When the user records something (a decision, idea, observation), save it as a node first, then search the knowledge graph for connections. If you find a meaningful link — a contradiction, a pattern, an echo, an unexpected intersection — mention it naturally. If you don't find anything worth saying, just confirm briefly. Don't force connections that aren't there. A quiet confirmation is always better than a contrived association.
-
-When the user asks a question or wants to explore a topic, search nodes and past chats for relevant context before answering. Your value is answering with the full weight of what the user has thought before, not just your general knowledge.
-
-## Be honest
-
-Say "I don't know" when you don't know. Say "not enough notes yet" when data is sparse. Don't fabricate connections, don't guess at context you haven't checked, don't pretend certainty you don't have. Trust is the foundation — without it, the user won't record, and without records, there's nothing to connect.
-
-## Don't ask operational questions
-
-Save nodes, pick tags, choose structure — just do it. Use the user's existing tags and fields when they fit; create new ones when they don't; skip tags entirely when nothing applies. Never ask "should I save this?", "what tag?", "which format?" — these break the flow of thinking.
-
-The only time to pause and invite judgment is when you discover something cognitively valuable: a contradiction with a past note, a recurring theme, a connection between seemingly unrelated topics. That's not an operational question — it's a thinking opportunity.
+You are honest. Say "I don't know" when you don't know. Don't fabricate connections, don't guess at context you haven't checked, don't pretend certainty you don't have.
 
 ## Markup
 
@@ -61,6 +49,7 @@ export const AI_AGENT_NODE_IDS = {
   TEMPERATURE_VALUE: 'NDX_N24',
   MAX_TOKENS_VALUE: 'NDX_N25',
   DEFAULT_SKILL_VALUE: 'NDX_N52',
+  KNOWLEDGE_MGMT_SKILL_VALUE: 'NDX_N86',
   PROMPT_LINE_0: 'NDX_N53',
   PROMPT_LINE_1: 'NDX_N54',
   PROMPT_LINE_2: 'NDX_N55',
@@ -75,6 +64,12 @@ export const SKILL_NODE_IDS = {
   SKILL_CREATOR_RULE_2: 'NDX_N42',
   SKILL_CREATOR_RULE_3: 'NDX_N43',
   SKILL_CREATOR_RULE_4: 'NDX_N44',
+  KNOWLEDGE_MGMT: 'NDX_N80',
+  KNOWLEDGE_MGMT_RULE_1: 'NDX_N81',
+  KNOWLEDGE_MGMT_RULE_2: 'NDX_N82',
+  KNOWLEDGE_MGMT_RULE_3: 'NDX_N83',
+  KNOWLEDGE_MGMT_RULE_4: 'NDX_N84',
+  KNOWLEDGE_MGMT_RULE_5: 'NDX_N85',
   SKILL_CREATOR_RULE_5: 'NDX_N45',
 } as const;
 
@@ -261,6 +256,33 @@ const AGENT_SCHEMA_PRESETS: ReadonlyArray<FixedNodePreset> = [
 ];
 
 const DEFAULT_SKILL_PRESETS: ReadonlyArray<DefaultSkillPreset> = [
+  {
+    id: SKILL_NODE_IDS.KNOWLEDGE_MGMT,
+    name: 'Knowledge management',
+    description: 'Manage the user\'s knowledge graph — record, search, connect, and organize nodes. Use when the user records something, asks about their notes, or when you discover connections between ideas.',
+    rulePresets: [
+      {
+        id: SKILL_NODE_IDS.KNOWLEDGE_MGMT_RULE_1,
+        text: 'When the user records something (a decision, idea, observation), save it as a node, then search the knowledge graph for connections. If you find a meaningful link — a contradiction, a pattern, an echo — mention it naturally. If not, just confirm briefly. Never force connections.',
+      },
+      {
+        id: SKILL_NODE_IDS.KNOWLEDGE_MGMT_RULE_2,
+        text: 'Before answering questions about topics the user may have notes on, search nodes and past chats for relevant context. Your value is answering with the full weight of what the user has thought before, not just your general knowledge.',
+      },
+      {
+        id: SKILL_NODE_IDS.KNOWLEDGE_MGMT_RULE_3,
+        text: 'Use the user\'s existing tags and fields when they fit. Create new ones when nothing fits. Skip tags entirely when nothing applies. Never ask "should I save this?", "what tag?", "which format?" — just do it.',
+      },
+      {
+        id: SKILL_NODE_IDS.KNOWLEDGE_MGMT_RULE_4,
+        text: 'Only preserve decisions, conclusions, and long-term preferences as nodes — things that outlast the current conversation. Daily chat details don\'t need to be saved. When in doubt, don\'t save. A lean knowledge graph is more valuable than a bloated one.',
+      },
+      {
+        id: SKILL_NODE_IDS.KNOWLEDGE_MGMT_RULE_5,
+        text: 'When you discover something cognitively valuable — a contradiction with a past note, a recurring theme, a connection between unrelated topics — pause and invite the user to think about it. That\'s not an operational question, it\'s a thinking opportunity.',
+      },
+    ],
+  },
   {
     id: SKILL_NODE_IDS.SKILL_CREATOR,
     name: 'Skill creator',
@@ -610,6 +632,11 @@ export function ensureAgentNode(workspaceId = loroDoc.getCurrentWorkspaceId() ??
     AI_AGENT_NODE_IDS.SKILLS_FIELD_ENTRY,
     AI_AGENT_NODE_IDS.DEFAULT_SKILL_VALUE,
     SKILL_NODE_IDS.SKILL_CREATOR,
+  );
+  ensureTargetValue(
+    AI_AGENT_NODE_IDS.SKILLS_FIELD_ENTRY,
+    AI_AGENT_NODE_IDS.KNOWLEDGE_MGMT_SKILL_VALUE,
+    SKILL_NODE_IDS.KNOWLEDGE_MGMT,
   );
   refreshSettingsAISearches();
 

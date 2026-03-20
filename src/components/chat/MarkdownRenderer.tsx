@@ -325,10 +325,9 @@ export function MarkdownContent({ text, streaming = false, keyPrefix }: Markdown
 
         if (streaming && isLast) {
           // Last block during streaming: no memo (content changes every tick).
-          // [data-streaming] CSS makes a single <p> inline so cursor follows text.
           const components = buildComponents(blockKey, placeholders);
           return (
-            <div key={blockKey} data-streaming="">
+            <div key={blockKey}>
               <Markdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={components}>
                 {block}
               </Markdown>

@@ -183,12 +183,20 @@ export function ChatMessage({
     setEditText(text);
   }, [isEditing, text]);
 
+  // Focus + cursor to end only when entering edit mode
   useEffect(() => {
     if (!isEditing) return;
     const el = textareaRef.current;
     if (!el) return;
     el.focus();
     el.setSelectionRange(el.value.length, el.value.length);
+  }, [isEditing]);
+
+  // Auto-resize height on every content change
+  useEffect(() => {
+    if (!isEditing) return;
+    const el = textareaRef.current;
+    if (!el) return;
     el.style.height = '0px';
     el.style.height = `${Math.max(el.scrollHeight, 40)}px`;
   }, [editText, isEditing]);

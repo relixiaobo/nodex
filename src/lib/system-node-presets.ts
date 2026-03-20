@@ -1,5 +1,6 @@
 import { SYSTEM_NODE_IDS, SYSTEM_TAGS } from '../types/index.js';
 import * as loroDoc from './loro-doc.js';
+import { SETTINGS_AI_NODE_IDS } from './ai-system-node-ids.js';
 
 export type SystemNodeIconKey =
   | 'library'
@@ -26,9 +27,9 @@ export interface SystemNodePreset {
 }
 
 export const SYSTEM_NODE_PRESETS: ReadonlyArray<SystemNodePreset> = [
-  { id: SYSTEM_NODE_IDS.LIBRARY, defaultName: 'Library', iconKey: 'library', bootstrap: false, locked: false, canEditStructure: true, canEditFieldValues: true, quickNav: false, paletteSearchable: true },
-  { id: SYSTEM_NODE_IDS.INBOX, defaultName: 'Inbox', iconKey: 'inbox', bootstrap: false, locked: false, canEditStructure: true, canEditFieldValues: true, quickNav: false, paletteSearchable: true },
   { id: SYSTEM_NODE_IDS.JOURNAL, defaultName: 'Daily notes', iconKey: 'journal', bootstrap: true, locked: true, canEditStructure: false, canEditFieldValues: false, quickNav: true, paletteSearchable: true },
+  { id: SYSTEM_NODE_IDS.LIBRARY, defaultName: 'Library', iconKey: 'library', bootstrap: true, locked: true, canEditStructure: true, canEditFieldValues: true, quickNav: false, paletteSearchable: true },
+  { id: SYSTEM_NODE_IDS.INBOX, defaultName: 'Inbox', iconKey: 'inbox', bootstrap: false, locked: false, canEditStructure: true, canEditFieldValues: true, quickNav: false, paletteSearchable: true },
   { id: SYSTEM_NODE_IDS.AGENT, defaultName: 'soma', iconKey: 'ai', bootstrap: false, locked: false, canEditStructure: true, canEditFieldValues: true, quickNav: false, paletteSearchable: true },
   { id: SYSTEM_NODE_IDS.SEARCHES, defaultName: 'Searches', iconKey: 'search', bootstrap: false, locked: false, canEditStructure: true, canEditFieldValues: true, quickNav: false, paletteSearchable: true },
   { id: SYSTEM_NODE_IDS.TRASH, defaultName: 'Trash', iconKey: 'trash', bootstrap: true, locked: true, canEditStructure: false, canEditFieldValues: false, quickNav: true, paletteSearchable: true },
@@ -36,6 +37,9 @@ export const SYSTEM_NODE_PRESETS: ReadonlyArray<SystemNodePreset> = [
   { id: SYSTEM_NODE_IDS.CLIPS, defaultName: 'Clips', iconKey: 'clips', bootstrap: false, locked: false, canEditStructure: true, canEditFieldValues: true, quickNav: false, paletteSearchable: true },
   { id: SYSTEM_NODE_IDS.STASH, defaultName: 'Stash', iconKey: 'stash', bootstrap: false, locked: false, canEditStructure: true, canEditFieldValues: true, quickNav: false, paletteSearchable: true },
   { id: SYSTEM_NODE_IDS.SETTINGS, defaultName: 'Settings', iconKey: 'settings', bootstrap: true, locked: true, canEditStructure: false, canEditFieldValues: true, quickNav: false, paletteSearchable: true },
+  { id: SETTINGS_AI_NODE_IDS.AI, defaultName: 'AI', iconKey: 'ai', bootstrap: false, locked: true, canEditStructure: false, canEditFieldValues: true, quickNav: false, paletteSearchable: false },
+  { id: SETTINGS_AI_NODE_IDS.AGENTS, defaultName: 'Agents', iconKey: 'search', bootstrap: false, locked: true, canEditStructure: false, canEditFieldValues: false, quickNav: false, paletteSearchable: false },
+  { id: SETTINGS_AI_NODE_IDS.SKILLS, defaultName: 'Skills', iconKey: 'search', bootstrap: false, locked: true, canEditStructure: false, canEditFieldValues: false, quickNav: false, paletteSearchable: false },
   { id: SYSTEM_NODE_IDS.SPARK_AGENT, defaultName: 'Spark', iconKey: 'ai', bootstrap: false, locked: false, canEditStructure: true, canEditFieldValues: true, quickNav: false, paletteSearchable: true },
   { id: SYSTEM_TAGS.DAY, defaultName: 'day', iconKey: 'journal', bootstrap: false, locked: true, canEditStructure: true, canEditFieldValues: true, quickNav: false, paletteSearchable: false },
   { id: SYSTEM_TAGS.WEEK, defaultName: 'week', iconKey: 'journal', bootstrap: false, locked: true, canEditStructure: true, canEditFieldValues: true, quickNav: false, paletteSearchable: false },

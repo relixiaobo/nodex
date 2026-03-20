@@ -6,6 +6,7 @@
  *
  * @see docs/plans/search-node-design.md
  */
+import { nanoid } from 'nanoid';
 import * as loroDoc from './loro-doc.js';
 import { SYSTEM_NODE_IDS } from '../types/index.js';
 import { isLockedNode, isWorkspaceHomeNode } from './node-capabilities.js';
@@ -179,6 +180,46 @@ export function runSearch(searchNodeId: string): Set<string> {
   }
 
   return matched;
+}
+
+/**
+ * Materialize a search node's live result set as reference children.
+ *
+ * Keeps queryCondition children intact, removes stale result references,
+ * adds new ones, updates lastRefreshedAt, and commits with system:refresh.
+ */
+export function materializeSearchResults(searchNodeId: string): void {
+  const searchNode = loroDoc.toNodexNode(searchNodeId);
+  if (!searchNode || searchNode.type !== 'search') return;
+
+  const matchedIds = runSearch(searchNodeId);
+
+  const existingRefs = new Map<string, string>();
+  for (const childId of searchNode.children) {
+    const child = loroDoc.toNodexNode(childId);
+    if (child?.type === 'reference' && child.targetId) {
+      existingRefs.set(child.targetId, childId);
+    }
+  }
+
+  for (const [targetId, refNodeId] of existingRefs) {
+    if (!matchedIds.has(targetId)) {
+      loroDoc.deleteNode(refNodeId);
+    }
+  }
+
+  for (const targetId of matchedIds) {
+    if (existingRefs.has(targetId)) continue;
+    const refId = nanoid();
+    loroDoc.createNode(refId, searchNodeId);
+    loroDoc.setNodeDataBatch(refId, {
+      type: 'reference',
+      targetId,
+    });
+  }
+
+  loroDoc.setNodeData(searchNodeId, 'lastRefreshedAt', Date.now());
+  loroDoc.commitDoc('system:refresh');
 }
 
 /**

@@ -1,7 +1,7 @@
 {
   "name": "soma",
-  "version": "0.1.2",
-  "description": "Think where you read — knowledge management in your browser side panel",
+  "version": "0.2.0",
+  "description": "Think with your AI — your thinking partner in the browser",
   "type": "module",
   "scripts": {
     "dev": "wxt",

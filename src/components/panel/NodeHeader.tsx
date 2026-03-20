@@ -238,7 +238,7 @@ export function NodeHeader({ nodeId, panelId = 'main', onTitleRef }: NodeHeaderP
               <SystemNodeIcon size={20} />
             </span>
           )}
-          {isSearchNode && (
+          {isSearchNode && !systemNodePreset && (
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-foreground/[0.04] mix-blend-multiply text-foreground-tertiary">
               <Search size={20} />
             </span>

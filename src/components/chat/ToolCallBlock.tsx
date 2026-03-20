@@ -18,9 +18,9 @@ interface ToolCallBlockProps {
 // Status
 // ---------------------------------------------------------------------------
 
-type ToolStatus = 'pending' | 'done' | 'error';
+export type ToolStatus = 'pending' | 'done' | 'error';
 
-function getStatus(result?: ToolResultMessage): ToolStatus {
+export function getStatus(result?: ToolResultMessage): ToolStatus {
   if (!result) return 'pending';
   return result.isError ? 'error' : 'done';
 }
@@ -107,7 +107,7 @@ function verbByStatus(forms: VerbForms, status: ToolStatus): string {
 // Summarize
 // ---------------------------------------------------------------------------
 
-function summarizeToolCall(toolCall: ToolCall, status: ToolStatus): string {
+export function summarizeToolCall(toolCall: ToolCall, status: ToolStatus): string {
   const { name, arguments: args } = toolCall;
   const subject = pickSubject(args, 'name', 'query');
 

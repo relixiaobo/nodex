@@ -60,15 +60,15 @@ export function AboutSection() {
     <div className="flex flex-col pr-4 pb-4">
       {/* About soma */}
       <ParentRow
-        text="Think where you read"
-        description={<><em>"Words can be like X-rays if you use them properly."</em> — Huxley</>}
+        text="Think with your AI"
+        description={<><em>"The test of a first-rate intelligence is the ability to hold two opposed ideas in mind at the same time and still retain the ability to function."</em> — Fitzgerald</>}
         expanded={aboutExpanded}
         onToggle={useCallback(() => setAboutExpanded((v) => !v), [])}
         isHeading
       >
-        <LeafRow>You read more than you realize. But most of it slips away — not because it wasn't good, but because you <strong className="font-semibold text-foreground">never stopped to put it in your own words</strong>.</LeafRow>
-        <LeafRow>One sentence is enough. A reaction, a doubt, a connection to something you already know. <strong className="font-semibold text-foreground">That's where understanding begins.</strong></LeafRow>
-        <LeafRow>Do this over weeks and months, and something shifts — your notes <strong className="font-semibold text-foreground">start connecting</strong>, patterns surface, and you begin to see <strong className="font-semibold text-foreground">what you actually think</strong>, not just what you've read.</LeafRow>
+        <LeafRow>soma is your <strong className="font-semibold text-foreground">thinking partner</strong>. It challenges your ideas, questions your assumptions, and connects what you know — so you see more clearly.</LeafRow>
+        <LeafRow>Record a thought, and soma searches your knowledge graph for <strong className="font-semibold text-foreground">contradictions, patterns, and unexpected connections</strong>. If it finds something worth thinking about, it tells you. If not, it stays quiet.</LeafRow>
+        <LeafRow>Over time, your conversations and notes <strong className="font-semibold text-foreground">become a shared memory</strong> that makes every future conversation deeper. soma grows with you — it remembers what you discussed, learns how you think, and evolves as you do.</LeafRow>
       </ParentRow>
 
       {/* What's New */}

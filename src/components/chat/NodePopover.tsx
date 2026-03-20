@@ -7,6 +7,7 @@
  */
 import { useCallback, useEffect, useState, type RefObject } from 'react';
 import { ExternalLink } from '../../lib/icons.js';
+import * as loroDoc from '../../lib/loro-doc.js';
 import { useUIStore } from '../../stores/ui-store.js';
 import { OutlinerItem } from '../outliner/OutlinerItem.js';
 import { useNode } from '../../hooks/use-node.js';
@@ -15,9 +16,6 @@ import { PopoverShell } from './PopoverShell.js';
 
 /** Shared panelId for all OutlinerViews rendered inside Chat (popover + embed). */
 export const CHAT_OUTLINER_PANEL_ID = 'chat';
-
-/** Synthetic parent ID for root-level items in chat context. */
-export const CHAT_ROOT_PARENT_ID = '__chat_root__';
 
 const POPOVER_MAX_HEIGHT = 320;
 
@@ -54,14 +52,15 @@ export function NodePopover({ nodeId, anchorRect, onClose }: NodePopoverProps) {
   const navigateTo = useUIStore((s) => s.navigateTo);
   const setExpanded = useUIStore((s) => s.setExpanded);
   const node = useNode(nodeId);
+  const realParentId = loroDoc.getParentId(nodeId) ?? nodeId;
   const hasChildren = (node?.children?.length ?? 0) > 0;
 
   // Auto-expand on mount so children are visible
   useEffect(() => {
     if (hasChildren) {
-      setExpanded(`${CHAT_OUTLINER_PANEL_ID}:${CHAT_ROOT_PARENT_ID}:${nodeId}`, true, true);
+      setExpanded(`${CHAT_OUTLINER_PANEL_ID}:${realParentId}:${nodeId}`, true, true);
     }
-  }, [nodeId, hasChildren, setExpanded]);
+  }, [nodeId, realParentId, hasChildren, setExpanded]);
 
   const handleOpenInPanel = useCallback(() => {
     navigateTo(nodeId);
@@ -78,8 +77,8 @@ export function NodePopover({ nodeId, anchorRect, onClose }: NodePopoverProps) {
           nodeId={nodeId}
           depth={0}
           rootChildIds={[nodeId]}
-          parentId={CHAT_ROOT_PARENT_ID}
-          rootNodeId={CHAT_ROOT_PARENT_ID}
+          parentId={realParentId}
+          rootNodeId={realParentId}
           panelId={CHAT_OUTLINER_PANEL_ID}
         />
       </div>

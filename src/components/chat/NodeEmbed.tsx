@@ -7,8 +7,9 @@
 import { useEffect } from 'react';
 import { useNode } from '../../hooks/use-node.js';
 import { useUIStore } from '../../stores/ui-store.js';
+import * as loroDoc from '../../lib/loro-doc.js';
 import { OutlinerItem } from '../outliner/OutlinerItem.js';
-import { CHAT_OUTLINER_PANEL_ID, CHAT_ROOT_PARENT_ID } from './NodePopover.js';
+import { CHAT_OUTLINER_PANEL_ID } from './NodePopover.js';
 
 interface NodeEmbedProps {
   nodeId: string;
@@ -17,14 +18,15 @@ interface NodeEmbedProps {
 export function NodeEmbed({ nodeId }: NodeEmbedProps) {
   const node = useNode(nodeId);
   const setExpanded = useUIStore((s) => s.setExpanded);
+  const realParentId = loroDoc.getParentId(nodeId) ?? nodeId;
   const hasChildren = (node?.children?.length ?? 0) > 0;
 
   // Auto-expand on mount so children are visible
   useEffect(() => {
     if (hasChildren) {
-      setExpanded(`${CHAT_OUTLINER_PANEL_ID}:${CHAT_ROOT_PARENT_ID}:${nodeId}`, true, true);
+      setExpanded(`${CHAT_OUTLINER_PANEL_ID}:${realParentId}:${nodeId}`, true, true);
     }
-  }, [nodeId, hasChildren, setExpanded]);
+  }, [nodeId, realParentId, hasChildren, setExpanded]);
 
   if (!node) {
     return (
@@ -40,8 +42,8 @@ export function NodeEmbed({ nodeId }: NodeEmbedProps) {
         nodeId={nodeId}
         depth={0}
         rootChildIds={[nodeId]}
-        parentId={CHAT_ROOT_PARENT_ID}
-        rootNodeId={CHAT_ROOT_PARENT_ID}
+        parentId={realParentId}
+        rootNodeId={realParentId}
         panelId={CHAT_OUTLINER_PANEL_ID}
       />
     </div>

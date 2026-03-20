@@ -232,8 +232,7 @@ describe('search-engine', () => {
       const condId = loroDoc.createNode(undefined, andGroupId);
       loroDoc.setNodeDataBatch(condId, {
         type: 'queryCondition',
-        queryOp: 'FIELD_IS',
-        queryFieldDefId: 'some_field',
+        queryOp: 'REGEXP_MATCH',
       });
       loroDoc.commitDoc('__seed__');
 

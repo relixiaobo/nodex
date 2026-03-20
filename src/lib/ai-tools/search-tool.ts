@@ -10,7 +10,6 @@
 import type { AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core';
 import { Type } from '@mariozechner/pi-ai';
 import * as loroDoc from '../loro-doc.js';
-import { SYSTEM_NODE_IDS } from '../../types/index.js';
 import { fuzzySort } from '../fuzzy-search.js';
 import { getFieldValue } from '../filter-utils.js';
 import { computeBacklinks, buildBacklinkCountMap } from '../backlinks.js';
@@ -22,10 +21,12 @@ import type { NodexNode } from '../../types/node.js';
 import {
   MAX_PAGE_SIZE,
   DEFAULT_PAGE_SIZE,
+  findFieldDefIdInSchema,
   findTagDefIdByName,
   getTagDisplayNames,
   isSearchCandidate,
   formatResultText,
+  parseSortBy,
 } from './shared.js';
 
 const searchToolParameters = Type.Object({
@@ -34,20 +35,9 @@ const searchToolParameters = Type.Object({
   fields: Type.Optional(Type.Record(Type.String(), Type.String(), { description: 'Filter by field values, e.g. {"Status": "Todo"}. Field names must match existing tag field definitions.' })),
   linkedTo: Type.Optional(Type.String({ description: 'Find all nodes that reference this node ID (backlinks).' })),
   parentId: Type.Optional(Type.String({ description: 'Restrict search to descendants of this node.' })),
-  dateRange: Type.Optional(Type.Object({
-    from: Type.Optional(Type.String({ description: 'Start date (inclusive), ISO format e.g. "2026-01-15".' })),
-    to: Type.Optional(Type.String({ description: 'End date (inclusive), ISO format e.g. "2026-03-12".' })),
-  }, { description: 'Filter by creation date range.' })),
-  sort: Type.Optional(Type.Object({
-    field: Type.Union([
-      Type.Literal('relevance'),
-      Type.Literal('created'),
-      Type.Literal('modified'),
-      Type.Literal('name'),
-      Type.Literal('refCount'),
-    ], { description: 'Sort field. "refCount" = number of backlinks. Default: "relevance" if query is set, "modified" otherwise.' }),
-    order: Type.Optional(Type.Union([Type.Literal('asc'), Type.Literal('desc')], { description: 'Sort direction. Default: "desc".' })),
-  }, { description: 'Sort configuration.' })),
+  after: Type.Optional(Type.String({ description: 'Creation date lower bound (inclusive), ISO format e.g. "2026-01-15".' })),
+  before: Type.Optional(Type.String({ description: 'Creation date upper bound (inclusive), ISO format e.g. "2026-03-12".' })),
+  sortBy: Type.Optional(Type.String({ description: 'Sort string: "field" or "field:order". field = relevance|created|modified|name|refCount.' })),
   limit: Type.Optional(Type.Integer({ minimum: 1, maximum: MAX_PAGE_SIZE, default: DEFAULT_PAGE_SIZE, description: 'Max results per page (default 20, max 50).' })),
   offset: Type.Optional(Type.Integer({ minimum: 0, default: 0, description: 'Pagination offset.' })),
   count: Type.Optional(Type.Boolean({ description: 'If true, return only the total count — no items.' })),
@@ -62,25 +52,6 @@ function toTimestamp(dateText: string | undefined, endOfDay: boolean): number | 
   const suffix = endOfDay ? 'T23:59:59.999' : 'T00:00:00';
   const value = new Date(`${dateText}${suffix}`).getTime();
   return Number.isFinite(value) ? value : null;
-}
-
-/**
- * Resolve field display name → fieldDefId by scanning tagDef children under SCHEMA.
- * FieldDefs are grandchildren of SCHEMA (SCHEMA → tagDef → fieldDef).
- */
-function resolveFieldDefId(fieldName: string): string | null {
-  const normalized = fieldName.trim().toLowerCase();
-  for (const tagDefId of loroDoc.getChildren(SYSTEM_NODE_IDS.SCHEMA)) {
-    const tagDef = loroDoc.toNodexNode(tagDefId);
-    if (tagDef?.type !== 'tagDef') continue;
-    for (const childId of loroDoc.getChildren(tagDefId)) {
-      const child = loroDoc.toNodexNode(childId);
-      if (child?.type === 'fieldDef' && (child.name ?? '').trim().toLowerCase() === normalized) {
-        return child.id;
-      }
-    }
-  }
-  return null;
 }
 
 /**
@@ -184,15 +155,15 @@ function searchByFilters(params: SearchToolParams, requiredTagIds: string[]): Ag
   const query = params.query?.trim() ?? '';
 
   // Date range
-  const fromTs = toTimestamp(params.dateRange?.from, false);
-  const toTs = toTimestamp(params.dateRange?.to, true);
+  const fromTs = toTimestamp(params.after, false);
+  const toTs = toTimestamp(params.before, true);
 
   // Field filters: resolve names → fieldDefIds
   const fieldFilters: Array<{ fieldDefId: string; value: string }> = [];
   const unresolvedFilters: string[] = [];
   if (params.fields) {
     for (const [name, value] of Object.entries(params.fields)) {
-      const fieldDefId = resolveFieldDefId(name);
+      const fieldDefId = findFieldDefIdInSchema(name);
       if (fieldDefId) {
         fieldFilters.push({ fieldDefId, value });
       } else {
@@ -248,8 +219,9 @@ function searchByFilters(params: SearchToolParams, requiredTagIds: string[]): Ag
   }
 
   // Sorting (relevance = fuzzySort order, skip additional sort)
-  const sortField = params.sort?.field ?? (query ? 'relevance' : 'modified');
-  const sortOrder = params.sort?.order ?? 'desc';
+  const parsedSort = parseSortBy(params.sortBy);
+  const sortField = parsedSort?.field ?? (query ? 'relevance' : 'modified');
+  const sortOrder = parsedSort?.order ?? 'desc';
 
   if (sortField !== 'relevance') {
     const store = useNodeStore.getState();
@@ -323,7 +295,7 @@ export const searchTool: AgentTool<typeof searchToolParameters, unknown> = {
   description: [
     'Search the knowledge graph. Supports text search (fuzzy, CJK), tag filtering,',
     'field value filtering, backlink lookup, date range, subtree scoping, and',
-    'structured sort. Think of it as Grep for your knowledge graph.',
+    'flat sortBy strings. Think of it as Grep for your knowledge graph.',
     '',
     'Quick patterns:',
     '- Text search: node_search(query: "API design")',
@@ -331,7 +303,8 @@ export const searchTool: AgentTool<typeof searchToolParameters, unknown> = {
     '- Backlinks: node_search(linkedTo: "nodeId")  → all nodes referencing this node',
     '- Subtree: node_search(parentId: "projectId", query: "auth")',
     '- Count only: node_search(searchTags: ["task"], count: true)',
-    '- Sorted: node_search(query: "auth", sort: { field: "modified", order: "desc" })',
+    '- Date range: node_search(after: "2026-03-01", before: "2026-03-31")',
+    '- Sorted: node_search(query: "auth", sortBy: "modified:desc")',
   ].join('\n'),
   parameters: searchToolParameters,
   execute: async (_toolCallId, params) => executeSearchTool(params),

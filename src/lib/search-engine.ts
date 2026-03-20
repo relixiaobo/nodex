@@ -11,6 +11,10 @@ import * as loroDoc from './loro-doc.js';
 import { SYSTEM_NODE_IDS } from '../types/index.js';
 import { isLockedNode, isWorkspaceHomeNode } from './node-capabilities.js';
 import type { NodexNode, NodeType, QueryOp } from '../types/node.js';
+import { getFieldValue } from './filter-utils.js';
+import { computeBacklinks } from './backlinks.js';
+
+const CREATED_AT_FIELD_SENTINEL = '__createdAt__';
 
 // ============================================================
 // Candidate filtering — which node types can appear as results
@@ -117,6 +121,46 @@ function evaluateOp(
       return hasCheckbox(candidate) &&
         (candidate.completedAt == null || candidate.completedAt === 0);
 
+    case 'FIELD_IS': {
+      const fieldDefId = condition.queryFieldDefId;
+      if (!fieldDefId) return false;
+      const candidateValues = getComparableFieldValues(candidate, fieldDefId);
+      const ruleValues = getConditionComparableValues(condition);
+      if (candidateValues.length === 0 || ruleValues.length === 0) return false;
+      return ruleValues.some((ruleValue) => candidateValues.includes(ruleValue));
+    }
+
+    case 'LINKS_TO': {
+      const targetId = getConditionTargetIds(condition)[0];
+      if (!targetId) return false;
+      const backlinks = computeBacklinks(targetId);
+      const refIds = new Set(backlinks.mentionedIn.map((m) => m.referencingNodeId));
+      for (const refs of Object.values(backlinks.fieldValueRefs)) {
+        for (const ref of refs) {
+          refIds.add(ref.ownerNodeId);
+        }
+      }
+      return refIds.has(candidate.id);
+    }
+
+    case 'PARENTS_DESCENDANTS': {
+      const scopeParentId = getConditionTargetIds(condition)[0];
+      if (!scopeParentId) return false;
+      return isDescendantOf(candidate.id, scopeParentId);
+    }
+
+    case 'GT':
+    case 'LT': {
+      const fieldDefId = condition.queryFieldDefId;
+      if (!fieldDefId) return false;
+      const candidateComparable = getComparableScalar(candidate, fieldDefId);
+      const ruleComparable = getConditionComparableScalar(condition, fieldDefId, op);
+      if (candidateComparable == null || ruleComparable == null) return false;
+      return op === 'GT'
+        ? candidateComparable >= ruleComparable
+        : candidateComparable <= ruleComparable;
+    }
+
     // All other ops: explicitly throw "not supported"
     default:
       throw new Error(`[search-engine] QueryOp "${op}" is not supported yet`);
@@ -131,6 +175,74 @@ function hasCheckbox(node: NodexNode): boolean {
   for (const tagId of node.tags) {
     const tagDef = loroDoc.toNodexNode(tagId);
     if (tagDef?.showCheckbox) return true;
+  }
+  return false;
+}
+
+function getConditionValueNodes(condition: NodexNode): NodexNode[] {
+  return condition.children
+    .map((id) => loroDoc.toNodexNode(id))
+    .filter((node): node is NodexNode => node !== null);
+}
+
+function normalizeComparableValue(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function getConditionComparableValues(condition: NodexNode): string[] {
+  return getConditionValueNodes(condition)
+    .map((node) => {
+      if (node.targetId) {
+        return normalizeComparableValue(loroDoc.toNodexNode(node.targetId)?.name ?? node.targetId);
+      }
+      return normalizeComparableValue(node.name ?? '');
+    })
+    .filter(Boolean);
+}
+
+function getConditionTargetIds(condition: NodexNode): string[] {
+  return getConditionValueNodes(condition)
+    .map((node) => node.targetId)
+    .filter((targetId): targetId is string => Boolean(targetId));
+}
+
+function getComparableFieldValues(candidate: NodexNode, fieldDefId: string): string[] {
+  const rawValues = getFieldValue(candidate, fieldDefId, loroDoc.toNodexNode);
+  return rawValues
+    .map((value) => normalizeComparableValue(loroDoc.toNodexNode(value)?.name ?? value))
+    .filter(Boolean);
+}
+
+function getConditionComparableScalar(
+  condition: NodexNode,
+  fieldDefId: string,
+  op: 'GT' | 'LT',
+): number | string | null {
+  if (fieldDefId === CREATED_AT_FIELD_SENTINEL || fieldDefId === 'createdAt' || fieldDefId === 'updatedAt') {
+    const text = getConditionValueNodes(condition)[0]?.name ?? '';
+    const suffix = op === 'GT' ? 'T00:00:00' : 'T23:59:59.999';
+    const date = new Date(`${text}${suffix}`).getTime();
+    if (!Number.isFinite(date)) return null;
+    return date;
+  }
+  return getConditionComparableValues(condition)[0] ?? null;
+}
+
+function getComparableScalar(candidate: NodexNode, fieldDefId: string): number | string | null {
+  if (fieldDefId === CREATED_AT_FIELD_SENTINEL || fieldDefId === 'createdAt') {
+    return candidate.createdAt;
+  }
+  if (fieldDefId === 'updatedAt') {
+    return candidate.updatedAt;
+  }
+  return getComparableFieldValues(candidate, fieldDefId)[0] ?? null;
+}
+
+function isDescendantOf(nodeId: string, ancestorId: string): boolean {
+  let cursor = loroDoc.getParentId(nodeId);
+  while (cursor) {
+    if (cursor === ancestorId) return true;
+    cursor = loroDoc.getParentId(cursor);
   }
   return false;
 }

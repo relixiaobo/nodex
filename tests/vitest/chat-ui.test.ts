@@ -640,12 +640,10 @@ describe('chat ui', () => {
     await vi.waitFor(() => {
       expect(container.textContent).toContain('Thought');
       expect(container.textContent).toContain('Reading page text');
-      expect(container.textContent).toContain('step 3');
+      // Auto-expanded during execution — shows "3 steps" title + individual steps
+      expect(container.textContent).toContain('3 steps');
+      expect(container.textContent).toContain('Navigated to');
     });
-
-    expect(container.textContent).not.toContain('Navigating to');
-    expect(container.textContent).not.toContain('Opened page');
-    expect(container.textContent).not.toContain('Clicked details');
   });
 
   it('breaks cross-message grouping when the next assistant message has text content', async () => {

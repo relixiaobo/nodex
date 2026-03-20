@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Pencil, Trash2 } from '../../lib/icons.js';
+import { Loader2, Pencil, Trash2 } from '../../lib/icons.js';
 import { useAgent } from '../../hooks/use-agent.js';
 import type { AssistantMessage, ThinkingLevel } from '@mariozechner/pi-ai';
 import { readChatDebugEnabled } from '../../lib/ai-debug.js';
@@ -447,6 +447,11 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
                   </div>
                 ) : (
                   renderConversationMessages()
+                )}
+                {isStreaming && (
+                  <div className="flex items-center px-1 py-2">
+                    <Loader2 size={16} strokeWidth={2} className="animate-spin text-foreground-tertiary" />
+                  </div>
                 )}
               </div>
               <div className="relative">

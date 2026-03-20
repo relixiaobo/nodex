@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Pencil, Trash2 } from '../../lib/icons.js';
 import { useAgent } from '../../hooks/use-agent.js';
-import type { ThinkingLevel } from '@mariozechner/pi-ai';
+import type { AssistantMessage, ThinkingLevel } from '@mariozechner/pi-ai';
 import { readChatDebugEnabled } from '../../lib/ai-debug.js';
 import { getAvailableModelsWithMeta, hasAnyEnabledProvider } from '../../lib/ai-provider-config.js';
 import { getAgentForSession, selectChatModel, selectThinkingLevel } from '../../lib/ai-service.js';
@@ -10,6 +10,7 @@ import { useNodeStore } from '../../stores/node-store.js';
 import { useSyncStore } from '../../stores/sync-store.js';
 import { useUIStore } from '../../stores/ui-store.js';
 import { SYSTEM_NODE_IDS } from '../../types/index.js';
+import type { ChatConversationMessage, ChatMessageEntry } from '../../hooks/use-agent.js';
 import { ChatDebugPanel } from './ChatDebugPanel.js';
 import { ChatOnboarding } from './ChatOnboarding.js';
 import { ChatPanelHeader } from './ChatPanelHeader.js';
@@ -37,6 +38,48 @@ function getActionErrorMessage(error: unknown, fallback: string): string {
     return error.message;
   }
   return fallback;
+}
+
+type ToolCallOnlyEntry = ChatMessageEntry & { message: AssistantMessage };
+
+export function isToolCallOnlyMessage(message: ChatConversationMessage): message is AssistantMessage {
+  if (message.role !== 'assistant') {
+    return false;
+  }
+
+  let hasToolCall = false;
+  for (const block of message.content) {
+    if (block.type === 'toolCall') {
+      hasToolCall = true;
+      continue;
+    }
+
+    if (block.type === 'thinking') {
+      continue;
+    }
+
+    if (block.type === 'text' && block.text.trim().length === 0) {
+      continue;
+    }
+
+    return false;
+  }
+
+  return hasToolCall;
+}
+
+function mergeToolCallOnlyEntries(entries: ToolCallOnlyEntry[]): ChatMessageEntry {
+  const lastEntry = entries[entries.length - 1]!;
+  const thinkingBlocks = entries.flatMap((entry) => entry.message.content.filter((block) => block.type === 'thinking'));
+  const toolCallBlocks = entries.flatMap((entry) => entry.message.content.filter((block) => block.type === 'toolCall'));
+
+  return {
+    ...lastEntry,
+    message: {
+      ...lastEntry.message,
+      content: [...thinkingBlocks, ...toolCallBlocks],
+    },
+  };
 }
 
 export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
@@ -249,6 +292,61 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
     }
   }
 
+  function renderConversationMessages() {
+    const rendered: Array<ReturnType<typeof ChatMessage>> = [];
+
+    const renderMessage = (entry: ChatMessageEntry, startIndex: number, endIndex: number, key?: string) => {
+      rendered.push(
+        <ChatMessage
+          key={key ?? entry.nodeId ?? `stream-${entry.message.timestamp}-${startIndex}`}
+          entry={entry}
+          toolResults={toolResults}
+          streaming={isStreaming && endIndex === messages.length - 1 && entry.message.role === 'assistant'}
+          grouped={startIndex > 0 && messages[startIndex - 1]?.message.role === entry.message.role}
+          busy={chatBusy}
+          isLastInTurn={endIndex === messages.length - 1 || messages[endIndex + 1]?.message.role !== entry.message.role}
+          onEdit={handleEditMessage}
+          onRegenerate={handleRegenerateMessage}
+          onSwitchBranch={switchBranch}
+        />,
+      );
+    };
+
+    let index = 0;
+    while (index < messages.length) {
+      const entry = messages[index]!;
+
+      if (isToolCallOnlyMessage(entry.message)) {
+        const runStart = index;
+        const toolCallEntries: ToolCallOnlyEntry[] = [];
+
+        while (index < messages.length && isToolCallOnlyMessage(messages[index]!.message)) {
+          toolCallEntries.push(messages[index] as ToolCallOnlyEntry);
+          index += 1;
+        }
+
+        if (toolCallEntries.length >= 2) {
+          const mergedEntry = mergeToolCallOnlyEntries(toolCallEntries);
+          renderMessage(
+            mergedEntry,
+            runStart,
+            index - 1,
+            `toolgroup-${toolCallEntries[0]!.nodeId ?? toolCallEntries[0]!.message.timestamp}-${toolCallEntries.at(-1)!.nodeId ?? toolCallEntries.at(-1)!.message.timestamp}`,
+          );
+          continue;
+        }
+
+        renderMessage(toolCallEntries[0]!, runStart, runStart);
+        continue;
+      }
+
+      renderMessage(entry, index, index);
+      index += 1;
+    }
+
+    return rendered;
+  }
+
   return (
     <div className="flex flex-1 flex-col overflow-hidden bg-background">
       {!hideHeader && (
@@ -348,20 +446,7 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
                     </div>
                   </div>
                 ) : (
-                  messages.map((entry, index) => (
-                    <ChatMessage
-                      key={entry.nodeId ?? `stream-${entry.message.timestamp}-${index}`}
-                      entry={entry}
-                      toolResults={toolResults}
-                      streaming={isStreaming && index === messages.length - 1 && entry.message.role === 'assistant'}
-                      grouped={index > 0 && messages[index - 1].message.role === entry.message.role}
-                      busy={chatBusy}
-                      isLastInTurn={index === messages.length - 1 || messages[index + 1].message.role !== entry.message.role}
-                      onEdit={handleEditMessage}
-                      onRegenerate={handleRegenerateMessage}
-                      onSwitchBranch={switchBranch}
-                    />
-                  ))
+                  renderConversationMessages()
                 )}
               </div>
               <div className="relative">

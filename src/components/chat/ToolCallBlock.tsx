@@ -158,6 +158,25 @@ function summarizeToolCall(toolCall: ToolCall, status: ToolStatus): string {
     return legacySubject ? `node.${action} ${q(legacySubject)}` : `node.${action}`;
   }
 
+  // ── Past chats ──────────────────────────────────────────────────────────
+
+  if (name === 'past_chats') {
+    const sessionId = typeof args.sessionId === 'string' ? args.sessionId : null;
+    const messageId = typeof args.messageId === 'string' ? args.messageId : null;
+    const query = pickSubject(args, 'query');
+
+    if (messageId) {
+      const verb = verbByStatus(['read', 'Reading', 'Read'], status);
+      return `${verb} chat message`;
+    }
+    if (sessionId) {
+      const verb = verbByStatus(['browse', 'Browsing', 'Browsed'], status);
+      return query ? `${verb} chat ${q(query)}` : `${verb} chat session`;
+    }
+    const verb = verbByStatus(['browse', 'Browsing', 'Browsed'], status);
+    return query ? `${verb} chats ${q(query)}` : `${verb} recent chats`;
+  }
+
   // ── Undo ────────────────────────────────────────────────────────────────
 
   if (name === 'undo') {

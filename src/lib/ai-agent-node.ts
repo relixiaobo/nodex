@@ -32,13 +32,9 @@ When citing a source, use <cite type="TYPE" id="ID">N</cite> where TYPE is:
 N is a sequential number (1, 2, 3...).
 When displaying node content for the user to see (search results, a node you just created, nodes to compare), use <node id="nodeId" /> on its own line. This renders as an interactive outliner the user can expand and edit. Reserve <node /> for when the user benefits from seeing the content — don't use it for every mention.`;
 
-export const AGENT_PAST_CHATS_GUIDANCE = [
-  'When the user references past conversations or assumes shared knowledge, use the past_chats tool to search history.',
-  'Browse with past_chats() first, then drill into a session with sessionId and a user message with messageId.',
-  'Use concrete keywords in query. Do not use past_chats to search the current conversation; the current session is already in context.',
-  'Never say you cannot access previous conversations without checking past_chats first.',
-  'If past conversations conflict with the current context, prioritize the current context.',
-].join('\n');
+// Legacy — past chats guidance now lives in the Chat recall skill.
+// Kept as unused export for backward compatibility with any external references.
+export const AGENT_PAST_CHATS_GUIDANCE = '';
 
 export const AI_AGENT_NODE_IDS = {
   MODEL_FIELD_ENTRY: 'NDX_FE13',
@@ -49,7 +45,8 @@ export const AI_AGENT_NODE_IDS = {
   TEMPERATURE_VALUE: 'NDX_N24',
   MAX_TOKENS_VALUE: 'NDX_N25',
   DEFAULT_SKILL_VALUE: 'NDX_N52',
-  KNOWLEDGE_MGMT_SKILL_VALUE: 'NDX_N86',
+  KNOWLEDGE_MGMT_SKILL_VALUE: 'NDX_N87',
+  MEMORY_SKILL_VALUE: 'NDX_N88',
   PROMPT_LINE_0: 'NDX_N53',
   PROMPT_LINE_1: 'NDX_N54',
   PROMPT_LINE_2: 'NDX_N55',
@@ -69,7 +66,10 @@ export const SKILL_NODE_IDS = {
   KNOWLEDGE_MGMT_RULE_2: 'NDX_N82',
   KNOWLEDGE_MGMT_RULE_3: 'NDX_N83',
   KNOWLEDGE_MGMT_RULE_4: 'NDX_N84',
-  KNOWLEDGE_MGMT_RULE_5: 'NDX_N85',
+  MEMORY: 'NDX_N85',
+  MEMORY_RULE_1: 'NDX_N86_R1',
+  MEMORY_RULE_2: 'NDX_N86_R2',
+  MEMORY_RULE_3: 'NDX_N86_R3',
   SKILL_CREATOR_RULE_5: 'NDX_N45',
 } as const;
 
@@ -258,8 +258,8 @@ const AGENT_SCHEMA_PRESETS: ReadonlyArray<FixedNodePreset> = [
 const DEFAULT_SKILL_PRESETS: ReadonlyArray<DefaultSkillPreset> = [
   {
     id: SKILL_NODE_IDS.KNOWLEDGE_MGMT,
-    name: 'Knowledge management',
-    description: 'Manage the user\'s knowledge graph — record, search, connect, and organize nodes. Use when the user records something, asks about their notes, or when you discover connections between ideas.',
+    name: 'Node organizer',
+    description: 'Record, search, connect, and organize nodes in the knowledge graph. Use when the user records something, asks about their notes, or when you discover connections between ideas.',
     rulePresets: [
       {
         id: SKILL_NODE_IDS.KNOWLEDGE_MGMT_RULE_1,
@@ -267,19 +267,34 @@ const DEFAULT_SKILL_PRESETS: ReadonlyArray<DefaultSkillPreset> = [
       },
       {
         id: SKILL_NODE_IDS.KNOWLEDGE_MGMT_RULE_2,
-        text: 'Before answering questions about topics the user may have notes on, search nodes and past chats for relevant context. Your value is answering with the full weight of what the user has thought before, not just your general knowledge.',
-      },
-      {
-        id: SKILL_NODE_IDS.KNOWLEDGE_MGMT_RULE_3,
         text: 'Use the user\'s existing tags and fields when they fit. Create new ones when nothing fits. Skip tags entirely when nothing applies. Never ask "should I save this?", "what tag?", "which format?" — just do it.',
       },
       {
-        id: SKILL_NODE_IDS.KNOWLEDGE_MGMT_RULE_4,
+        id: SKILL_NODE_IDS.KNOWLEDGE_MGMT_RULE_3,
         text: 'Only preserve decisions, conclusions, and long-term preferences as nodes — things that outlast the current conversation. Daily chat details don\'t need to be saved. When in doubt, don\'t save. A lean knowledge graph is more valuable than a bloated one.',
       },
       {
-        id: SKILL_NODE_IDS.KNOWLEDGE_MGMT_RULE_5,
+        id: SKILL_NODE_IDS.KNOWLEDGE_MGMT_RULE_4,
         text: 'When you discover something cognitively valuable — a contradiction with a past note, a recurring theme, a connection between unrelated topics — pause and invite the user to think about it. That\'s not an operational question, it\'s a thinking opportunity.',
+      },
+    ],
+  },
+  {
+    id: SKILL_NODE_IDS.MEMORY,
+    name: 'Chat recall',
+    description: 'Search and recall past conversations. Use when the user references past discussions, assumes shared context, or when you need to ground your answer in what was previously discussed.',
+    rulePresets: [
+      {
+        id: SKILL_NODE_IDS.MEMORY_RULE_1,
+        text: 'Before answering, search nodes and past chats for relevant context. Your value is answering with the full weight of what the user has thought before, not just your general knowledge.',
+      },
+      {
+        id: SKILL_NODE_IDS.MEMORY_RULE_2,
+        text: 'Use past_chats() to browse recent sessions, then drill in with sessionId and messageId. Use concrete keywords (names, concepts, decisions), not meta words like "discussed" or "mentioned". Never say you cannot access previous conversations without checking past_chats first.',
+      },
+      {
+        id: SKILL_NODE_IDS.MEMORY_RULE_3,
+        text: 'If past conversations conflict with the current context, prioritize the current context. The user\'s thinking evolves — don\'t anchor on outdated information.',
       },
     ],
   },
@@ -638,6 +653,11 @@ export function ensureAgentNode(workspaceId = loroDoc.getCurrentWorkspaceId() ??
     AI_AGENT_NODE_IDS.KNOWLEDGE_MGMT_SKILL_VALUE,
     SKILL_NODE_IDS.KNOWLEDGE_MGMT,
   );
+  ensureTargetValue(
+    AI_AGENT_NODE_IDS.SKILLS_FIELD_ENTRY,
+    AI_AGENT_NODE_IDS.MEMORY_SKILL_VALUE,
+    SKILL_NODE_IDS.MEMORY,
+  );
   refreshSettingsAISearches();
 
   return SYSTEM_NODE_IDS.AGENT;
@@ -822,7 +842,6 @@ function escapeXmlAttribute(value: string): string {
 export function buildAgentSystemPrompt(config: AgentNodeConfig = readAgentNodeConfig()): string {
   const sections = [
     DEFAULT_AGENT_SYSTEM_PROMPT,
-    AGENT_PAST_CHATS_GUIDANCE,
   ];
 
   const userInstructions = config.userInstructions.trim();

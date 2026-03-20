@@ -448,11 +448,11 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
                 ) : (
                   renderConversationMessages()
                 )}
-                {isStreaming && (
-                  <div className="flex h-6 items-center">
+                <div className="flex h-6 items-center">
+                  {isStreaming && (
                     <span className="inline-block h-3 w-1.5 animate-pulse rounded-sm bg-primary" />
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
               <div className="relative">
                 {steeringNote && (

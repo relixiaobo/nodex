@@ -9,30 +9,35 @@ interface LoginScreenProps {
 export function LoginScreen({ message = 'Sign in to continue' }: LoginScreenProps) {
   const continueInOfflineMode = useWorkspaceStore((s) => s.continueInOfflineMode);
   const signInWithGoogle = useWorkspaceStore((s) => s.signInWithGoogle);
-  const [loading, setLoading] = useState(false);
+  const [pendingAction, setPendingAction] = useState<'sign-in' | 'offline' | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const isSigningIn = pendingAction === 'sign-in';
+  const isContinuingOffline = pendingAction === 'offline';
+  const isBusy = pendingAction !== null;
 
   async function handleSignIn() {
-    setLoading(true);
+    if (isBusy) return;
+    setPendingAction('sign-in');
     setError(null);
     try {
       await signInWithGoogle();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign in failed');
     } finally {
-      setLoading(false);
+      setPendingAction(null);
     }
   }
 
   async function handleContinueOffline() {
-    setLoading(true);
+    if (isBusy) return;
+    setPendingAction('offline');
     setError(null);
     try {
       await continueInOfflineMode();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to continue offline');
     } finally {
-      setLoading(false);
+      setPendingAction(null);
     }
   }
 
@@ -48,25 +53,25 @@ export function LoginScreen({ message = 'Sign in to continue' }: LoginScreenProp
       <button
         type="button"
         onClick={handleSignIn}
-        disabled={loading}
+        disabled={isBusy}
         className="flex w-full max-w-[240px] items-center justify-center gap-2 rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium transition-colors hover:bg-foreground/4 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {loading ? (
+        {isSigningIn ? (
           <span className="h-4 w-4 animate-spin rounded-full border-2 border-foreground/30 border-t-foreground" />
         ) : (
           <GoogleIcon />
         )}
-        {loading ? 'Signing in…' : 'Sign in with Google'}
+        {isSigningIn ? 'Signing in…' : 'Sign in with Google'}
       </button>
 
       {import.meta.env.DEV && (
         <button
           type="button"
           onClick={handleContinueOffline}
-          disabled={loading}
+          disabled={isBusy}
           className="text-xs text-foreground-tertiary transition-colors hover:text-foreground disabled:opacity-50"
         >
-          Continue offline (dev only)
+          {isContinuingOffline ? 'Opening offline workspace…' : 'Continue offline (dev only)'}
         </button>
       )}
 

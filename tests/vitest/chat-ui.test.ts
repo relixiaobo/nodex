@@ -15,6 +15,7 @@ import { resetChatPersistenceForTests, saveChatSession } from '../../src/lib/ai-
 import { resetAIAgentForTests } from '../../src/lib/ai-service.js';
 import { findProviderOptionNodeId, getApiKeyForProvider } from '../../src/lib/ai-provider-config.js';
 import { ensureTodayNode } from '../../src/lib/journal.js';
+import * as loroDoc from '../../src/lib/loro-doc.js';
 import { getStartupPagePreference, STARTUP_PAGE } from '../../src/lib/settings-service.js';
 import { SYSTEM_SCHEMA_NODE_IDS } from '../../src/lib/system-schema-presets.js';
 import { useNodeStore } from '../../src/stores/node-store.js';
@@ -415,6 +416,28 @@ describe('chat ui', () => {
       expect(container.textContent).toContain('Welcome to soma');
       expect(container.textContent).toContain('Save API key');
       expect(container.textContent).toContain('Start with outliner');
+    });
+  });
+
+  it('shows a settings fallback when a provider is configured but no models resolve', async () => {
+    resetAndSeed();
+    loroDoc.createNode('NDX_PROVIDER_OPT_QWEN', NDX_F.PROVIDER_ID);
+    loroDoc.setNodeRichTextContent('NDX_PROVIDER_OPT_QWEN', 'qwen', [], []);
+    loroDoc.commitDoc();
+    seedProviderConfig({
+      provider: 'qwen',
+      enabled: true,
+      apiKey: 'sk-qwen-primary',
+      name: 'Qwen',
+    });
+
+    flushSync(() => {
+      root.render(React.createElement(ChatPanel, { panelId: 'chat-panel', sessionId: 'session-no-models' }));
+    });
+
+    await vi.waitFor(() => {
+      expect(container.textContent).toContain('does not expose any chat models yet');
+      expect(container.textContent).toContain('Open Settings');
     });
   });
 

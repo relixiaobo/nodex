@@ -231,9 +231,10 @@ export function saveProviderApiKey(provider: string, apiKey: string): ProviderCo
       { commit: false },
     ).id;
 
-  store.setOptionsFieldValue(nodeId, NDX_F.PROVIDER_ID, providerOptionNodeId);
-  store.setFieldValue(nodeId, NDX_F.PROVIDER_ENABLED, [SYS_V.YES]);
-  store.setFieldValue(nodeId, NDX_F.PROVIDER_API_KEY, [trimmedApiKey]);
+  store.setOptionsFieldValue(nodeId, NDX_F.PROVIDER_ID, providerOptionNodeId, { commit: false });
+  store.setFieldValue(nodeId, NDX_F.PROVIDER_ENABLED, [SYS_V.YES], { commit: false });
+  store.setFieldValue(nodeId, NDX_F.PROVIDER_API_KEY, [trimmedApiKey], { commit: false });
+  loroDoc.commitDoc();
 
   return {
     provider: normalizedProvider,

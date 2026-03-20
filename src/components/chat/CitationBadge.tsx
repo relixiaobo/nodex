@@ -35,31 +35,23 @@ export function CitationBadge({ id, label, type = 'node' }: CitationBadgeProps) 
       ? 'Past conversation'
       : id; // url — show the URL itself
 
-  const typeColor = type === 'chat'
-    ? 'border-secondary/40 hover:border-secondary/60 hover:text-secondary-foreground'
-    : type === 'url'
-      ? 'border-primary/30 hover:border-primary/50 hover:text-primary'
-      : 'border-border hover:border-primary/30 hover:text-foreground';
-
   return (
     <>
-      <sup className="mx-px align-[0.4em]">
-        <button
-          ref={triggerRef}
-          type="button"
-          onClick={open}
-          disabled={isDisabled}
-          title={title}
-          className={[
-            'inline-flex min-w-3 items-center justify-center rounded-full border px-0.5 text-[9px] leading-3',
-            isDisabled
-              ? 'cursor-default border-border bg-background text-foreground-tertiary line-through'
-              : `bg-background text-foreground-tertiary transition-colors ${typeColor}`,
-          ].join(' ')}
-        >
-          {label}
-        </button>
-      </sup>
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={open}
+        disabled={isDisabled}
+        title={title}
+        className={[
+          'ml-0.5 inline-flex min-w-4 items-center justify-center rounded px-1 text-[11px] leading-[18px]',
+          isDisabled
+            ? 'cursor-default bg-foreground/[0.06] text-foreground-tertiary line-through'
+            : 'bg-foreground/[0.06] text-foreground-secondary transition-colors hover:bg-foreground/[0.1] hover:text-foreground',
+        ].join(' ')}
+      >
+        {label}
+      </button>
       {anchorRect && (
         type === 'node' ? <NodePopover nodeId={id} anchorRect={anchorRect} onClose={close} />
         : type === 'chat' ? <ChatCitePopover sessionId={id} anchorRect={anchorRect} onClose={close} />

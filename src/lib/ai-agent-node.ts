@@ -72,6 +72,7 @@ export const SKILL_NODE_IDS = {
 export const SETTINGS_AI_GROUP_NODE_IDS = {
   AI: 'NDX_N70',
   DEFAULT_AGENTS: 'NDX_N71',
+  DEFAULT_SKILLS: 'NDX_N72',
 } as const;
 
 // ─── Spark agent defaults ───
@@ -345,7 +346,7 @@ function ensureTargetValue(fieldEntryId: string, valueNodeId: string, targetId: 
 function ensureSkillNode(skillPreset: DefaultSkillPreset): void {
   ensureNode({
     id: skillPreset.id,
-    parentId: SYSTEM_NODE_IDS.SCHEMA,
+    parentId: SETTINGS_AI_GROUP_NODE_IDS.DEFAULT_SKILLS,
     name: skillPreset.name,
     data: {
       description: skillPreset.description,
@@ -432,6 +433,16 @@ function ensureSettingsAIGrouping(): void {
     },
   });
   moveNodeToIndex(SETTINGS_AI_GROUP_NODE_IDS.DEFAULT_AGENTS, SETTINGS_AI_GROUP_NODE_IDS.AI, 1);
+
+  ensureNode({
+    id: SETTINGS_AI_GROUP_NODE_IDS.DEFAULT_SKILLS,
+    parentId: SETTINGS_AI_GROUP_NODE_IDS.AI,
+    name: 'Default Skills',
+    data: {
+      locked: true,
+    },
+  });
+  moveNodeToIndex(SETTINGS_AI_GROUP_NODE_IDS.DEFAULT_SKILLS, SETTINGS_AI_GROUP_NODE_IDS.AI, 2);
 }
 
 function ensureAgentParent(agentNodeId: string, index: number): void {

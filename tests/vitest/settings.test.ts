@@ -113,6 +113,7 @@ describe('settings system', () => {
     expect(loroDoc.getParentId(SETTINGS_AI_GROUP_NODE_IDS.AI)).toBe(SYSTEM_NODE_IDS.SETTINGS);
     expect(loroDoc.toNodexNode(SETTINGS_AI_GROUP_NODE_IDS.AI)?.locked).toBe(true);
     expect(loroDoc.getParentId(SETTINGS_AI_GROUP_NODE_IDS.DEFAULT_AGENTS)).toBe(SETTINGS_AI_GROUP_NODE_IDS.AI);
+    expect(loroDoc.getParentId(SETTINGS_AI_GROUP_NODE_IDS.DEFAULT_SKILLS)).toBe(SETTINGS_AI_GROUP_NODE_IDS.AI);
     expect(loroDoc.getParentId(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDERS_FIELD_ENTRY)).toBe(SETTINGS_AI_GROUP_NODE_IDS.AI);
   });
 

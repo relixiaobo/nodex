@@ -9,6 +9,7 @@ import {
   DEFAULT_AGENT_TEMPERATURE,
   readAgentNodeConfig,
   readSkillIds,
+  SETTINGS_AI_GROUP_NODE_IDS,
   SKILL_NODE_IDS,
 } from '../../src/lib/ai-agent-node.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
@@ -59,6 +60,11 @@ describe('ai agent skill bootstrap and prompt rendering', () => {
 
   it('readSkillIds returns the default active skill reference', () => {
     expect(readSkillIds(AI_AGENT_NODE_IDS.SKILLS_FIELD_ENTRY)).toEqual([SKILL_NODE_IDS.SKILL_CREATOR]);
+  });
+
+  it('places the built-in skill under Settings AI Default Skills', () => {
+    expect(loroDoc.getParentId(SKILL_NODE_IDS.SKILL_CREATOR)).toBe(SETTINGS_AI_GROUP_NODE_IDS.DEFAULT_SKILLS);
+    expect(loroDoc.toNodexNode(SKILL_NODE_IDS.SKILL_CREATOR)?.tags).toContain(SYS_T.SKILL);
   });
 
   it('reads agent node content as user instructions, not built-in system prompt', () => {

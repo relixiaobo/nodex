@@ -16,7 +16,7 @@ import { SYSTEM_NODE_IDS, NDX_F, NDX_T, SYS_T, SYS_V } from '../../src/types/ind
 import { SYSTEM_SCHEMA_NODE_IDS } from '../../src/lib/system-schema-presets.js';
 import { useNodeStore } from '../../src/stores/node-store.js';
 import { isOutlinerContentNodeType } from '../../src/lib/node-type-utils.js';
-import { ensureSparkAgentNode, SETTINGS_AI_GROUP_NODE_IDS } from '../../src/lib/ai-agent-node.js';
+import { ensureSparkAgentNode, SETTINGS_AI_GROUP_NODE_IDS, SKILL_NODE_IDS } from '../../src/lib/ai-agent-node.js';
 
 describe('ensureSystemNodes', () => {
   beforeEach(() => {
@@ -51,8 +51,11 @@ describe('ensureSystemNodes', () => {
     expect(toNodexNode(SETTINGS_AI_GROUP_NODE_IDS.AI)?.locked).toBe(true);
     expect(getParentId(SETTINGS_AI_GROUP_NODE_IDS.DEFAULT_AGENTS)).toBe(SETTINGS_AI_GROUP_NODE_IDS.AI);
     expect(toNodexNode(SETTINGS_AI_GROUP_NODE_IDS.DEFAULT_AGENTS)?.locked).toBe(true);
+    expect(getParentId(SETTINGS_AI_GROUP_NODE_IDS.DEFAULT_SKILLS)).toBe(SETTINGS_AI_GROUP_NODE_IDS.AI);
+    expect(toNodexNode(SETTINGS_AI_GROUP_NODE_IDS.DEFAULT_SKILLS)?.locked).toBe(true);
     expect(getParentId(SYSTEM_NODE_IDS.AGENT)).toBe(SETTINGS_AI_GROUP_NODE_IDS.DEFAULT_AGENTS);
     expect(toNodexNode(SYSTEM_NODE_IDS.AGENT)?.locked).toBeUndefined();
+    expect(getParentId(SKILL_NODE_IDS.SKILL_CREATOR)).toBe(SETTINGS_AI_GROUP_NODE_IDS.DEFAULT_SKILLS);
   });
 
   it('bootstraps fixed Settings schema and default provider config', () => {

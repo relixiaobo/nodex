@@ -39,6 +39,7 @@ export const SYSTEM_NODE_PRESETS: ReadonlyArray<SystemNodePreset> = [
   { id: SYSTEM_NODE_IDS.SETTINGS, defaultName: 'Settings', iconKey: 'settings', bootstrap: true, locked: true, canEditStructure: false, canEditFieldValues: true, quickNav: false, paletteSearchable: true },
   { id: SETTINGS_AI_GROUP_NODE_IDS.AI, defaultName: 'AI', iconKey: 'ai', bootstrap: false, locked: true, canEditStructure: false, canEditFieldValues: true, quickNav: false, paletteSearchable: false },
   { id: SETTINGS_AI_GROUP_NODE_IDS.DEFAULT_AGENTS, defaultName: 'Default Agents', iconKey: 'ai', bootstrap: false, locked: true, canEditStructure: false, canEditFieldValues: false, quickNav: false, paletteSearchable: false },
+  { id: SETTINGS_AI_GROUP_NODE_IDS.DEFAULT_SKILLS, defaultName: 'Default Skills', iconKey: 'ai', bootstrap: false, locked: true, canEditStructure: false, canEditFieldValues: false, quickNav: false, paletteSearchable: false },
   { id: SYSTEM_NODE_IDS.SPARK_AGENT, defaultName: 'Spark', iconKey: 'ai', bootstrap: false, locked: false, canEditStructure: true, canEditFieldValues: true, quickNav: false, paletteSearchable: true },
   { id: SYSTEM_TAGS.DAY, defaultName: 'day', iconKey: 'journal', bootstrap: false, locked: true, canEditStructure: true, canEditFieldValues: true, quickNav: false, paletteSearchable: false },
   { id: SYSTEM_TAGS.WEEK, defaultName: 'week', iconKey: 'journal', bootstrap: false, locked: true, canEditStructure: true, canEditFieldValues: true, quickNav: false, paletteSearchable: false },

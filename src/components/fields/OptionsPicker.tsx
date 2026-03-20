@@ -26,6 +26,25 @@ export function isAutoCollectCreationEnabled(fieldDef: NodexNode | null | undefi
   return fieldDef?.autocollectOptions !== false;
 }
 
+export function resolveSelectedOptionId(
+  valueNode: Pick<NodexNode, 'targetId' | 'name'> | null | undefined,
+  options: Array<{ id: string; name: string }>,
+): string | undefined {
+  const targetId = valueNode?.targetId;
+  if (targetId && options.some((opt) => opt.id === targetId)) {
+    return targetId;
+  }
+
+  const rawName = valueNode?.name?.trim();
+  if (!rawName) return undefined;
+
+  const matchById = options.find((opt) => opt.id === rawName);
+  if (matchById) return matchById.id;
+
+  const matchByName = options.find((opt) => opt.name === rawName);
+  return matchByName?.id;
+}
+
 export function OptionsPicker({ nodeId, attrDefId, fieldEntryId }: OptionsPickerProps) {
   const options = useFieldOptions(attrDefId);
   const setOptionsFieldValue = useNodeStore((s) => s.setOptionsFieldValue);
@@ -43,11 +62,12 @@ export function OptionsPicker({ nodeId, attrDefId, fieldEntryId }: OptionsPicker
     void s._version;
     if (!fieldEntryId) return undefined;
     const fieldEntry = s.getNode(fieldEntryId);
-    const valueNodeId = fieldEntry?.children?.[0];
-    if (!valueNodeId) return undefined;
-    const valueNode = s.getNode(valueNodeId);
-    const targetId = valueNode?.targetId;
-    return targetId && options.some((opt) => opt.id === targetId) ? targetId : undefined;
+    for (const valueNodeId of fieldEntry?.children ?? []) {
+      const valueNode = s.getNode(valueNodeId);
+      const resolvedId = resolveSelectedOptionId(valueNode, options);
+      if (resolvedId) return resolvedId;
+    }
+    return undefined;
   });
 
   const handleSelect = useCallback(

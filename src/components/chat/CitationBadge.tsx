@@ -44,7 +44,7 @@ export function CitationBadge({ id, label, type = 'node' }: CitationBadgeProps) 
         disabled={isDisabled}
         title={title}
         className={[
-          'ml-0.5 inline-flex min-w-4 items-center justify-center rounded px-1 text-[11px] leading-[18px] align-middle',
+          'ml-0.5 inline-flex min-w-4 items-center justify-center rounded px-1 py-px text-[11px] leading-normal align-baseline',
           isDisabled
             ? 'cursor-default bg-foreground/[0.06] text-foreground-tertiary line-through'
             : 'bg-foreground/[0.06] text-foreground-secondary transition-colors hover:bg-foreground/[0.1] hover:text-foreground',

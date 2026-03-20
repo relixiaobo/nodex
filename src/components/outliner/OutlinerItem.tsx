@@ -449,13 +449,7 @@ export function OutlinerItem({
   const hasTags = tagIds.length > 0;
   const hasFields = fields.length > 0;
   const isReferenceNode = node?.type === 'reference';
-  // A node is an "alias" when displayed under a parent different from its actual parent
-  // (e.g. template field preview, options picker). Only check when the parentId refers
-  // to a real node in the graph — synthetic contexts (chat embeds, popovers) use
-  // non-existent parentIds and should not trigger alias styling.
-  const isReferenceAlias = !isReferenceNode && !!node
-    && loroDoc.hasNode(parentId)
-    && loroDoc.getParentId(nodeId) !== parentId;
+  const isReferenceAlias = !isReferenceNode && !!node && loroDoc.getParentId(nodeId) !== parentId;
   const isReference = isReferenceNode || isReferenceAlias;
   const isTagDef = effectiveNode?.type === 'tagDef';
   // Bullet colors: use prop override (template items) or derive from the node's own supertags

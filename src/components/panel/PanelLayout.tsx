@@ -75,7 +75,7 @@ function renderPanelHeader(
   opts: { isActive: boolean; titleVisible: boolean; onClose: (e: React.MouseEvent) => void },
 ): React.ReactNode {
   if (isChatPanel(nodeId)) {
-    return <ChatPanelHeader nodeId={nodeId} onClose={opts.onClose} />;
+    return <ChatPanelHeader sessionId={chatPanelSessionId(nodeId)} onClose={opts.onClose} />;
   }
   if (isAppPanel(nodeId)) {
     return (
@@ -170,7 +170,7 @@ function ChatDropdownRow({
   onSelect: () => void;
   onClose: (e: React.MouseEvent) => void;
 }) {
-  const edit = useChatTitleEdit(nodeId);
+  const edit = useChatTitleEdit(chatPanelSessionId(nodeId));
 
   return (
     <div

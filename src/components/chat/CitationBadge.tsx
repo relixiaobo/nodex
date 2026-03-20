@@ -45,7 +45,7 @@ export function CitationBadge({ id, label, type = 'node' }: CitationBadgeProps) 
         onKeyDown={isDisabled ? undefined : (e) => { if (e.key === 'Enter') open(); }}
         title={title}
         className={[
-          'mx-0.5 rounded bg-foreground/[0.06] px-1 text-[11px]',
+          'mx-0.5 rounded-sm bg-foreground/[0.06] px-1 text-[11px]',
           isDisabled
             ? 'cursor-default text-foreground-tertiary line-through'
             : 'cursor-pointer text-foreground-secondary transition-colors hover:bg-foreground/[0.1] hover:text-foreground',

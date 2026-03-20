@@ -66,11 +66,11 @@ describe('extractInlineMarkup — <node /> tags', () => {
 
     const { placeholders } = extractInlineMarkup(text);
 
-    // node extracted first (pass 1), then ref and cite (pass 2)
+    // node extracted first (pass 1), then ref (pass 2), then cite (pass 3)
     expect(placeholders).toHaveLength(3);
     expect(placeholders[0]).toEqual({ kind: 'node', nodeId: 'n1' });
     expect(placeholders[1]).toEqual({ kind: 'ref', nodeId: 'r1', content: 'this note' });
-    expect(placeholders[2]).toEqual({ kind: 'cite', nodeId: 'c1', content: '1' });
+    expect(placeholders[2]).toEqual({ kind: 'cite', id: 'c1', content: '1', citeType: 'node' });
   });
 });
 
@@ -87,13 +87,77 @@ describe('extractInlineMarkup — ref/cite backward compatibility', () => {
     expect(cleaned).not.toContain('<ref');
   });
 
-  it('extracts <cite> tags as before', () => {
+  it('extracts <cite> tags without type as node (default)', () => {
     const text = 'Source <cite id="xyz">1</cite>.';
     const { cleaned, placeholders } = extractInlineMarkup(text);
 
     expect(placeholders).toHaveLength(1);
-    expect(placeholders[0]).toEqual({ kind: 'cite', nodeId: 'xyz', content: '1' });
+    expect(placeholders[0]).toEqual({ kind: 'cite', id: 'xyz', content: '1', citeType: 'node' });
     expect(cleaned).toContain('%%SOMA_0%%');
+  });
+});
+
+// ── extractInlineMarkup: cite types ──
+
+describe('extractInlineMarkup — cite types', () => {
+  it('parses <cite type="node" id="xxx">1</cite>', () => {
+    const text = 'See <cite type="node" id="abc123">1</cite>.';
+    const { placeholders } = extractInlineMarkup(text);
+
+    expect(placeholders).toHaveLength(1);
+    expect(placeholders[0]).toEqual({ kind: 'cite', id: 'abc123', content: '1', citeType: 'node' });
+  });
+
+  it('parses <cite type="chat" id="xxx">2</cite>', () => {
+    const text = 'From <cite type="chat" id="session-abc">2</cite>.';
+    const { placeholders } = extractInlineMarkup(text);
+
+    expect(placeholders).toHaveLength(1);
+    expect(placeholders[0]).toEqual({ kind: 'cite', id: 'session-abc', content: '2', citeType: 'chat' });
+  });
+
+  it('parses <cite type="url" id="https://example.com">3</cite>', () => {
+    const text = 'Source <cite type="url" id="https://example.com/article">3</cite>.';
+    const { placeholders } = extractInlineMarkup(text);
+
+    expect(placeholders).toHaveLength(1);
+    expect(placeholders[0]).toEqual({ kind: 'cite', id: 'https://example.com/article', content: '3', citeType: 'url' });
+  });
+
+  it('parses <cite id="xxx">1</cite> (no type) as node default', () => {
+    const text = 'Note <cite id="node123">1</cite>.';
+    const { placeholders } = extractInlineMarkup(text);
+
+    expect(placeholders).toHaveLength(1);
+    expect(placeholders[0]).toEqual({ kind: 'cite', id: 'node123', content: '1', citeType: 'node' });
+  });
+
+  it('handles mixed markup: ref + cite(node) + cite(chat) + node', () => {
+    const text = [
+      'See <ref id="r1">this note</ref> and check <cite type="node" id="n1">1</cite>.',
+      '<node id="embed1" />',
+      'Also <cite type="chat" id="s1">2</cite> and <cite type="url" id="https://x.com">3</cite>.',
+    ].join('\n');
+
+    const { placeholders } = extractInlineMarkup(text);
+
+    expect(placeholders).toHaveLength(5);
+    // pass 1: node embed
+    expect(placeholders[0]).toEqual({ kind: 'node', nodeId: 'embed1' });
+    // pass 2: ref
+    expect(placeholders[1]).toEqual({ kind: 'ref', nodeId: 'r1', content: 'this note' });
+    // pass 3: cites
+    expect(placeholders[2]).toEqual({ kind: 'cite', id: 'n1', content: '1', citeType: 'node' });
+    expect(placeholders[3]).toEqual({ kind: 'cite', id: 's1', content: '2', citeType: 'chat' });
+    expect(placeholders[4]).toEqual({ kind: 'cite', id: 'https://x.com', content: '3', citeType: 'url' });
+  });
+
+  it('treats unknown cite type as node', () => {
+    const text = 'See <cite type="unknown" id="x1">1</cite>.';
+    const { placeholders } = extractInlineMarkup(text);
+
+    expect(placeholders).toHaveLength(1);
+    expect(placeholders[0]).toEqual({ kind: 'cite', id: 'x1', content: '1', citeType: 'node' });
   });
 });
 

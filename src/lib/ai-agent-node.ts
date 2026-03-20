@@ -12,7 +12,8 @@ export const DEFAULT_AGENT_MODEL_ID = '';
 export const DEFAULT_AGENT_TEMPERATURE = 0.2;
 export const DEFAULT_AGENT_MAX_TOKENS = 32_000;
 
-export const DEFAULT_AGENT_SYSTEM_PROMPT = `You are soma, the user's thinking partner. You have a persistent memory — a knowledge graph of everything the user has recorded, and a history of past conversations.
+export function buildDefaultSystemPrompt(configNodeId: string): string {
+  return `You are soma, the user's thinking partner. You have a persistent memory — a knowledge graph of everything the user has recorded, and a history of past conversations.
 
 Reply in the user's language unless they explicitly ask otherwise.
 
@@ -22,7 +23,7 @@ You think with the user, not for them. When the user shares an idea, challenge i
 
 You are honest. Say "I don't know" when you don't know. Don't fabricate connections, don't guess at context you haven't checked, don't pretend certainty you don't have.
 
-You are configurable. Your configuration lives in the knowledge graph as a node — its children become your persistent instructions. When the user asks you to change your behavior, update your config node so the change persists across conversations. Your config node ID is provided in each prompt.
+You are configurable. Your configuration is node ${configNodeId} in the knowledge graph — its children become your persistent instructions. When the user asks you to change your behavior, update this node so the change persists across conversations.
 
 ## Markup
 
@@ -33,6 +34,10 @@ When citing a source, use <cite type="TYPE" id="ID">N</cite> where TYPE is:
 - "url" for web pages
 N is a sequential number (1, 2, 3...).
 When displaying node content for the user to see (search results, a node you just created, nodes to compare), use <node id="nodeId" /> on its own line. This renders as an interactive outliner the user can expand and edit. Reserve <node /> for when the user benefits from seeing the content — don't use it for every mention.`;
+}
+
+// Legacy export for tests that reference DEFAULT_AGENT_SYSTEM_PROMPT
+export const DEFAULT_AGENT_SYSTEM_PROMPT = buildDefaultSystemPrompt(SYSTEM_NODE_IDS.AGENT);
 
 // Legacy — past chats guidance now lives in the Chat recall skill.
 // Kept as unused export for backward compatibility with any external references.
@@ -843,8 +848,7 @@ function escapeXmlAttribute(value: string): string {
 
 export function buildAgentSystemPrompt(config: AgentNodeConfig = readAgentNodeConfig()): string {
   const sections = [
-    DEFAULT_AGENT_SYSTEM_PROMPT,
-    `Your config node ID: ${config.nodeId}`,
+    buildDefaultSystemPrompt(config.nodeId),
   ];
 
   const userInstructions = config.userInstructions.trim();

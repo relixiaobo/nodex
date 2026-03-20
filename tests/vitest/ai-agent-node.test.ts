@@ -116,7 +116,7 @@ describe('ai agent skill bootstrap and prompt rendering', () => {
     });
 
     expect(prompt).toContain(DEFAULT_AGENT_SYSTEM_PROMPT);
-    expect(prompt).toContain('Who you are');
+    expect(prompt).toContain('How you think');
     expect(prompt).toContain('<user-instructions>');
     expect(prompt).toContain('Base prompt');
     expect(prompt).toContain('<available-skills>');
@@ -130,7 +130,7 @@ describe('ai agent skill bootstrap and prompt rendering', () => {
     const prompt = buildAgentSystemPrompt(BASE_CONFIG);
 
     expect(prompt).toContain(DEFAULT_AGENT_SYSTEM_PROMPT);
-    expect(prompt).toContain('Who you are');
+    expect(prompt).toContain('How you think');
     expect(prompt).toContain('<user-instructions>\nBase prompt\n</user-instructions>');
     expect(prompt).not.toContain('<available-skills>');
   });

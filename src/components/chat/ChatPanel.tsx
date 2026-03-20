@@ -7,6 +7,7 @@ import { readChatDebugEnabled } from '../../lib/ai-debug.js';
 import { getAvailableModelsWithMeta, hasAnyEnabledProvider } from '../../lib/ai-provider-config.js';
 import { getAgentForSession, selectChatModel, selectThinkingLevel } from '../../lib/ai-service.js';
 import { useNodeStore } from '../../stores/node-store.js';
+import { useSyncStore } from '../../stores/sync-store.js';
 import { useUIStore } from '../../stores/ui-store.js';
 import { SYSTEM_NODE_IDS } from '../../types/index.js';
 import { ChatDebugPanel } from './ChatDebugPanel.js';
@@ -80,11 +81,17 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
     void settingsVersion;
     return hasAnyEnabledProvider();
   }, [settingsVersion]);
-  const chatState = !hasConfiguredProvider
-    ? 'onboarding'
-    : hasAvailableModels
-      ? 'ready'
-      : 'no-models';
+  // During initial sync, don't show onboarding — wait for sync to finish
+  // so we don't flash the onboarding screen when config is about to arrive.
+  const syncStatus = useSyncStore((s) => s.status);
+  const isSyncingInitial = syncStatus === 'syncing' && !hasConfiguredProvider;
+  const chatState = isSyncingInitial
+    ? 'loading'
+    : !hasConfiguredProvider
+      ? 'onboarding'
+      : hasAvailableModels
+        ? 'ready'
+        : 'no-models';
 
   const currentModel = useMemo(() => {
     const key = selectedModelKey ?? { id: debug.modelId, provider: debug.provider };
@@ -271,9 +278,9 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
           </button>
         )}
 
-        {!ready ? (
+        {!ready || chatState === 'loading' ? (
           <div className="flex flex-1 items-center justify-center text-sm text-foreground-tertiary">
-            Loading chat…
+            {chatState === 'loading' ? 'Syncing...' : 'Loading chat…'}
           </div>
         ) : chatState === 'onboarding' ? (
           <div className="flex flex-1 overflow-hidden">

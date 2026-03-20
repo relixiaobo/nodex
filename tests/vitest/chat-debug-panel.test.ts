@@ -217,7 +217,7 @@ describe('ChatDebugPanel', () => {
     const usageText = usageMetas[0]?.textContent ?? '';
     expect(usageText).toContain('in:120');
     expect(usageText).toContain('out:24');
-    expect(usageText).toContain('cache:89');
+    expect(usageText).toContain('cr:89');
     expect(usageText).toContain('$0.0042');
     expect(usageText).toContain('toolUse');
   });

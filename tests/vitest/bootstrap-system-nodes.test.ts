@@ -64,6 +64,7 @@ describe('ensureSystemNodes', () => {
     expect(toNodexNode(NDX_T.WORKSPACE_SETTINGS)?.locked).toBe(true);
     expect(getParentId(NDX_T.AI_PROVIDER)).toBe(SYSTEM_NODE_IDS.SCHEMA);
     expect(getParentId(NDX_F.SETTING_HIGHLIGHT_ENABLED)).toBe(NDX_T.WORKSPACE_SETTINGS);
+    expect(getParentId(NDX_F.SETTING_STARTUP_PAGE)).toBe(NDX_T.WORKSPACE_SETTINGS);
     expect(getParentId(NDX_F.SETTING_AI_PROVIDERS)).toBe(NDX_T.WORKSPACE_SETTINGS);
     expect(toNodexNode(NDX_F.SETTING_HIGHLIGHT_ENABLED)?.locked).toBe(true);
     expect(getParentId(NDX_F.PROVIDER_ID)).toBe(NDX_T.AI_PROVIDER);
@@ -73,6 +74,12 @@ describe('ensureSystemNodes', () => {
     expect(getParentId(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_HIGHLIGHT_FIELD_ENTRY)).toBe(SYSTEM_NODE_IDS.SETTINGS);
     expect(getParentId(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_HIGHLIGHT_VALUE)).toBe(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_HIGHLIGHT_FIELD_ENTRY);
     expect(toNodexNode(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_HIGHLIGHT_VALUE)?.name).toBe(SYS_V.YES);
+    expect(getParentId(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_STARTUP_PAGE_FIELD_ENTRY)).toBe(SYSTEM_NODE_IDS.SETTINGS);
+    expect(getParentId(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_STARTUP_PAGE_CHAT_OPTION)).toBe(NDX_F.SETTING_STARTUP_PAGE);
+    expect(getParentId(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_STARTUP_PAGE_TODAY_OPTION)).toBe(NDX_F.SETTING_STARTUP_PAGE);
+    expect(toNodexNode(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_STARTUP_PAGE_VALUE)?.targetId).toBe(
+      SYSTEM_SCHEMA_NODE_IDS.SETTINGS_STARTUP_PAGE_CHAT_OPTION,
+    );
     expect(getParentId(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDERS_FIELD_ENTRY)).toBe(SETTINGS_AI_NODE_IDS.AI);
     // Default Anthropic provider is no longer auto-created on bootstrap;
     // the providers field entry starts empty for new workspaces.

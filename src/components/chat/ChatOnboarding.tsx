@@ -37,7 +37,6 @@ export function ChatOnboarding({ panelId }: ChatOnboardingProps) {
     setSubmitting(true);
     try {
       saveProviderApiKey(provider, apiKey);
-      toast.success('API key saved');
       setApiKey('');
     } catch (error) {
       toast.error(getActionErrorMessage(error, 'Failed to save API key'));

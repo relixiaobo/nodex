@@ -116,6 +116,56 @@ function createAssistantMessage(text: string, timestamp: number) {
   };
 }
 
+function createToolCall(id: string, name: string, args: Record<string, unknown> = {}) {
+  return { type: 'toolCall' as const, id, name, arguments: args };
+}
+
+function createThinkingBlock(thinking: string, redacted = false) {
+  return {
+    type: 'thinking' as const,
+    thinking,
+    redacted,
+  };
+}
+
+function createAssistantBlocksMessage(
+  content: Array<
+    | { type: 'text'; text: string }
+    | { type: 'toolCall'; id: string; name: string; arguments: Record<string, unknown> }
+    | { type: 'thinking'; thinking: string; redacted: boolean }
+  >,
+  timestamp: number,
+) {
+  return {
+    role: 'assistant' as const,
+    content,
+    api: 'anthropic-messages' as const,
+    provider: 'anthropic' as const,
+    model: 'test',
+    usage: {
+      input: 0,
+      output: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+      totalTokens: 0,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+    },
+    stopReason: 'stop' as const,
+    timestamp,
+  };
+}
+
+function createToolResultMessage(toolCallId: string, timestamp: number, text: string) {
+  return {
+    role: 'toolResult' as const,
+    toolCallId,
+    toolName: 'browser',
+    content: [{ type: 'text' as const, text }],
+    isError: false,
+    timestamp,
+  };
+}
+
 describe('chat ui', () => {
   const originalInnerWidth = window.innerWidth;
   const originalResizeObserver = globalThis.ResizeObserver;
@@ -555,6 +605,81 @@ describe('chat ui', () => {
       expect(container.textContent).toContain('2/2');
       expect(container.textContent).not.toContain('assistant-2');
     });
+  });
+
+  it('groups consecutive tool-call-only assistant messages across chat messages', async () => {
+    resetAndSeed();
+    seedProviderConfig({
+      provider: 'anthropic',
+      enabled: true,
+      apiKey: 'sk-ant-tool-group',
+      name: 'Anthropic',
+    });
+
+    const session = linearToTree([
+      createUserMessage('Check the page', 1),
+      createAssistantBlocksMessage([
+        createToolCall('call_1', 'browser', { action: 'navigate', url: 'https://example.com' }),
+      ], 2),
+      createToolResultMessage('call_1', 3, 'Opened page'),
+      createAssistantBlocksMessage([
+        createThinkingBlock('Need another step'),
+        createToolCall('call_2', 'browser', { action: 'click', elementDescription: 'Details' }),
+      ], 4),
+      createToolResultMessage('call_2', 5, 'Clicked details'),
+      createAssistantBlocksMessage([
+        createToolCall('call_3', 'browser', { action: 'get_text' }),
+      ], 6),
+    ]);
+    await saveChatSession(session);
+
+    flushSync(() => {
+      root.render(React.createElement(ChatPanel, { panelId: 'chat-panel', sessionId: session.id }));
+    });
+
+    await vi.waitFor(() => {
+      expect(container.textContent).toContain('Thought');
+      expect(container.textContent).toContain('Reading page text');
+      expect(container.textContent).toContain('step 3');
+    });
+
+    expect(container.textContent).not.toContain('Navigating to');
+    expect(container.textContent).not.toContain('Opened page');
+    expect(container.textContent).not.toContain('Clicked details');
+  });
+
+  it('breaks cross-message grouping when the next assistant message has text content', async () => {
+    resetAndSeed();
+    seedProviderConfig({
+      provider: 'anthropic',
+      enabled: true,
+      apiKey: 'sk-ant-tool-break',
+      name: 'Anthropic',
+    });
+
+    const session = linearToTree([
+      createUserMessage('Check the page', 1),
+      createAssistantBlocksMessage([
+        createToolCall('call_1', 'browser', { action: 'navigate', url: 'https://example.com' }),
+      ], 2),
+      createToolResultMessage('call_1', 3, 'Opened page'),
+      createAssistantBlocksMessage([
+        { type: 'text', text: 'Here are the results.' },
+      ], 4),
+    ]);
+    await saveChatSession(session);
+
+    flushSync(() => {
+      root.render(React.createElement(ChatPanel, { panelId: 'chat-panel', sessionId: session.id }));
+    });
+
+    await vi.waitFor(() => {
+      expect(container.textContent).toContain('https://example.com');
+      expect(container.textContent).toContain('Here are the results.');
+    });
+
+    expect(container.textContent).not.toContain('step 1');
+    expect(container.textContent).not.toContain('Opened page');
   });
 
   it('enables textarea during streaming when onSteer is provided and shows steering placeholder', () => {

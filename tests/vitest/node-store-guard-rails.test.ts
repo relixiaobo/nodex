@@ -138,13 +138,13 @@ describe('replaceFieldDef', () => {
   });
 });
 
-describe('legacy top-level nodes remain mutable', () => {
+describe('editable top-level nodes remain mutable', () => {
   beforeEach(() => {
     resetAndSeed();
-    loroDoc.createNode(SYSTEM_NODE_IDS.LIBRARY, 'ws_default');
-    loroDoc.setNodeDataBatch(SYSTEM_NODE_IDS.LIBRARY, { name: 'Library' });
-    loroDoc.createNode(SYSTEM_NODE_IDS.INBOX, 'ws_default');
-    loroDoc.setNodeDataBatch(SYSTEM_NODE_IDS.INBOX, { name: 'Inbox' });
+    if (!loroDoc.hasNode(SYSTEM_NODE_IDS.INBOX)) {
+      loroDoc.createNode(SYSTEM_NODE_IDS.INBOX, 'ws_default');
+      loroDoc.setNodeDataBatch(SYSTEM_NODE_IDS.INBOX, { name: 'Inbox' });
+    }
     loroDoc.commitDoc('__seed__');
   });
 
@@ -160,12 +160,10 @@ describe('legacy top-level nodes remain mutable', () => {
     expect(loroDoc.getChildren(SYSTEM_NODE_IDS.TRASH)).toContain('INBOX');
   });
 
-  it('rename and description updates work for legacy Library/Inbox', () => {
+  it('rename updates work for legacy Inbox', () => {
     useNodeStore.getState().setNodeName(SYSTEM_NODE_IDS.INBOX, 'Renamed Inbox');
-    useNodeStore.getState().updateNodeDescription(SYSTEM_NODE_IDS.LIBRARY, 'library desc');
 
     expect(loroDoc.toNodexNode(SYSTEM_NODE_IDS.INBOX)?.name).toBe('Renamed Inbox');
-    expect(loroDoc.toNodexNode(SYSTEM_NODE_IDS.LIBRARY)?.description).toBe('library desc');
   });
 });
 
@@ -203,6 +201,26 @@ describe('locked system nodes remain immutable', () => {
 
     expect(loroDoc.toNodexNode(SYSTEM_NODE_IDS.SETTINGS)?.name).toBe('Settings');
     expect(loroDoc.toNodexNode(SYSTEM_NODE_IDS.SETTINGS)?.description).toBeUndefined();
+  });
+
+  it('setNodeName and updateNodeDescription ignore locked Library node', () => {
+    useNodeStore.getState().setNodeName(SYSTEM_NODE_IDS.LIBRARY, 'Renamed Library');
+    useNodeStore.getState().updateNodeDescription(SYSTEM_NODE_IDS.LIBRARY, 'library desc');
+
+    expect(loroDoc.toNodexNode(SYSTEM_NODE_IDS.LIBRARY)?.name).toBe('Library');
+    expect(loroDoc.toNodexNode(SYSTEM_NODE_IDS.LIBRARY)?.description).toBeUndefined();
+  });
+
+  it('moveNodeTo and trashNode ignore locked Library node', () => {
+    const originalParent = loroDoc.getParentId(SYSTEM_NODE_IDS.LIBRARY);
+    const trashChildrenBefore = loroDoc.getChildren(SYSTEM_NODE_IDS.TRASH);
+
+    useNodeStore.getState().moveNodeTo(SYSTEM_NODE_IDS.LIBRARY, 'proj_1', 0);
+    useNodeStore.getState().trashNode(SYSTEM_NODE_IDS.LIBRARY);
+
+    expect(loroDoc.getParentId(SYSTEM_NODE_IDS.LIBRARY)).toBe(originalParent);
+    expect(loroDoc.getChildren('proj_1')).not.toContain(SYSTEM_NODE_IDS.LIBRARY);
+    expect(loroDoc.getChildren(SYSTEM_NODE_IDS.TRASH)).toEqual(trashChildrenBefore);
   });
 
   it('allows Settings field values but blocks Settings structure edits', () => {

@@ -22,7 +22,6 @@ import { ensureSystemSchema } from './system-schema-presets.js';
 import { ensureAgentNode } from './ai-agent-node.js';
 
 const LEGACY_UNLOCKED_SYSTEM_NODE_IDS = [
-  SYSTEM_NODE_IDS.LIBRARY,
   SYSTEM_NODE_IDS.INBOX,
   SYSTEM_NODE_IDS.SEARCHES,
   SYSTEM_NODE_IDS.CLIPS,
@@ -105,7 +104,7 @@ export function ensureSystemNodes(wsId: string): void {
   const workspaceHomeId = ensureWorkspaceHomeNode(wsId);
   if (!workspaceHomeId) return;
 
-  for (const { id, defaultName, locked } of BOOTSTRAP_SYSTEM_NODES) {
+  for (const [index, { id, defaultName, locked }] of BOOTSTRAP_SYSTEM_NODES.entries()) {
     if (!loroDoc.hasNode(id)) {
       loroDoc.createNode(id, wsId);
       loroDoc.setNodeRichTextContent(id, defaultName, [], []);
@@ -113,6 +112,7 @@ export function ensureSystemNodes(wsId: string): void {
     } else if (loroDoc.getParentId(id) !== wsId) {
       loroDoc.moveNode(id, wsId);
     }
+    loroDoc.moveNode(id, wsId, index);
 
     const node = loroDoc.toNodexNode(id);
     const patch: Record<string, unknown> = {};

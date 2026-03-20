@@ -1,6 +1,12 @@
 import { FIELD_TYPES, NDX_F, SYSTEM_NODE_IDS, SYS_T } from '../types/index.js';
 import { isOutlinerContentNodeType } from './node-type-utils.js';
 import * as loroDoc from './loro-doc.js';
+import { SYSTEM_SCHEMA_NODE_IDS } from './system-schema-presets.js';
+import { materializeSearchResults } from './search-engine.js';
+import {
+  SETTINGS_AI_NODE_IDS,
+  SETTINGS_AI_QUERY_NODE_IDS,
+} from './ai-system-node-ids.js';
 
 export const DEFAULT_AGENT_MODEL_ID = '';
 export const DEFAULT_AGENT_TEMPERATURE = 0.2;
@@ -71,6 +77,12 @@ export const SKILL_NODE_IDS = {
   SKILL_CREATOR_RULE_4: 'NDX_N44',
   SKILL_CREATOR_RULE_5: 'NDX_N45',
 } as const;
+
+export {
+  SETTINGS_AI_GROUP_NODE_IDS,
+  SETTINGS_AI_NODE_IDS,
+  SETTINGS_AI_QUERY_NODE_IDS,
+} from './ai-system-node-ids.js';
 
 // ─── Spark agent defaults ───
 
@@ -256,7 +268,7 @@ const DEFAULT_SKILL_PRESETS: ReadonlyArray<DefaultSkillPreset> = [
     rulePresets: [
       {
         id: SKILL_NODE_IDS.SKILL_CREATOR_RULE_1,
-        text: 'A skill is a #skill node whose children define the rules the AI follows when that skill is active. Create the skill node under Schema, tag it #skill, and add rule nodes as children.',
+        text: 'A skill is a #skill node whose children define the rules the AI follows when that skill is active. Built-in skills live in Library; user-created skills can live anywhere in the graph. Tag it #skill and add rule nodes as children.',
       },
       {
         id: SKILL_NODE_IDS.SKILL_CREATOR_RULE_2,
@@ -318,6 +330,27 @@ function ensureFieldEntry(nodeId: string, fieldEntryId: string, fieldDefId: stri
   });
 }
 
+function ensureLibraryNode(workspaceId: string): void {
+  if (!loroDoc.hasNode(SYSTEM_NODE_IDS.LIBRARY)) {
+    loroDoc.createNode(SYSTEM_NODE_IDS.LIBRARY, workspaceId);
+    loroDoc.setNodeRichTextContent(SYSTEM_NODE_IDS.LIBRARY, 'Library', [], []);
+    loroDoc.setNodeData(SYSTEM_NODE_IDS.LIBRARY, 'locked', true);
+    return;
+  }
+
+  if (loroDoc.getParentId(SYSTEM_NODE_IDS.LIBRARY) !== workspaceId) {
+    loroDoc.moveNode(SYSTEM_NODE_IDS.LIBRARY, workspaceId);
+  }
+
+  const libraryNode = loroDoc.toNodexNode(SYSTEM_NODE_IDS.LIBRARY);
+  if (!libraryNode?.name?.trim()) {
+    loroDoc.setNodeRichTextContent(SYSTEM_NODE_IDS.LIBRARY, 'Library', [], []);
+  }
+  if (libraryNode?.locked !== true) {
+    loroDoc.setNodeData(SYSTEM_NODE_IDS.LIBRARY, 'locked', true);
+  }
+}
+
 function ensureTextValue(fieldEntryId: string, valueNodeId: string, value: string): void {
   const fieldEntry = loroDoc.toNodexNode(fieldEntryId);
   if ((fieldEntry?.children?.length ?? 0) > 0) return;
@@ -343,7 +376,7 @@ function ensureTargetValue(fieldEntryId: string, valueNodeId: string, targetId: 
 function ensureSkillNode(skillPreset: DefaultSkillPreset): void {
   ensureNode({
     id: skillPreset.id,
-    parentId: SYSTEM_NODE_IDS.SCHEMA,
+    parentId: SYSTEM_NODE_IDS.LIBRARY,
     name: skillPreset.name,
     data: {
       description: skillPreset.description,
@@ -397,20 +430,121 @@ function cleanupSeededPromptPresetNodes(
   }
 }
 
+function moveNodeToIndex(nodeId: string, parentId: string, index: number): void {
+  if (!loroDoc.hasNode(nodeId)) return;
+  const currentParentId = loroDoc.getParentId(nodeId);
+  const siblingCount = currentParentId === parentId
+    ? loroDoc.getChildren(parentId).filter((childId) => childId !== nodeId).length
+    : loroDoc.getChildren(parentId).length;
+  const clampedIndex = Math.max(0, Math.min(index, siblingCount));
+  loroDoc.moveNode(nodeId, parentId, clampedIndex);
+}
+
+function ensureTaggedSearchNode(
+  searchNodeId: string,
+  name: string,
+  tagId: string,
+  groupId: string,
+  leafId: string,
+  index: number,
+): void {
+  ensureNode({
+    id: searchNodeId,
+    parentId: SETTINGS_AI_NODE_IDS.AI,
+    name,
+    data: {
+      type: 'search',
+      locked: true,
+    },
+  });
+  moveNodeToIndex(searchNodeId, SETTINGS_AI_NODE_IDS.AI, index);
+
+  ensureNode({
+    id: groupId,
+    parentId: searchNodeId,
+    data: {
+      type: 'queryCondition',
+      queryLogic: 'AND',
+    },
+  });
+
+  ensureNode({
+    id: leafId,
+    parentId: groupId,
+    data: {
+      type: 'queryCondition',
+      queryOp: 'HAS_TAG',
+      queryTagDefId: tagId,
+    },
+  });
+}
+
+function ensureSettingsAIGrouping(): void {
+  ensureNode({
+    id: SETTINGS_AI_NODE_IDS.AI,
+    parentId: SYSTEM_NODE_IDS.SETTINGS,
+    name: 'AI',
+    data: {
+      locked: true,
+    },
+  });
+  moveNodeToIndex(SETTINGS_AI_NODE_IDS.AI, SYSTEM_NODE_IDS.SETTINGS, 0);
+
+  if (loroDoc.hasNode(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDERS_FIELD_ENTRY)) {
+    moveNodeToIndex(
+      SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDERS_FIELD_ENTRY,
+      SETTINGS_AI_NODE_IDS.AI,
+      0,
+    );
+  }
+
+  ensureTaggedSearchNode(
+    SETTINGS_AI_NODE_IDS.AGENTS,
+    'Agents',
+    SYS_T.AGENT,
+    SETTINGS_AI_QUERY_NODE_IDS.AGENTS_GROUP,
+    SETTINGS_AI_QUERY_NODE_IDS.AGENTS_TAG,
+    1,
+  );
+  ensureTaggedSearchNode(
+    SETTINGS_AI_NODE_IDS.SKILLS,
+    'Skills',
+    SYS_T.SKILL,
+    SETTINGS_AI_QUERY_NODE_IDS.SKILLS_GROUP,
+    SETTINGS_AI_QUERY_NODE_IDS.SKILLS_TAG,
+    2,
+  );
+}
+
+function refreshSettingsAISearches(): void {
+  materializeSearchResults(SETTINGS_AI_NODE_IDS.AGENTS);
+  materializeSearchResults(SETTINGS_AI_NODE_IDS.SKILLS);
+}
+
+function ensureLibraryChild(nodeId: string, index: number): void {
+  ensureSettingsAIGrouping();
+  if (!loroDoc.hasNode(nodeId) || !loroDoc.hasNode(SYSTEM_NODE_IDS.LIBRARY)) return;
+  moveNodeToIndex(nodeId, SYSTEM_NODE_IDS.LIBRARY, index);
+}
+
 // ─── Bootstrap ───
 
 export function ensureAgentNode(workspaceId = loroDoc.getCurrentWorkspaceId() ?? 'ws_default'): string {
+  ensureLibraryNode(workspaceId);
+
   // Schema presets (tagDefs + fieldDefs)
   for (const preset of AGENT_SCHEMA_PRESETS) {
     ensureNode(preset);
   }
+  ensureSettingsAIGrouping();
 
   // Agent node itself
   ensureNode({
     id: SYSTEM_NODE_IDS.AGENT,
-    parentId: workspaceId,
+    parentId: SYSTEM_NODE_IDS.LIBRARY,
     name: 'soma',
   });
+  ensureLibraryChild(SYSTEM_NODE_IDS.AGENT, 0);
   if (!loroDoc.toNodexNode(SYSTEM_NODE_IDS.AGENT)?.tags.includes(SYS_T.AGENT)) {
     loroDoc.addTag(SYSTEM_NODE_IDS.AGENT, SYS_T.AGENT);
   }
@@ -469,6 +603,7 @@ export function ensureAgentNode(workspaceId = loroDoc.getCurrentWorkspaceId() ??
   for (const skillPreset of DEFAULT_SKILL_PRESETS) {
     ensureSkillNode(skillPreset);
   }
+  moveNodeToIndex(SKILL_NODE_IDS.SKILL_CREATOR, SYSTEM_NODE_IDS.LIBRARY, 2);
 
   ensureFieldEntry(SYSTEM_NODE_IDS.AGENT, AI_AGENT_NODE_IDS.SKILLS_FIELD_ENTRY, NDX_F.AGENT_SKILLS);
   ensureTargetValue(
@@ -476,6 +611,7 @@ export function ensureAgentNode(workspaceId = loroDoc.getCurrentWorkspaceId() ??
     AI_AGENT_NODE_IDS.DEFAULT_SKILL_VALUE,
     SKILL_NODE_IDS.SKILL_CREATOR,
   );
+  refreshSettingsAISearches();
 
   return SYSTEM_NODE_IDS.AGENT;
 }
@@ -582,17 +718,21 @@ export function readAgentNodeConfig(): AgentNodeConfig {
 // ─── Spark agent bootstrap ───
 
 export function ensureSparkAgentNode(workspaceId = loroDoc.getCurrentWorkspaceId() ?? 'ws_default'): string {
+  ensureLibraryNode(workspaceId);
+
   // Schema presets (shared with main agent — tagDefs + fieldDefs)
   for (const preset of AGENT_SCHEMA_PRESETS) {
     ensureNode(preset);
   }
+  ensureSettingsAIGrouping();
 
   // Spark agent node
   ensureNode({
     id: SYSTEM_NODE_IDS.SPARK_AGENT,
-    parentId: workspaceId,
+    parentId: SYSTEM_NODE_IDS.LIBRARY,
     name: 'Spark',
   });
+  ensureLibraryChild(SYSTEM_NODE_IDS.SPARK_AGENT, 1);
   if (!loroDoc.toNodexNode(SYSTEM_NODE_IDS.SPARK_AGENT)?.tags.includes(SYS_T.AGENT)) {
     loroDoc.addTag(SYSTEM_NODE_IDS.SPARK_AGENT, SYS_T.AGENT);
   }
@@ -623,6 +763,7 @@ export function ensureSparkAgentNode(workspaceId = loroDoc.getCurrentWorkspaceId
     SPARK_AGENT_NODE_IDS.MAX_TOKENS_VALUE,
     String(SPARK_DEFAULT_MAX_TOKENS),
   );
+  materializeSearchResults(SETTINGS_AI_NODE_IDS.AGENTS);
 
   return SYSTEM_NODE_IDS.SPARK_AGENT;
 }

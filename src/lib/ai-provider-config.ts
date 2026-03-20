@@ -1,6 +1,7 @@
 import { getModels, getProviders } from '@mariozechner/pi-ai';
 import type { Api, Model } from '@mariozechner/pi-ai';
 import { NDX_F, NDX_T, SYS_V } from '../types/index.js';
+import { useNodeStore } from '../stores/node-store.js';
 import * as loroDoc from './loro-doc.js';
 import { SYSTEM_SCHEMA_NODE_IDS } from './system-schema-presets.js';
 
@@ -51,8 +52,21 @@ export interface ProviderConfig {
   nodeId: string;
 }
 
+export function guessProviderFromApiKey(apiKey: string): string | null {
+  const trimmed = apiKey.trim();
+  if (trimmed.startsWith('sk-ant-')) return 'anthropic';
+  if (trimmed.startsWith('sk-')) return 'openai';
+  return null;
+}
+
 export function normalizeProviderId(provider: string | null | undefined): string {
   return provider?.trim().toLowerCase() ?? '';
+}
+
+function getProviderDisplayName(provider: string): string {
+  const providerOptionNodeId = findProviderOptionNodeId(provider);
+  if (!providerOptionNodeId) return provider;
+  return loroDoc.toNodexNode(providerOptionNodeId)?.name?.trim() || provider;
 }
 
 function findFieldEntry(nodeId: string, fieldDefId: string): string | null {
@@ -188,6 +202,45 @@ export function getProviderConfigs(): ProviderConfig[] {
   } catch {
     return [];
   }
+}
+
+export function saveProviderApiKey(provider: string, apiKey: string): ProviderConfig {
+  const normalizedProvider = normalizeProviderId(provider);
+  const trimmedApiKey = apiKey.trim();
+  if (!normalizedProvider) {
+    throw new Error('Choose a provider first.');
+  }
+  if (!trimmedApiKey) {
+    throw new Error('Paste an API key to continue.');
+  }
+
+  const providerOptionNodeId = findProviderOptionNodeId(normalizedProvider);
+  if (!providerOptionNodeId) {
+    throw new Error(`Unsupported provider: ${provider}`);
+  }
+
+  const store = useNodeStore.getState();
+  const existingConfig = getProviderConfigs().find(
+    (config) => normalizeProviderId(config.provider) === normalizedProvider,
+  );
+  const nodeId = existingConfig?.nodeId
+    ?? store.createChild(
+      SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDERS_FIELD_ENTRY,
+      undefined,
+      { name: getProviderDisplayName(normalizedProvider) },
+      { commit: false },
+    ).id;
+
+  store.setOptionsFieldValue(nodeId, NDX_F.PROVIDER_ID, providerOptionNodeId);
+  store.setFieldValue(nodeId, NDX_F.PROVIDER_ENABLED, [SYS_V.YES]);
+  store.setFieldValue(nodeId, NDX_F.PROVIDER_API_KEY, [trimmedApiKey]);
+
+  return {
+    provider: normalizedProvider,
+    enabled: true,
+    apiKey: trimmedApiKey,
+    nodeId,
+  };
 }
 
 export function getEnabledProviderConfigs(): ProviderConfig[] {

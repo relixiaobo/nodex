@@ -10,7 +10,13 @@ import {
   getSystemNodePreset,
   isPaletteSearchableSystemNode,
 } from '../../src/lib/system-node-presets.js';
-import { getHighlightEnabled, setHighlightEnabled } from '../../src/lib/settings-service.js';
+import {
+  getHighlightEnabled,
+  getStartupPagePreference,
+  setHighlightEnabled,
+  setStartupPagePreference,
+  STARTUP_PAGE,
+} from '../../src/lib/settings-service.js';
 import { SYSTEM_SCHEMA_NODE_IDS } from '../../src/lib/system-schema-presets.js';
 import { NDX_F, NDX_T } from '../../src/types/index.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
@@ -104,12 +110,14 @@ describe('settings system', () => {
     expect(loroDoc.toNodexNode(NDX_T.WORKSPACE_SETTINGS)?.locked).toBe(true);
     expect(loroDoc.getParentId(NDX_T.AI_PROVIDER)).toBe(SYSTEM_NODE_IDS.SCHEMA);
     expect(loroDoc.getParentId(NDX_F.SETTING_HIGHLIGHT_ENABLED)).toBe(NDX_T.WORKSPACE_SETTINGS);
+    expect(loroDoc.getParentId(NDX_F.SETTING_STARTUP_PAGE)).toBe(NDX_T.WORKSPACE_SETTINGS);
     expect(loroDoc.getParentId(NDX_F.SETTING_AI_PROVIDERS)).toBe(NDX_T.WORKSPACE_SETTINGS);
     expect(loroDoc.getParentId(NDX_F.PROVIDER_ID)).toBe(NDX_T.AI_PROVIDER);
     expect(loroDoc.getParentId(NDX_F.PROVIDER_ENABLED)).toBe(NDX_T.AI_PROVIDER);
     expect(loroDoc.getParentId(NDX_F.PROVIDER_API_KEY)).toBe(NDX_T.AI_PROVIDER);
     expect(loroDoc.getParentId(NDX_F.PROVIDER_BASE_URL)).toBe(NDX_T.AI_PROVIDER);
     expect(loroDoc.getParentId(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_HIGHLIGHT_FIELD_ENTRY)).toBe(SYSTEM_NODE_IDS.SETTINGS);
+    expect(loroDoc.getParentId(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_STARTUP_PAGE_FIELD_ENTRY)).toBe(SYSTEM_NODE_IDS.SETTINGS);
     expect(loroDoc.getParentId(SETTINGS_AI_NODE_IDS.AI)).toBe(SYSTEM_NODE_IDS.SETTINGS);
     expect(loroDoc.toNodexNode(SETTINGS_AI_NODE_IDS.AI)?.locked).toBe(true);
     expect(loroDoc.getParentId(SETTINGS_AI_NODE_IDS.AGENTS)).toBe(SETTINGS_AI_NODE_IDS.AI);
@@ -131,6 +139,16 @@ describe('settings system', () => {
     expect(getHighlightEnabled()).toBe(true);
   });
 
+  it('startup page defaults to Chat and can switch to Today', () => {
+    expect(getStartupPagePreference()).toBe(STARTUP_PAGE.CHAT);
+
+    setStartupPagePreference(STARTUP_PAGE.TODAY);
+    expect(getStartupPagePreference()).toBe(STARTUP_PAGE.TODAY);
+
+    setStartupPagePreference(STARTUP_PAGE.CHAT);
+    expect(getStartupPagePreference()).toBe(STARTUP_PAGE.CHAT);
+  });
+
   it('renders the Settings node panel without triggering a React update loop', () => {
     expect(() => {
       flushSync(() => {
@@ -141,6 +159,8 @@ describe('settings system', () => {
     expect(container.textContent).toContain('Settings');
     expect(container.textContent).toContain('AI');
     expect(container.textContent).toContain('Highlight & Comment');
+    expect(container.textContent).toContain('Startup page');
+    expect(container.textContent).toContain('Chat');
     expect(container.querySelector('[role="switch"]')?.getAttribute('aria-checked')).toBe('true');
     expect(container.querySelector('[data-field-row]')?.className).toContain('@md:grid-cols-[clamp(10rem,32%,15rem)_minmax(0,1fr)]');
   });

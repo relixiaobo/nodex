@@ -93,6 +93,24 @@ describe('workspace-store auth and persistence', () => {
     expect(state.currentWorkspaceId).toBeNull();
   });
 
+  it('continueInOfflineMode seeds a local dev workspace without auth', async () => {
+    vi.doMock('../../src/lib/workspace-id.js', () => ({
+      getOrCreateDefaultWorkspaceId: vi.fn().mockResolvedValue('ws_offline_dev'),
+    }));
+
+    await useWorkspaceStore.getState().continueInOfflineMode();
+
+    expect(useWorkspaceStore.getState()).toMatchObject({
+      currentWorkspaceId: 'ws_offline_dev',
+      userId: 'user_default',
+      isAuthenticated: true,
+      authUser: {
+        id: 'user_default',
+        name: 'Offline mode',
+      },
+    });
+  });
+
   it('signInWithGoogle action updates store with user and workspaceId', async () => {
     const mockUser = { id: 'guser_1', email: 'g@example.com', name: 'Google User' };
     vi.doMock('../../src/lib/auth.js', () => ({

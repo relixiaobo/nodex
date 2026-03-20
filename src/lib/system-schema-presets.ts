@@ -9,6 +9,10 @@ export const SYSTEM_SCHEMA_NODE_IDS = {
   SETTINGS_HIGHLIGHT_VALUE: 'NDX_N10',
   SETTINGS_AI_DEBUG_FIELD_ENTRY: 'NDX_FE22',
   SETTINGS_AI_DEBUG_VALUE: 'NDX_N18',
+  SETTINGS_STARTUP_PAGE_FIELD_ENTRY: 'NDX_FE25',
+  SETTINGS_STARTUP_PAGE_VALUE: 'NDX_N19',
+  SETTINGS_STARTUP_PAGE_CHAT_OPTION: 'NDX_N20',
+  SETTINGS_STARTUP_PAGE_TODAY_OPTION: 'NDX_N21',
   LEGACY_SETTINGS_AI_PROVIDER_FIELD_ENTRY: 'NDX_FE11',
   LEGACY_SETTINGS_AI_PROVIDER_ANTHROPIC_OPTION: 'NDX_N11',
   LEGACY_SETTINGS_AI_PROVIDER_VALUE: 'NDX_N12',
@@ -67,6 +71,35 @@ const SYSTEM_SCHEMA_NODE_PRESETS: ReadonlyArray<FixedSchemaNodePreset> = [
       locked: true,
       nullable: true,
       cardinality: 'single',
+    },
+  },
+  {
+    id: NDX_F.SETTING_STARTUP_PAGE,
+    parentId: NDX_T.WORKSPACE_SETTINGS,
+    name: 'Startup page',
+    data: {
+      type: 'fieldDef',
+      fieldType: FIELD_TYPES.OPTIONS,
+      description: 'Choose the default page when soma opens',
+      locked: true,
+      nullable: false,
+      cardinality: 'single',
+    },
+  },
+  {
+    id: SYSTEM_SCHEMA_NODE_IDS.SETTINGS_STARTUP_PAGE_CHAT_OPTION,
+    parentId: NDX_F.SETTING_STARTUP_PAGE,
+    name: 'Chat',
+    data: {
+      locked: true,
+    },
+  },
+  {
+    id: SYSTEM_SCHEMA_NODE_IDS.SETTINGS_STARTUP_PAGE_TODAY_OPTION,
+    parentId: NDX_F.SETTING_STARTUP_PAGE,
+    name: 'Today',
+    data: {
+      locked: true,
     },
   },
   {
@@ -174,6 +207,14 @@ const SYSTEM_SCHEMA_NODE_PRESETS: ReadonlyArray<FixedSchemaNodePreset> = [
     data: {
       type: 'fieldEntry',
       fieldDefId: NDX_F.SETTING_AI_DEBUG,
+    },
+  },
+  {
+    id: SYSTEM_SCHEMA_NODE_IDS.SETTINGS_STARTUP_PAGE_FIELD_ENTRY,
+    parentId: SYSTEM_NODE_IDS.SETTINGS,
+    data: {
+      type: 'fieldEntry',
+      fieldDefId: NDX_F.SETTING_STARTUP_PAGE,
     },
   },
   {
@@ -349,6 +390,15 @@ export function ensureSystemSchema(): void {
       SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_DEBUG_FIELD_ENTRY,
       SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_DEBUG_VALUE,
       SYS_V.NO,
+    );
+  }
+
+  const startupPageFieldEntry = loroDoc.toNodexNode(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_STARTUP_PAGE_FIELD_ENTRY);
+  if ((startupPageFieldEntry?.children?.length ?? 0) === 0) {
+    ensureTargetValue(
+      SYSTEM_SCHEMA_NODE_IDS.SETTINGS_STARTUP_PAGE_FIELD_ENTRY,
+      SYSTEM_SCHEMA_NODE_IDS.SETTINGS_STARTUP_PAGE_VALUE,
+      SYSTEM_SCHEMA_NODE_IDS.SETTINGS_STARTUP_PAGE_CHAT_OPTION,
     );
   }
 

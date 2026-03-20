@@ -29,6 +29,7 @@ import {
   isColorFieldType,
   isDateFieldType,
   isEmailFieldType,
+  isOptionsFieldType,
   isPasswordFieldType,
   isUrlFieldType,
   resolveConfigValueWithDefault,
@@ -44,6 +45,7 @@ import { OUTLINER_ROW_CONTAINER_CLASS, shouldShowTrailingInput, type OutlinerRow
 import { useDragSelect } from '../../hooks/use-drag-select.js';
 import { navigateToSiblingRow } from '../../lib/outliner-navigation.js';
 import { canCreateChildrenUnder, canEditFieldEntryValue, getNodeCapabilities } from '../../lib/node-capabilities.js';
+import { OptionsPicker } from './OptionsPicker.js';
 
 interface FieldValueOutlinerProps {
   fieldEntryId: string;
@@ -63,6 +65,15 @@ export function shouldShowFieldValueTrailingInput(
   items: Array<{ type: string }>,
 ): boolean {
   return shouldShowTrailingInput(items as Array<{ type: OutlinerRowType }>);
+}
+
+export function shouldRenderSingleSelectOptionsPicker(
+  fieldDataType: string | undefined,
+  fieldDef: { locked?: boolean; cardinality?: string } | null | undefined,
+): boolean {
+  return isOptionsFieldType(fieldDataType)
+    && fieldDef?.locked === true
+    && fieldDef.cardinality === 'single';
 }
 
 function PasswordFieldEditor({ fieldEntryId, selectableChildIds }: { fieldEntryId: string; selectableChildIds: string[] }) {
@@ -199,6 +210,11 @@ export function FieldValueOutliner({ fieldEntryId, fieldDataType, attrDefId, con
     void s._version;
     return canCreateChildrenUnder(fieldEntryId);
   });
+  const renderSingleSelectOptionsPicker = useNodeStore((s) => {
+    void s._version;
+    if (!attrDefId) return false;
+    return shouldRenderSingleSelectOptionsPicker(fieldDataType, s.getNode(attrDefId));
+  });
 
   // Drop zone hooks (must be before early returns)
   const moveNodeTo = useNodeStore((s) => s.moveNodeTo);
@@ -265,6 +281,19 @@ export function FieldValueOutliner({ fieldEntryId, fieldDataType, attrDefId, con
   }, [visibleChildren, fieldEntryId, navToField, navToContent, onNavigateOut]);
 
   // --- Special control early returns (Boolean, Checkbox, Date) ---
+
+  if (renderSingleSelectOptionsPicker && attrDefId) {
+    const parentNodeId = loroDoc.getParentId(fieldEntryId);
+    if (parentNodeId) {
+      return (
+        <OptionsPicker
+          nodeId={parentNodeId}
+          attrDefId={attrDefId}
+          fieldEntryId={fieldEntryId}
+        />
+      );
+    }
+  }
 
   // --- BOOLEAN: Yes/No toggle switch ---
   // For virtual config entries: read from node attribute directly.

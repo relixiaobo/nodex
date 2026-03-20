@@ -94,6 +94,7 @@ describe('node tools (Phase 1.5)', () => {
     expect(details.id).toBe('ws_default');
     expect(details.children.items.map((item) => item.id)).toEqual([
       SYSTEM_NODE_IDS.JOURNAL,
+      SYSTEM_NODE_IDS.LIBRARY,
       SYSTEM_NODE_IDS.SCHEMA,
       topLevel.id,
     ]);

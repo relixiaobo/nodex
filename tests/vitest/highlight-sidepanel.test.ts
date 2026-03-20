@@ -219,8 +219,6 @@ describe('highlight-sidepanel (unified Path B model)', () => {
     const store = getStore();
     const result = await createHighlightFromPayload(makePayload({ selectedText: 'legacy-library' }), store);
 
-    loroDoc.createNode(SYSTEM_NODE_IDS.LIBRARY, 'ws_default');
-    loroDoc.setNodeDataBatch(SYSTEM_NODE_IDS.LIBRARY, { name: 'Library' });
     loroDoc.moveNode(result.clipNodeId, SYSTEM_NODE_IDS.LIBRARY);
     loroDoc.commitDoc('__seed__');
 

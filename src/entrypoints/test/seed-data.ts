@@ -55,6 +55,7 @@ function seedBody(): void {
 
   // ─── Well-known top-level nodes ───
   cn(SYSTEM_NODE_IDS.JOURNAL,  WS_ID, { name: 'Daily notes', locked: true });
+  cn(SYSTEM_NODE_IDS.LIBRARY,  WS_ID, { name: 'Library' });
   cn(SYSTEM_NODE_IDS.SEARCHES, WS_ID, { name: 'Searches' });
   cn(SYSTEM_NODE_IDS.TRASH,    WS_ID, { name: 'Trash', locked: true });
   cn(SYSTEM_NODE_IDS.SCHEMA,   WS_ID, { name: 'Schema', locked: true });

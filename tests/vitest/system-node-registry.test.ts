@@ -7,7 +7,7 @@ import {
   QUICK_NAV_SYSTEM_NODES,
   getSystemNodePreset,
 } from '../../src/lib/system-node-presets.js';
-import { SETTINGS_AI_GROUP_NODE_IDS } from '../../src/lib/ai-agent-node.js';
+import { SETTINGS_AI_NODE_IDS } from '../../src/lib/ai-agent-node.js';
 
 describe('system node presets', () => {
   it('contains all declared system and journal schema node ids exactly once', () => {
@@ -15,16 +15,17 @@ describe('system node presets', () => {
     expect(new Set(ids).size).toBe(ids.length);
     expect(new Set(ids)).toEqual(new Set([
       ...Object.values(SYSTEM_NODE_IDS),
-      ...Object.values(SETTINGS_AI_GROUP_NODE_IDS),
+      ...Object.values(SETTINGS_AI_NODE_IDS),
       SYSTEM_TAGS.DAY,
       SYSTEM_TAGS.WEEK,
       SYSTEM_TAGS.YEAR,
     ]));
   });
 
-  it('bootstraps only locked system roots', () => {
+  it('bootstraps workspace roots including Library', () => {
     expect(BOOTSTRAP_SYSTEM_NODES.map((c) => c.id)).toEqual([
       SYSTEM_NODE_IDS.JOURNAL,
+      SYSTEM_NODE_IDS.LIBRARY,
       SYSTEM_NODE_IDS.TRASH,
       SYSTEM_NODE_IDS.SCHEMA,
       SYSTEM_NODE_IDS.SETTINGS,

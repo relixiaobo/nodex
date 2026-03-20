@@ -138,13 +138,13 @@ describe('replaceFieldDef', () => {
   });
 });
 
-describe('legacy top-level nodes remain mutable', () => {
+describe('editable top-level nodes remain mutable', () => {
   beforeEach(() => {
     resetAndSeed();
-    loroDoc.createNode(SYSTEM_NODE_IDS.LIBRARY, 'ws_default');
-    loroDoc.setNodeDataBatch(SYSTEM_NODE_IDS.LIBRARY, { name: 'Library' });
-    loroDoc.createNode(SYSTEM_NODE_IDS.INBOX, 'ws_default');
-    loroDoc.setNodeDataBatch(SYSTEM_NODE_IDS.INBOX, { name: 'Inbox' });
+    if (!loroDoc.hasNode(SYSTEM_NODE_IDS.INBOX)) {
+      loroDoc.createNode(SYSTEM_NODE_IDS.INBOX, 'ws_default');
+      loroDoc.setNodeDataBatch(SYSTEM_NODE_IDS.INBOX, { name: 'Inbox' });
+    }
     loroDoc.commitDoc('__seed__');
   });
 
@@ -160,7 +160,7 @@ describe('legacy top-level nodes remain mutable', () => {
     expect(loroDoc.getChildren(SYSTEM_NODE_IDS.TRASH)).toContain('INBOX');
   });
 
-  it('rename and description updates work for legacy Library/Inbox', () => {
+  it('rename and description updates work for Library/Inbox', () => {
     useNodeStore.getState().setNodeName(SYSTEM_NODE_IDS.INBOX, 'Renamed Inbox');
     useNodeStore.getState().updateNodeDescription(SYSTEM_NODE_IDS.LIBRARY, 'library desc');
 

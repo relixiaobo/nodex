@@ -9,11 +9,12 @@ import {
   DEFAULT_AGENT_TEMPERATURE,
   readAgentNodeConfig,
   readSkillIds,
-  SETTINGS_AI_GROUP_NODE_IDS,
+  SETTINGS_AI_NODE_IDS,
   SKILL_NODE_IDS,
 } from '../../src/lib/ai-agent-node.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
 import { SYSTEM_NODE_IDS, SYS_T } from '../../src/types/index.js';
+import { runSearch } from '../../src/lib/search-engine.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
 function createSkillNode({
@@ -62,9 +63,37 @@ describe('ai agent skill bootstrap and prompt rendering', () => {
     expect(readSkillIds(AI_AGENT_NODE_IDS.SKILLS_FIELD_ENTRY)).toEqual([SKILL_NODE_IDS.SKILL_CREATOR]);
   });
 
-  it('places the built-in skill under Settings AI Default Skills', () => {
-    expect(loroDoc.getParentId(SKILL_NODE_IDS.SKILL_CREATOR)).toBe(SETTINGS_AI_GROUP_NODE_IDS.DEFAULT_SKILLS);
+  it('places the built-in skill under Library', () => {
+    expect(loroDoc.getParentId(SKILL_NODE_IDS.SKILL_CREATOR)).toBe(SYSTEM_NODE_IDS.LIBRARY);
     expect(loroDoc.toNodexNode(SKILL_NODE_IDS.SKILL_CREATOR)?.tags).toContain(SYS_T.SKILL);
+  });
+
+  it('uses fixed Settings AI search nodes to aggregate all agents and skills', () => {
+    loroDoc.createNode('custom_agent', 'note_1');
+    loroDoc.setNodeRichTextContent('custom_agent', 'Custom agent', [], []);
+    loroDoc.addTag('custom_agent', SYS_T.AGENT);
+
+    createSkillNode({
+      id: 'skill_custom_anywhere',
+      name: 'Custom skill',
+      description: 'User-authored skill',
+      ruleText: 'Custom rule',
+    });
+
+    const agentsSearch = loroDoc.toNodexNode(SETTINGS_AI_NODE_IDS.AGENTS);
+    const skillsSearch = loroDoc.toNodexNode(SETTINGS_AI_NODE_IDS.SKILLS);
+
+    expect(loroDoc.getParentId(SETTINGS_AI_NODE_IDS.AGENTS)).toBe(SETTINGS_AI_NODE_IDS.AI);
+    expect(loroDoc.getParentId(SETTINGS_AI_NODE_IDS.SKILLS)).toBe(SETTINGS_AI_NODE_IDS.AI);
+    expect(agentsSearch?.type).toBe('search');
+    expect(skillsSearch?.type).toBe('search');
+
+    expect(Array.from(runSearch(SETTINGS_AI_NODE_IDS.AGENTS))).toEqual(
+      expect.arrayContaining([SYSTEM_NODE_IDS.AGENT, 'custom_agent']),
+    );
+    expect(Array.from(runSearch(SETTINGS_AI_NODE_IDS.SKILLS))).toEqual(
+      expect.arrayContaining([SKILL_NODE_IDS.SKILL_CREATOR, 'skill_custom_anywhere']),
+    );
   });
 
   it('reads agent node content as user instructions, not built-in system prompt', () => {

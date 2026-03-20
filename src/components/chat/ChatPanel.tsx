@@ -315,6 +315,10 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
       );
     };
 
+    if (import.meta.env.DEV && messages.length > 0) {
+      console.log('[tool-group] message scan:', messages.map((m, i) => `${i}:${m.message.role}:${isToolCallOnlyMessage(m.message) ? 'TOOL' : 'TEXT'}:${m.message.role === 'assistant' ? (m.message as AssistantMessage).content.map((b: { type: string }) => b.type).join('+') : ''}`).join(' | '));
+    }
+
     let index = 0;
     while (index < messages.length) {
       const entry = messages[index]!;

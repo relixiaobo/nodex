@@ -80,6 +80,11 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
     void settingsVersion;
     return hasAnyEnabledProvider();
   }, [settingsVersion]);
+  const chatState = !hasConfiguredProvider
+    ? 'onboarding'
+    : hasAvailableModels
+      ? 'ready'
+      : 'no-models';
 
   const currentModel = useMemo(() => {
     const key = selectedModelKey ?? { id: debug.modelId, provider: debug.provider };
@@ -130,7 +135,7 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
   }, [hasSteering]);
 
   useEffect(() => {
-    if (!hasConfiguredProvider || !hasAvailableModels) return;
+    if (chatState !== 'ready') return;
     const scroller = scrollRef.current;
     if (!scroller) return;
     if (!shouldStickToBottomRef.current) return;
@@ -139,23 +144,22 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
       scroller.scrollTop = scroller.scrollHeight;
       shouldStickToBottomRef.current = true;
     });
-  }, [hasAvailableModels, hasConfiguredProvider, isStreaming, messages, steeringNote]);
+  }, [chatState, isStreaming, messages, steeringNote]);
 
   useEffect(() => {
     if (!isActive || !pendingChatPrompt || pendingChatPrompt.panelId !== panelId) return;
-    if (!hasConfiguredProvider || !hasAvailableModels || chatBusy || !ready) return;
+    if (chatState !== 'ready' || chatBusy || !ready) return;
 
     setPendingChatPrompt(null);
     void handleSendMessage(pendingChatPrompt.prompt);
   }, [
     chatBusy,
-    hasAvailableModels,
-    hasConfiguredProvider,
     isActive,
     panelId,
     pendingChatPrompt,
     ready,
     setPendingChatPrompt,
+    chatState,
   ]);
 
   function handleSteerMessage(text: string) {
@@ -271,9 +275,31 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
           <div className="flex flex-1 items-center justify-center text-sm text-foreground-tertiary">
             Loading chat…
           </div>
-        ) : !hasConfiguredProvider ? (
+        ) : chatState === 'onboarding' ? (
           <div className="flex flex-1 overflow-hidden">
             <ChatOnboarding panelId={panelId} />
+            {debugEnabled && debugOpen && (
+              <div className="w-1/2 shrink-0 overflow-y-auto overflow-x-hidden border-l border-border px-3 py-3">
+                <ChatDebugPanel debug={debug} />
+              </div>
+            )}
+          </div>
+        ) : chatState === 'no-models' ? (
+          <div className="flex flex-1 overflow-hidden">
+            <div className="flex flex-1 flex-col justify-center gap-4 px-6">
+              <div className="flex flex-col items-center gap-4 text-center">
+                <div className="max-w-[280px] text-sm text-foreground-tertiary">
+                  Your enabled provider does not expose any chat models yet. Check the provider settings or add custom model IDs.
+                </div>
+                <button
+                  type="button"
+                  onClick={handleOpenSettings}
+                  className="inline-flex h-9 items-center rounded-full border border-border px-4 text-sm font-medium text-foreground transition-colors hover:bg-foreground/4"
+                >
+                  Open Settings
+                </button>
+              </div>
+            </div>
             {debugEnabled && debugOpen && (
               <div className="w-1/2 shrink-0 overflow-y-auto overflow-x-hidden border-l border-border px-3 py-3">
                 <ChatDebugPanel debug={debug} />

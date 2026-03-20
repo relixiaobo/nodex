@@ -98,8 +98,8 @@ interface NodeStore {
 
   createFieldDef(name: string, fieldType: FieldType, tagDefId: string): NodexNode;
 
-  setFieldValue(nodeId: string, fieldDefId: string, values: string[]): void;
-  setOptionsFieldValue(nodeId: string, fieldDefId: string, optionNodeId: string): void;
+  setFieldValue(nodeId: string, fieldDefId: string, values: string[], options?: { commit?: boolean }): void;
+  setOptionsFieldValue(nodeId: string, fieldDefId: string, optionNodeId: string, options?: { commit?: boolean }): void;
   selectFieldOption(fieldEntryId: string, optionNodeId: string, oldOptionNodeId?: string): void;
   clearFieldValue(nodeId: string, fieldDefId: string): void;
   addFieldToNode(nodeId: string, fieldDefId: string): void;
@@ -1462,7 +1462,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       return loroDoc.toNodexNode(id)!;
     },
 
-    setFieldValue: (nodeId, fieldDefId, values) => {
+    setFieldValue: (nodeId, fieldDefId, values, options) => {
       if (!canEditFieldValues(nodeId)) return;
       // 找到或创建 fieldEntry
       let feId = findFieldEntry(nodeId, fieldDefId);
@@ -1484,10 +1484,12 @@ export const useNodeStore = create<NodeStore>((set, get) => {
         loroDoc.createNode(valId, feId);
         loroDoc.setNodeData(valId, 'name', val);
       }
-      loroDoc.commitDoc();
+      if (options?.commit !== false) {
+        loroDoc.commitDoc();
+      }
     },
 
-    setOptionsFieldValue: (nodeId, fieldDefId, optionNodeId) => {
+    setOptionsFieldValue: (nodeId, fieldDefId, optionNodeId, options) => {
       if (!canEditFieldValues(nodeId)) return;
       let feId = findFieldEntry(nodeId, fieldDefId);
       if (!feId) {
@@ -1503,7 +1505,9 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       const valId = nanoid();
       loroDoc.createNode(valId, feId);
       loroDoc.setNodeData(valId, 'targetId', optionNodeId);
-      loroDoc.commitDoc();
+      if (options?.commit !== false) {
+        loroDoc.commitDoc();
+      }
     },
 
     selectFieldOption: (fieldEntryId, optionNodeId, oldOptionNodeId) => {

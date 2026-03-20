@@ -270,7 +270,7 @@ const DEFAULT_SKILL_PRESETS: ReadonlyArray<DefaultSkillPreset> = [
     rulePresets: [
       {
         id: SKILL_NODE_IDS.KNOWLEDGE_MGMT_RULE_1,
-        text: 'When the user records something (a decision, idea, observation), save it as a node, then search the knowledge graph for connections. If you find a meaningful link — a contradiction, a pattern, an echo — mention it naturally. If not, just confirm briefly. Never force connections.',
+        text: 'When the user records something (a decision, idea, observation), save it as a node, then show it with <node id="..." /> so the user can see and edit what was saved. Search the knowledge graph for connections — if you find a meaningful link, mention it naturally. If not, just confirm briefly. Never force connections.',
       },
       {
         id: SKILL_NODE_IDS.KNOWLEDGE_MGMT_RULE_2,

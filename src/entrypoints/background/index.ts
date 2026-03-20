@@ -543,14 +543,20 @@ async function queryTabs(queryInfo: chrome.tabs.QueryInfo = {}): Promise<chrome.
   });
 }
 
-async function waitForTabComplete(tabId: number, timeoutMs = 10_000): Promise<chrome.tabs.Tab> {
+async function waitForTabComplete(tabId: number, timeoutMs = 15_000): Promise<chrome.tabs.Tab> {
   const current = await getTab(tabId);
   if (current.status === 'complete') return current;
 
-  return new Promise((resolve, reject) => {
-    const timeoutId = setTimeout(() => {
+  return new Promise((resolve) => {
+    const timeoutId = setTimeout(async () => {
       chrome.tabs.onUpdated.removeListener(onUpdated);
-      reject(new Error(`Timed out waiting for tab ${tabId} to finish loading`));
+      // Timeout is not an error — page may still be usable (DOM loaded, resources pending).
+      // Return current tab state instead of rejecting.
+      try {
+        resolve(await getTab(tabId));
+      } catch {
+        resolve(current);
+      }
     }, timeoutMs);
 
     const onUpdated = (updatedTabId: number, changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab) => {

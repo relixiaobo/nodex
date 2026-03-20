@@ -266,11 +266,13 @@ function processProxyEvent(
       if (content.partialJson) {
         try {
           content.arguments = JSON.parse(content.partialJson);
-        } catch {
+        } catch (parseError) {
+          console.warn('[ai-proxy] toolcall_end JSON.parse failed, attempting jsonrepair:', (parseError as Error).message?.slice(0, 80));
           try {
             content.arguments = JSON.parse(jsonrepair(content.partialJson));
-          } catch {
-            // Repair failed — keep whatever parseStreamingJson produced
+            console.log('[ai-proxy] jsonrepair succeeded for tool:', content.name);
+          } catch (repairError) {
+            console.error('[ai-proxy] jsonrepair also failed:', (repairError as Error).message?.slice(0, 80));
           }
         }
       }

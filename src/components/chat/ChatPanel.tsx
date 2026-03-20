@@ -450,7 +450,7 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
                 )}
                 {isStreaming && (
                   <div className="flex items-center px-1 py-2">
-                    <span className="inline-block h-[18px] w-[3px] rounded-full bg-primary/60 animate-pulse" />
+                    <span className="inline-block h-3 w-1.5 animate-pulse rounded-sm bg-primary" />
                   </div>
                 )}
               </div>

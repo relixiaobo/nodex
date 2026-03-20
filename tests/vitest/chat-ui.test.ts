@@ -4,11 +4,14 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createRoot, type Root } from 'react-dom/client';
 import { flushSync } from 'react-dom';
+import type { ToolCall, ToolResultMessage } from '@mariozechner/pi-ai';
 import { ChatInput } from '../../src/components/chat/ChatInput.js';
 import { ChatPanelHeader } from '../../src/components/chat/ChatPanelHeader.js';
 import { ChatMessage } from '../../src/components/chat/ChatMessage.js';
 import { ChatPanel, shouldStickChatScroll } from '../../src/components/chat/ChatPanel.js';
 import { extractInlineMarkup, splitMarkdownBlocks } from '../../src/components/chat/MarkdownRenderer.js';
+import { ToolCallGroup } from '../../src/components/chat/ToolCallGroup.js';
+import { getStatus, summarizeToolCall } from '../../src/components/chat/ToolCallBlock.js';
 import { DeskLayout } from '../../src/components/layout/DeskLayout.js';
 import { appendMessage, editMessage, getLinearPath, linearToTree, switchBranch as switchChatBranch } from '../../src/lib/ai-chat-tree.js';
 import { resetChatPersistenceForTests, saveChatSession } from '../../src/lib/ai-persistence.js';
@@ -578,6 +581,201 @@ describe('chat ui', () => {
     // Empty desk state renders DeskLanding with a search input (placeholder is an attribute, not text)
     expect(container.querySelector('input[placeholder]')).not.toBeNull();
     expect(container.textContent).not.toContain('Loading chat…');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ToolCallGroup tests
+// ---------------------------------------------------------------------------
+
+function makeToolCall(id: string, name: string, args: Record<string, unknown> = {}): ToolCall {
+  return { type: 'toolCall', id, name, arguments: args };
+}
+
+function makeToolResult(toolCallId: string, text: string, isError = false): ToolResultMessage {
+  return {
+    role: 'toolResult',
+    toolCallId,
+    toolName: 'browser',
+    content: [{ type: 'text', text }],
+    isError,
+    timestamp: Date.now(),
+  };
+}
+
+function makeAssistantWithBlocks(
+  blocks: Array<{ type: 'text'; text: string } | ToolCall>,
+) {
+  return {
+    role: 'assistant' as const,
+    content: blocks,
+    api: 'anthropic-messages' as const,
+    provider: 'anthropic' as const,
+    model: 'test',
+    usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+    stopReason: 'stop' as const,
+    timestamp: 1,
+  };
+}
+
+describe('getStatus', () => {
+  it('returns pending when no result', () => {
+    expect(getStatus(undefined)).toBe('pending');
+  });
+
+  it('returns done when result has isError=false', () => {
+    expect(getStatus(makeToolResult('tc1', 'ok', false))).toBe('done');
+  });
+
+  it('returns error when result has isError=true', () => {
+    expect(getStatus(makeToolResult('tc1', 'fail', true))).toBe('error');
+  });
+});
+
+describe('ToolCallGroup', () => {
+  it('renders collapsed executing title with latest step summary and count', () => {
+    const toolCalls = [
+      makeToolCall('tc1', 'browser', { action: 'navigate', url: 'https://example.com' }),
+      makeToolCall('tc2', 'browser', { action: 'get_text' }),
+      makeToolCall('tc3', 'browser', { action: 'click', elementDescription: 'Submit' }),
+    ];
+    const results = new Map<string, ToolResultMessage>();
+    results.set('tc1', makeToolResult('tc1', 'ok'));
+    results.set('tc2', makeToolResult('tc2', 'ok'));
+    // tc3 has no result → pending → executing state
+
+    const html = renderToStaticMarkup(
+      React.createElement(ToolCallGroup, { toolCalls, results }),
+    );
+
+    // Collapsed executing: shows latest step summary + step count
+    expect(html).toContain('step 3');
+    expect(html).toContain('Clicking');
+    // Should show spinner icon (Loader2 has animate-spin)
+    expect(html).toContain('animate-spin');
+  });
+
+  it('renders collapsed completed title with total steps', () => {
+    const toolCalls = [
+      makeToolCall('tc1', 'node_create', { name: 'Test' }),
+      makeToolCall('tc2', 'node_read', {}),
+    ];
+    const results = new Map<string, ToolResultMessage>();
+    results.set('tc1', makeToolResult('tc1', 'ok'));
+    results.set('tc2', makeToolResult('tc2', 'ok'));
+
+    const html = renderToStaticMarkup(
+      React.createElement(ToolCallGroup, { toolCalls, results }),
+    );
+
+    expect(html).toContain('Completed 2 steps');
+    // No spinner for completed
+    expect(html).not.toContain('animate-spin');
+  });
+
+  it('renders completed with errors suffix', () => {
+    const toolCalls = [
+      makeToolCall('tc1', 'browser', { action: 'navigate', url: 'https://a.com' }),
+      makeToolCall('tc2', 'browser', { action: 'navigate', url: 'https://b.com' }),
+      makeToolCall('tc3', 'browser', { action: 'navigate', url: 'https://c.com' }),
+    ];
+    const results = new Map<string, ToolResultMessage>();
+    results.set('tc1', makeToolResult('tc1', 'ok'));
+    results.set('tc2', makeToolResult('tc2', 'error', true));
+    results.set('tc3', makeToolResult('tc3', 'error', true));
+
+    const html = renderToStaticMarkup(
+      React.createElement(ToolCallGroup, { toolCalls, results }),
+    );
+
+    expect(html).toContain('Completed 3 steps');
+    expect(html).toContain('2 failed');
+    expect(html).toContain('text-destructive');
+  });
+
+  it('renders children when expanded (not testable via static markup, but structure is correct)', () => {
+    // ToolCallGroup defaults to collapsed — expanded requires useState interaction.
+    // We verify the collapsed state renders without crashing.
+    const toolCalls = [
+      makeToolCall('tc1', 'node_create', { name: 'A' }),
+      makeToolCall('tc2', 'node_create', { name: 'B' }),
+    ];
+    const html = renderToStaticMarkup(
+      React.createElement(ToolCallGroup, { toolCalls }),
+    );
+
+    // Collapsed: should NOT render child ToolCallBlocks
+    expect(html).not.toContain('Created');
+    // But should have a button for toggling
+    expect(html).toContain('button');
+  });
+});
+
+describe('ChatMessage tool call grouping', () => {
+  it('groups 2+ consecutive toolCalls into a ToolCallGroup', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(ChatMessage, {
+        entry: {
+          nodeId: 'msg_tools',
+          message: makeAssistantWithBlocks([
+            makeToolCall('tc1', 'browser', { action: 'navigate', url: 'https://a.com' }),
+            makeToolCall('tc2', 'browser', { action: 'get_text' }),
+            makeToolCall('tc3', 'browser', { action: 'click', elementDescription: 'Next' }),
+          ]),
+          branches: null,
+        },
+        toolResults: new Map(),
+      }),
+    );
+
+    // Should see "step 3" from the group (executing, all pending)
+    expect(html).toContain('step 3');
+    // Should NOT see 3 separate tool lines — they're grouped
+    expect(html).not.toContain('step 1');
+  });
+
+  it('renders a single toolCall as a standalone ToolCallBlock (no grouping)', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(ChatMessage, {
+        entry: {
+          nodeId: 'msg_single',
+          message: makeAssistantWithBlocks([
+            makeToolCall('tc1', 'browser', { action: 'navigate', url: 'https://a.com' }),
+          ]),
+          branches: null,
+        },
+        toolResults: new Map(),
+      }),
+    );
+
+    // Single tool call renders its own summary, no "step N" group label
+    expect(html).toContain('Navigating to');
+    expect(html).not.toContain('step');
+  });
+
+  it('breaks groups when a text block appears between tool calls', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(ChatMessage, {
+        entry: {
+          nodeId: 'msg_mixed',
+          message: makeAssistantWithBlocks([
+            makeToolCall('tc1', 'browser', { action: 'navigate', url: 'https://a.com' }),
+            makeToolCall('tc2', 'browser', { action: 'get_text' }),
+            { type: 'text', text: 'Now let me check another page.' },
+            makeToolCall('tc3', 'browser', { action: 'navigate', url: 'https://b.com' }),
+            makeToolCall('tc4', 'browser', { action: 'get_text' }),
+          ]),
+          branches: null,
+        },
+        toolResults: new Map(),
+      }),
+    );
+
+    // Two groups of 2, separated by text
+    expect(html).toContain('step 2');
+    expect(html).toContain('Now let me check another page');
+    // No "step 4" — second group also has 2 items
+    expect(html).not.toContain('step 4');
   });
 });
 

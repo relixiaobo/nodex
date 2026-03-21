@@ -119,7 +119,7 @@ export function ToggleLayout() {
     <div className="flex flex-1 flex-col overflow-hidden p-1.5">
       <ToggleTopBar activeView={activeView} currentChatSessionId={currentChatSessionId} resolvedNodeId={renderableNodeId} />
 
-      <div className="flex flex-1 flex-col overflow-hidden rounded-b-xl bg-background shadow-[0_2px_6px_-2px_rgba(0,0,0,0.05)]">
+      <div className="flex flex-1 flex-col overflow-hidden bg-background">
         <div className="relative flex-1 overflow-hidden">
           <div className={activeView === 'chat' ? 'flex h-full flex-col' : hidden} aria-hidden={activeView !== 'chat'}>
             {currentChatSessionId ? (

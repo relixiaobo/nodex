@@ -18,13 +18,13 @@
 |--------|------|------|------|
 | nodex-claude | — | 空闲 | — |
 | nodex-gemini | — | 空闲 | — |
-| nodex-codex | — | 空闲 | — |
+| nodex-codex | codex/toggle-layout | Toggle Layout — Chat/Node 双视角切换 (#171) | 待启动 |
 
 ---
 
 ## 进行中
 
-（无进行中任务）
+- [ ] **Toggle Layout — Chat/Node 双视角切换** (#171, Codex) — 替换多面板为双视角 toggle，顶部栏切换 Chat/Node，状态保持。设计：`docs/plans/layout-design.md`
 
 ---
 

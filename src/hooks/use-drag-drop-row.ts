@@ -4,6 +4,7 @@ import { useNodeStore } from '../stores/node-store.js';
 import { useUIStore } from '../stores/ui-store.js';
 import { resolveDropHoverPosition } from '../lib/drag-drop-position.js';
 import { resolveDropMove, type DropPosition } from '../lib/drag-drop.js';
+import { buildExpandedNodeKey } from '../lib/expanded-node-key.js';
 
 interface UseDragDropRowOptions {
   nodeId: string;
@@ -98,7 +99,7 @@ export function useDragDropRow({
       dragNodeId: activeDragId,
       targetNodeId: nodeId,
       targetParentId: liveParentId,
-      targetParentKey: `${panelId}:${liveParentId}:${nodeId}`,
+      targetParentKey: buildExpandedNodeKey(liveParentId, nodeId),
       siblingIndex,
       dropPosition: currentDropPosition,
       targetHasChildren,

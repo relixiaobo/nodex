@@ -13,7 +13,6 @@ import { AtSign, Calendar, Plus } from '../../lib/icons.js';
 import { useNodeSearch, type NodeSearchResult } from '../../hooks/use-node-search';
 import { useUIStore } from '../../stores/ui-store';
 import { useNodeStore } from '../../stores/node-store';
-import type { Panel, NavigationEvent } from '../../types/index.js';
 import { isLockedNode, isWorkspaceHomeNode } from '../../lib/node-capabilities.js';
 import { getSystemNodePreset } from '../../lib/system-node-presets.js';
 import * as loroDoc from '../../lib/loro-doc.js';
@@ -94,13 +93,12 @@ function normalizeRecentNode(
 }
 
 export function collectRecentReferenceNodes(params: {
- currentNodeId: string;
- navHistory: NavigationEvent[];
- navIndex: number;
- panels: Panel[];
- limit?: number;
+  currentNodeId: string;
+  nodeHistory: string[];
+  nodeHistoryIndex: number;
+  limit?: number;
 }): NodeSearchResult[] {
- const { currentNodeId, navHistory, navIndex, panels, limit = 5 } = params;
+ const { currentNodeId, nodeHistory, nodeHistoryIndex, limit = 5 } = params;
  const seen = new Set<string>();
  const results: NodeSearchResult[] = [];
 
@@ -112,16 +110,10 @@ export function collectRecentReferenceNodes(params: {
   results.push(normalized);
  };
 
- // Primary source: current panels + navigation history (most recent first).
- for (const panel of panels) {
-  if (results.length >= limit) break;
-  pushIfValid(panel.nodeId);
- }
- for (let i = navIndex; i >= 0 && results.length < limit; i--) {
-  const event = navHistory[i];
-  if (event.action === 'navigate') {
-   pushIfValid(event.fromNodeId);
-  }
+ // Primary source: current node + node history (most recent first).
+ pushIfValid(currentNodeId);
+ for (let i = nodeHistoryIndex; i >= 0 && results.length < limit; i--) {
+  pushIfValid(nodeHistory[i]!);
  }
 
  // Fallback source: most recently edited nodes globally.
@@ -192,16 +184,15 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
 
   // When query is empty, show recently used nodes:
   // navigation history first, then recently edited fallback.
-  const navHistory = useUIStore((s) => s.navHistory);
-  const navIndex = useUIStore((s) => s.navIndex);
-  const panels = useUIStore((s) => s.panels);
+  const nodeHistory = useUIStore((s) => s.nodeHistory);
+  const nodeHistoryIndex = useUIStore((s) => s.nodeHistoryIndex);
   const _version = useNodeStore((s) => s._version);
 
   const recentNodes = useMemo(() => {
    if (query.trim()) return [];
-   return collectRecentReferenceNodes({ currentNodeId, navHistory, navIndex, panels, limit: 5 });
+   return collectRecentReferenceNodes({ currentNodeId, nodeHistory, nodeHistoryIndex, limit: 5 });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, navHistory, navIndex, panels, _version, currentNodeId]);
+  }, [query, nodeHistory, nodeHistoryIndex, _version, currentNodeId]);
 
   const dateMatches = useMemo(() => matchDateShortcuts(query), [query]);
   const items = query.trim() ? searchResults : recentNodes;

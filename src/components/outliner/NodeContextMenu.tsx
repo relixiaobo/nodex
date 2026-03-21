@@ -6,7 +6,7 @@
  * "Add tag" uses mode-based sub-view (needs search input).
  *
  * Menu layout:
- *   Open in new panel   ⌘\
+ *   Open in outliner
  *   ───
  *   Copy node link
  *   ───
@@ -232,8 +232,8 @@ const NodeContextMenuContent = forwardRef<HTMLDivElement, NodeContextMenuContent
 
     // ── Handlers ──
 
-    const handleOpenInNewPanel = useCallback(() => {
-      useUIStore.getState().openPanel(nodeId);
+    const handleOpenInOutliner = useCallback(() => {
+      useUIStore.getState().switchToNode(nodeId);
       onClose();
     }, [nodeId, onClose]);
 
@@ -355,7 +355,7 @@ const NodeContextMenuContent = forwardRef<HTMLDivElement, NodeContextMenuContent
       >
         {mode === 'main' && (
           <MainMenu
-            onOpenInNewPanel={handleOpenInNewPanel}
+            onOpenInNewPanel={handleOpenInOutliner}
             onCopyLink={handleCopyLink}
             onCopy={handleCopy}
             onCut={handleCut}
@@ -468,8 +468,7 @@ function MainMenu({
 }) {
   return (
     <>
-      {/* Open in new panel */}
-      <MenuItem icon={PanelRight} label="Open in new panel" kbd="⌘\" onClick={onOpenInNewPanel} />
+      <MenuItem icon={PanelRight} label="Open in outliner" onClick={onOpenInNewPanel} />
 
       <MenuSeparator />
 

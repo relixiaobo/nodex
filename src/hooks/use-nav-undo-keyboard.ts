@@ -1,22 +1,17 @@
 /**
- * Global keyboard hook for navigation undo/redo.
+ * Global keyboard hook for node-view history navigation.
  *
- * Cmd+Z / Cmd+Shift+Z → Loro UndoManager (single timeline)
- *
- * Does NOT intercept when a contentEditable element is focused;
- * the editor keymap handles the same Loro undo/redo path.
+ * Cmd+Z / Cmd+Shift+Z navigate the node-view history only when:
+ * - the user is not editing text
+ * - Node view is active
  */
 import { useEffect } from 'react';
-import { useUIStore } from '../stores/ui-store';
 import { getShortcutKeys, matchesShortcutEvent } from '../lib/shortcut-registry';
-import { undoDoc, redoDoc } from '../lib/loro-doc.js';
+import { useUIStore } from '../stores/ui-store.js';
 
 export type NavUndoAction = 'undo' | 'redo' | null;
 
 export function shouldHandleNavUndo(activeElement: Element | null, focusedNodeId: string | null): boolean {
-  // In editor mode, let the editor keymap handle undo/redo (it also uses Loro).
-  // Rely on actual DOM focus, not focusedNodeId store state, because clicking row controls
-  // (chevron/indent line/etc.) may keep focusedNodeId non-null while the editor lost focus.
   void focusedNodeId;
   if (activeElement instanceof HTMLTextAreaElement && activeElement.dataset.undoShortcutSink === 'true') {
     return true;
@@ -27,12 +22,12 @@ export function shouldHandleNavUndo(activeElement: Element | null, focusedNodeId
 }
 
 export function resolveNavUndoAction(
-  e: KeyboardEvent,
+  event: KeyboardEvent,
   undoBindings: string[],
   redoBindings: string[],
 ): NavUndoAction {
-  const matchesUndo = undoBindings.some((binding) => matchesShortcutEvent(e, binding));
-  const matchesRedo = redoBindings.some((binding) => matchesShortcutEvent(e, binding));
+  const matchesUndo = undoBindings.some((binding) => matchesShortcutEvent(event, binding));
+  const matchesRedo = redoBindings.some((binding) => matchesShortcutEvent(event, binding));
   if (matchesRedo) return 'redo';
   if (matchesUndo) return 'undo';
   return null;
@@ -43,45 +38,43 @@ export function useNavUndoKeyboard() {
     const undoBindings = getShortcutKeys('global.nav_undo', ['Mod-z', 'Ctrl-z']);
     const redoBindings = getShortcutKeys('global.nav_redo', ['Mod-Shift-z', 'Ctrl-Shift-z']);
 
-    function handler(e: KeyboardEvent) {
-      const action = resolveNavUndoAction(e, undoBindings, redoBindings);
+    function handleNavigation(action: NavUndoAction) {
       if (!action) return;
 
-      // Don't intercept while editing (or inside text inputs/contentEditable).
+      const state = useUIStore.getState();
+      if (state.activeView !== 'node') return;
+
+      if (action === 'redo') {
+        state.goForwardNode();
+      } else {
+        state.goBackNode();
+      }
+    }
+
+    function handler(event: KeyboardEvent) {
+      const action = resolveNavUndoAction(event, undoBindings, redoBindings);
+      if (!action) return;
+
       if (!shouldHandleNavUndo(document.activeElement, useUIStore.getState().focusedNodeId)) {
         return;
       }
 
-      e.preventDefault();
-
-      if (action === 'redo') {
-        redoDoc();
-      } else {
-        undoDoc();
-      }
+      event.preventDefault();
+      handleNavigation(action);
     }
 
-    function beforeInputHandler(e: InputEvent) {
-      if (e.inputType !== 'historyUndo' && e.inputType !== 'historyRedo') return;
+    function beforeInputHandler(event: InputEvent) {
+      if (event.inputType !== 'historyUndo' && event.inputType !== 'historyRedo') return;
       const active = document.activeElement as HTMLElement | null;
 
-      // In editor mode, keep relying on editor keymap path to avoid double-dispatch.
-      // This fallback primarily targets the hidden sink textarea because macOS Side Panel
-      // may swallow Cmd+Z keydown on focused text controls.
       if (!(active instanceof HTMLTextAreaElement && active.dataset.undoShortcutSink === 'true')) {
         return;
       }
 
-      e.preventDefault();
-      if (e.inputType === 'historyRedo') {
-        redoDoc();
-      } else {
-        undoDoc();
-      }
+      event.preventDefault();
+      handleNavigation(event.inputType === 'historyRedo' ? 'redo' : 'undo');
     }
 
-    // Capture phase so row-level / feature-specific document key handlers can't swallow
-    // Cmd+Z before unified undo gets a chance to run.
     window.addEventListener('keydown', handler, true);
     document.addEventListener('beforeinput', beforeInputHandler, true);
     return () => {

@@ -28,6 +28,7 @@ import * as loroDoc from '../../lib/loro-doc.js';
 import { shouldShowTrailingInput } from '../outliner/row-model.js';
 import { navigateToSiblingRow } from '../../lib/outliner-navigation.js';
 import { canCreateChildrenUnder } from '../../lib/node-capabilities.js';
+import { buildExpandedNodeKey } from '../../lib/expanded-node-key.js';
 
 interface ConfigOutlinerProps {
   nodeId: string;
@@ -260,7 +261,7 @@ export function ConfigOutliner({ nodeId, panelId = 'main', onNavigateOut }: Conf
           parentId={nodeId}
           depth={0}
           panelId={panelId}
-          parentExpandKey={`${panelId}:${ownerId}:${nodeId}`}
+          parentExpandKey={buildExpandedNodeKey(ownerId, nodeId)}
           onNavigateOut={handleTrailingNavigateOut}
         />
       )}

@@ -1,10 +1,8 @@
 import { useUIStore } from '../../src/stores/ui-store.js';
 import { resetAndSeed, resetStores } from './helpers/test-state.js';
 
-/** Helper: get current active panel node ID */
 function currentNodeId(): string | null {
-  const s = useUIStore.getState();
-  return s.panels.find((p) => p.id === s.activePanelId)?.nodeId ?? null;
+  return useUIStore.getState().currentNodeId;
 }
 
 describe('ui-store history guard behaviors', () => {
@@ -12,7 +10,7 @@ describe('ui-store history guard behaviors', () => {
     resetAndSeed();
   });
 
-  it('navigateTo same current node is a no-op for history', () => {
+  it('navigateTo same current node is a no-op for nodeHistory', () => {
     const ui = useUIStore.getState();
     const nodeId = currentNodeId()!;
     const before = useUIStore.getState();
@@ -20,37 +18,37 @@ describe('ui-store history guard behaviors', () => {
     ui.navigateTo(nodeId);
 
     const after = useUIStore.getState();
-    expect(after.panels).toEqual(before.panels);
-    expect(after.activePanelId).toBe(before.activePanelId);
-    expect(after.navHistory.length).toBe(before.navHistory.length);
+    expect(after.currentNodeId).toBe(before.currentNodeId);
+    expect(after.nodeHistory).toEqual(before.nodeHistory);
+    expect(after.nodeHistoryIndex).toBe(before.nodeHistoryIndex);
   });
 
-  it('goBack/goForward at boundaries are no-ops', () => {
+  it('goBackNode/goForwardNode at boundaries are no-ops', () => {
     const ui = useUIStore.getState();
 
-    // navIndex starts at -1 (no events yet), goBack should be no-op.
     const beforeBack = useUIStore.getState();
-    ui.goBack();
+    ui.goBackNode();
     const afterBack = useUIStore.getState();
-    expect(afterBack.navIndex).toBe(beforeBack.navIndex);
-    expect(afterBack.navHistory.length).toBe(beforeBack.navHistory.length);
+    expect(afterBack.nodeHistoryIndex).toBe(beforeBack.nodeHistoryIndex);
+    expect(afterBack.nodeHistory).toEqual(beforeBack.nodeHistory);
 
-    // Navigate, then goForward at end should be no-op.
     ui.navigateTo('note_2');
     const beforeForward = useUIStore.getState();
-    ui.goForward();
+    ui.goForwardNode();
     const afterForward = useUIStore.getState();
-    expect(afterForward.navIndex).toBe(beforeForward.navIndex);
-    expect(afterForward.navHistory.length).toBe(beforeForward.navHistory.length);
+    expect(afterForward.nodeHistoryIndex).toBe(beforeForward.nodeHistoryIndex);
+    expect(afterForward.nodeHistory).toEqual(beforeForward.nodeHistory);
   });
 
-  it('replacePanel seeds panels when panels array is empty', () => {
+  it('replaceCurrentNode seeds the node view when state is empty', () => {
     resetStores();
     const ui = useUIStore.getState();
-    ui.replacePanel('note_1');
+    ui.replaceCurrentNode('note_1');
 
     const state = useUIStore.getState();
-    expect(state.panels).toEqual([{ id: 'main', nodeId: 'note_1' }]);
-    expect(state.activePanelId).toBe('main');
+    expect(state.activeView).toBe('node');
+    expect(state.currentNodeId).toBe('note_1');
+    expect(state.nodeHistory).toEqual(['note_1']);
+    expect(state.nodeHistoryIndex).toBe(0);
   });
 });

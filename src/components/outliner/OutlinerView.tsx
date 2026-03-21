@@ -15,6 +15,7 @@ import { toFieldRowEntryProps } from '../fields/field-row-props.js';
 import { TrailingInput } from '../editor/TrailingInput';
 import { resolveTagColor } from '../../lib/tag-colors.js';
 import { useDragSelect } from '../../hooks/use-drag-select.js';
+import { buildExpandedNodeKey } from '../../lib/expanded-node-key.js';
 import { getFlattenedVisibleNodes, getNodeTextLengthById } from '../../lib/tree-utils.js';
 import {
   buildFieldOwnerColors,
@@ -256,7 +257,7 @@ export function OutlinerView({ rootNodeId, showTemplateFields, panelId }: Outlin
           parentId={rootNodeId}
           depth={0}
           autoFocus={!isSearchNode && visibleChildren.length === 0}
-          parentExpandKey={`${panelId}:${loroDoc.getParentId(rootNodeId) ?? ''}:${rootNodeId}`}
+          parentExpandKey={buildExpandedNodeKey(loroDoc.getParentId(rootNodeId) ?? '', rootNodeId)}
           panelId={panelId}
           isSearchContext={isSearchNode}
           onNavigateOut={(direction) => {

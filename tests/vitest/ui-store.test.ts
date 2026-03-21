@@ -1,11 +1,18 @@
-import { useUIStore } from '../../src/stores/ui-store.js';
+import { buildExpandedNodeKey } from '../../src/lib/expanded-node-key.js';
 import { ensureTodayNode } from '../../src/lib/journal.js';
-import { resetAndSeed } from './helpers/test-state.js';
+import { useUIStore } from '../../src/stores/ui-store.js';
+import { resetAndSeed, resetStores } from './helpers/test-state.js';
 
-/** Helper: get current active panel node ID */
 function currentNodeId(): string | null {
-  const s = useUIStore.getState();
-  return s.panels.find((p) => p.id === s.activePanelId)?.nodeId ?? null;
+  return useUIStore.getState().currentNodeId;
+}
+
+function getTodayDateKey(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 describe('ui-store navigation and UI state', () => {
@@ -13,34 +20,40 @@ describe('ui-store navigation and UI state', () => {
     resetAndSeed();
   });
 
-  it('handles navigation history and UI toggles correctly', () => {
+  it('handles node history, view toggles, and common UI state', () => {
     const ui = useUIStore.getState();
     const todayId = ensureTodayNode();
-    const noteExpandKey = `main:${todayId}:note_2`;
+    const noteExpandKey = buildExpandedNodeKey(todayId, 'note_2');
+
+    expect(useUIStore.getState().activeView).toBe('node');
+    expect(currentNodeId()).toBe(todayId);
+    expect(useUIStore.getState().nodeHistory).toEqual([todayId]);
+    expect(useUIStore.getState().nodeHistoryIndex).toBe(0);
 
     ui.navigateTo('inbox_3');
     expect(currentNodeId()).toBe('inbox_3');
 
-    ui.goBack();
+    ui.goBackNode();
     expect(currentNodeId()).toBe(todayId);
 
-    ui.goForward();
+    ui.goForwardNode();
     expect(currentNodeId()).toBe('inbox_3');
 
-    ui.replacePanel('note_2');
+    ui.replaceCurrentNode('note_2');
     expect(currentNodeId()).toBe('note_2');
 
     const beforeInvalidNavigate = useUIStore.getState();
     ui.navigateTo('missing_node_for_panel_navigation');
     let state = useUIStore.getState();
-    // navigateTo with missing node should be a no-op — panels unchanged
-    expect(state.panels).toEqual(beforeInvalidNavigate.panels);
-    expect(state.activePanelId).toBe(beforeInvalidNavigate.activePanelId);
+    expect(state.currentNodeId).toBe(beforeInvalidNavigate.currentNodeId);
+    expect(state.nodeHistory).toEqual(beforeInvalidNavigate.nodeHistory);
+    expect(state.nodeHistoryIndex).toBe(beforeInvalidNavigate.nodeHistoryIndex);
 
-    ui.replacePanel('missing_node_for_panel_navigation');
+    ui.replaceCurrentNode('missing_node_for_panel_navigation');
     state = useUIStore.getState();
-    expect(state.panels).toEqual(beforeInvalidNavigate.panels);
-    expect(state.activePanelId).toBe(beforeInvalidNavigate.activePanelId);
+    expect(state.currentNodeId).toBe(beforeInvalidNavigate.currentNodeId);
+    expect(state.nodeHistory).toEqual(beforeInvalidNavigate.nodeHistory);
+    expect(state.nodeHistoryIndex).toBe(beforeInvalidNavigate.nodeHistoryIndex);
 
     ui.setExpanded(noteExpandKey, true);
     expect(useUIStore.getState().expandedNodes.has(noteExpandKey)).toBe(true);
@@ -64,101 +77,51 @@ describe('ui-store navigation and UI state', () => {
     expect(useUIStore.getState().searchOpen).toBe(false);
     expect(useUIStore.getState().searchQuery).toBe('');
 
-    ui.openPanel('chat:session_test');
-    expect(useUIStore.getState().panels.at(-1)?.nodeId).toBe('chat:session_test');
+    ui.navigateTo('chat:session_test');
+    expect(useUIStore.getState().activeView).toBe('chat');
+    expect(useUIStore.getState().currentChatSessionId).toBe('session_test');
+    expect(useUIStore.getState().currentNodeId).toBe('note_2');
   });
 
-  it('openPanel creates a new panel and switches active', () => {
+  it('switchToNode falls back to Today on first visit and preserves the last node on the same day', () => {
+    resetAndSeed();
+    useUIStore.setState({
+      activeView: 'chat',
+      currentNodeId: null,
+      nodeHistory: [],
+      nodeHistoryIndex: -1,
+      lastVisitDate: null,
+    });
     const ui = useUIStore.getState();
     const todayId = ensureTodayNode();
-    expect(useUIStore.getState().panels).toHaveLength(1);
-    expect(useUIStore.getState().activePanelId).toBe('main');
 
-    ui.openPanel('note_2');
-    const s1 = useUIStore.getState();
-    expect(s1.panels).toHaveLength(2);
-    expect(s1.panels[1].nodeId).toBe('note_2');
-    expect(s1.activePanelId).toBe(s1.panels[1].id);
-    // Focus should be cleared
-    expect(s1.focusedNodeId).toBeNull();
+    ui.switchToNode();
+    expect(useUIStore.getState().activeView).toBe('node');
+    expect(currentNodeId()).toBe(todayId);
+    expect(useUIStore.getState().nodeHistory).toEqual([todayId]);
 
-    // navHistory should record the open-panel event
-    const lastEvent = s1.navHistory[s1.navIndex];
-    expect(lastEvent.action).toBe('open-panel');
+    useUIStore.setState({
+      activeView: 'chat',
+      currentNodeId: 'note_1',
+      nodeHistory: ['note_1'],
+      nodeHistoryIndex: 0,
+      lastVisitDate: getTodayDateKey(),
+    });
+
+    ui.switchToNode();
+    expect(useUIStore.getState().activeView).toBe('node');
+    expect(currentNodeId()).toBe('note_1');
+    expect(useUIStore.getState().nodeHistory).toEqual(['note_1']);
   });
 
-  it('closePanel removes the panel and adjusts active', () => {
-    const ui = useUIStore.getState();
-    ui.openPanel('note_2');
-    const s1 = useUIStore.getState();
-    const secondPanelId = s1.panels[1].id;
+  it('replaceCurrentNode seeds the node view when no current node exists', () => {
+    resetStores();
+    useUIStore.getState().replaceCurrentNode('note_1');
 
-    // Close the second panel
-    ui.closePanel(secondPanelId);
-    const s2 = useUIStore.getState();
-    expect(s2.panels).toHaveLength(1);
-    expect(s2.activePanelId).toBe('main');
-
-    // navHistory should record the close-panel event
-    const lastEvent = s2.navHistory[s2.navIndex];
-    expect(lastEvent.action).toBe('close-panel');
-  });
-
-  it('closePanel allows closing the last panel (empty state)', () => {
-    const ui = useUIStore.getState();
-    expect(useUIStore.getState().panels).toHaveLength(1);
-    ui.closePanel('main');
-    expect(useUIStore.getState().panels).toHaveLength(0);
-    expect(useUIStore.getState().activePanelId).toBe('');
-  });
-
-  it('setActivePanel switches active and clears focus', () => {
-    const ui = useUIStore.getState();
-    ui.openPanel('note_2');
-    const s1 = useUIStore.getState();
-    const secondPanelId = s1.panels[1].id;
-
-    // Set active back to main
-    ui.setActivePanel('main');
-    expect(useUIStore.getState().activePanelId).toBe('main');
-    expect(useUIStore.getState().focusedNodeId).toBeNull();
-
-    // setActivePanel to nonexistent panel is a no-op
-    ui.setActivePanel('nonexistent');
-    expect(useUIStore.getState().activePanelId).toBe('main');
-  });
-
-  it('goBack undoes open-panel and goForward redoes it', () => {
-    const ui = useUIStore.getState();
-    ui.openPanel('note_2');
-    const s1 = useUIStore.getState();
-    expect(s1.panels).toHaveLength(2);
-
-    // goBack should undo the open-panel → back to 1 panel
-    ui.goBack();
-    const s2 = useUIStore.getState();
-    expect(s2.panels).toHaveLength(1);
-
-    // goForward should redo the open-panel → back to 2 panels
-    ui.goForward();
-    const s3 = useUIStore.getState();
-    expect(s3.panels).toHaveLength(2);
-    expect(s3.panels[1].nodeId).toBe('note_2');
-  });
-
-  it('goBack undoes close-panel by restoring the snapshot', () => {
-    const ui = useUIStore.getState();
-    ui.openPanel('note_2');
-    const s1 = useUIStore.getState();
-    const secondPanelId = s1.panels[1].id;
-
-    ui.closePanel(secondPanelId);
-    expect(useUIStore.getState().panels).toHaveLength(1);
-
-    // goBack should restore the closed panel
-    ui.goBack();
-    const s3 = useUIStore.getState();
-    expect(s3.panels).toHaveLength(2);
-    expect(s3.panels.some((p) => p.id === secondPanelId)).toBe(true);
+    const state = useUIStore.getState();
+    expect(state.activeView).toBe('node');
+    expect(state.currentNodeId).toBe('note_1');
+    expect(state.nodeHistory).toEqual(['note_1']);
+    expect(state.nodeHistoryIndex).toBe(0);
   });
 });

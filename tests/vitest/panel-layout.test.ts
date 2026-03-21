@@ -1,80 +1,66 @@
 import React from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { flushSync } from 'react-dom';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { PanelLayout } from '../../src/components/panel/PanelLayout.js';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const { mockEnsureChatSession } = vi.hoisted(() => ({
+  mockEnsureChatSession: vi.fn<() => Promise<string>>(),
+}));
+
+vi.mock('../../src/lib/chat-panel-actions.js', () => ({
+  ensureChatSession: mockEnsureChatSession,
+}));
+
+vi.mock('../../src/lib/ai-service.js', () => ({
+  getChatTitle: (sessionId: string) => sessionId === 'session_1' ? 'Session One' : 'Chat',
+  subscribeChatTitles: () => () => {},
+}));
+
+vi.mock('../../src/components/chat/ChatPanel.js', () => ({
+  ChatPanel: ({ sessionId, hideHeader }: { sessionId: string; hideHeader?: boolean }) =>
+    React.createElement('div', {
+      'data-testid': 'chat-panel',
+      'data-session-id': sessionId,
+      'data-hide-header': String(Boolean(hideHeader)),
+    }),
+}));
+
+vi.mock('../../src/components/panel/NodePanel.js', () => ({
+  NodePanel: ({ nodeId, panelId }: { nodeId: string; panelId: string }) =>
+    React.createElement('div', {
+      'data-testid': 'node-panel',
+      'data-node-id': nodeId,
+      'data-panel-id': panelId,
+    }),
+}));
+
+vi.mock('../../src/components/panel/AppPanel.js', () => ({
+  AppPanel: ({ panelId }: { panelId: string }) =>
+    React.createElement('div', {
+      'data-testid': 'app-panel',
+      'data-panel-id': panelId,
+    }),
+}));
+
+vi.mock('../../src/components/toolbar/ToolbarUserMenu.js', () => ({
+  ToolbarUserMenu: () => React.createElement('div', { 'data-testid': 'user-menu' }),
+}));
+
+import { ToggleLayout } from '../../src/components/layout/ToggleLayout.js';
 import { useUIStore } from '../../src/stores/ui-store.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
-class MockResizeObserver {
-  static width = 400;
-
-  constructor(private readonly callback: ResizeObserverCallback) {}
-
-  observe(target: Element) {
-    this.callback(
-      [
-        {
-          target,
-          contentRect: {
-            width: MockResizeObserver.width,
-            height: 640,
-          } as DOMRectReadOnly,
-        } as ResizeObserverEntry,
-      ],
-      this as unknown as ResizeObserver,
-    );
-  }
-
-  disconnect() {}
-
-  unobserve() {}
-
-  takeRecords(): ResizeObserverEntry[] {
-    return [];
-  }
-}
-
-class MockIntersectionObserver {
-  constructor(private readonly callback: IntersectionObserverCallback) {}
-
-  observe() {
-    this.callback(
-      [
-        {
-          isIntersecting: true,
-        } as IntersectionObserverEntry,
-      ],
-      this as unknown as IntersectionObserver,
-    );
-  }
-
-  disconnect() {}
-
-  unobserve() {}
-
-  takeRecords(): IntersectionObserverEntry[] {
-    return [];
-  }
-
-  readonly root = null;
-  readonly rootMargin = '0px';
-  readonly thresholds = [0];
-}
-
-describe('PanelLayout notes dropdown', () => {
+describe('ToggleLayout', () => {
   let container: HTMLDivElement;
   let root: Root;
-  let originalResizeObserver: typeof globalThis.ResizeObserver | undefined;
-  let originalIntersectionObserver: typeof globalThis.IntersectionObserver | undefined;
 
   beforeEach(() => {
     resetAndSeed();
-    MockResizeObserver.width = 400;
-    originalResizeObserver = globalThis.ResizeObserver;
-    originalIntersectionObserver = globalThis.IntersectionObserver;
-    globalThis.ResizeObserver = MockResizeObserver as typeof ResizeObserver;
-    globalThis.IntersectionObserver = MockIntersectionObserver as typeof IntersectionObserver;
+    mockEnsureChatSession.mockReset();
+    mockEnsureChatSession.mockImplementation(async () => {
+      useUIStore.getState().setCurrentChatSessionId('session_auto');
+      return 'session_auto';
+    });
 
     container = document.createElement('div');
     document.body.appendChild(container);
@@ -86,151 +72,90 @@ describe('PanelLayout notes dropdown', () => {
       root.unmount();
     });
     container.remove();
-    globalThis.ResizeObserver = originalResizeObserver;
-    globalThis.IntersectionObserver = originalIntersectionObserver;
   });
 
   async function tick(): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, 0));
   }
 
-  async function renderLayout(): Promise<void> {
-    flushSync(() => {
-      root.render(React.createElement(PanelLayout, {
-        toolbar: React.createElement('div', { 'data-testid': 'toolbar' }, 'Tools'),
-      }));
+  function getViewWrappers(): HTMLElement[] {
+    const layout = container.firstElementChild as HTMLDivElement | null;
+    const viewContainer = layout?.children[1] as HTMLDivElement | undefined;
+    return Array.from(viewContainer?.children ?? []) as HTMLElement[];
+  }
+
+  it('keeps both views mounted and switches visibility through the top-bar toggles', async () => {
+    useUIStore.setState({
+      activeView: 'chat',
+      currentChatSessionId: 'session_1',
+      currentNodeId: 'proj_1',
+      nodeHistory: ['proj_1'],
+      nodeHistoryIndex: 0,
     });
-    await tick();
-  }
-
-  function setPanels(panels: Array<{ id: string; nodeId: string }>, activePanelId: string) {
-    useUIStore.setState({ panels, activePanelId });
-  }
-
-  function getNotesTrigger(): HTMLDivElement | null {
-    return container.querySelector('[aria-haspopup="menu"]');
-  }
-
-  /** The tab name area text (trigger div contains name + close button). */
-  function getNotesTabText(): string {
-    return getNotesTrigger()?.textContent ?? '';
-  }
-
-  function getMenuRow(label: string): HTMLDivElement | undefined {
-    return Array.from(container.querySelectorAll('div')).find(
-      (element) =>
-        typeof element.className === 'string' &&
-        element.className.includes('group/menu') &&
-        element.textContent?.includes(label),
-    ) as HTMLDivElement | undefined;
-  }
-
-  async function openNotesMenu(): Promise<void> {
-    const trigger = getNotesTrigger();
-    expect(trigger).not.toBeNull();
 
     flushSync(() => {
-      trigger?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
-    await tick();
-  }
-
-  it('uses a notes dropdown in narrow mode and switches the active panel from it', async () => {
-    setPanels([
-      { id: 'main', nodeId: 'proj_1' },
-      { id: 'notes', nodeId: 'note_1' },
-    ], 'main');
-
-    await renderLayout();
-
-    expect(getNotesTabText()).toContain('My Project');
-
-    await openNotesMenu();
-
-    const noteRow = getMenuRow('Meeting notes - Team standup');
-    expect(noteRow).toBeDefined();
-
-    flushSync(() => {
-      noteRow?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      root.render(React.createElement(ToggleLayout));
     });
     await tick();
 
-    expect(useUIStore.getState().activePanelId).toBe('notes');
-    expect(getNotesTabText()).toContain('Meeting notes - Team standup');
-    expect(getNotesTrigger()?.getAttribute('aria-expanded')).toBe('false');
-  });
+    const wrappers = getViewWrappers();
+    expect(container.querySelector('[data-testid="chat-panel"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="node-panel"]')).not.toBeNull();
+    expect(wrappers).toHaveLength(2);
+    expect(wrappers[0]?.getAttribute('aria-hidden')).toBe('false');
+    expect(wrappers[1]?.getAttribute('aria-hidden')).toBe('true');
+    expect(container.textContent).toContain('Session One');
 
-  it('closes the notes dropdown on outside pointerdown', async () => {
-    setPanels([
-      { id: 'main', nodeId: 'proj_1' },
-      { id: 'notes', nodeId: 'note_1' },
-    ], 'main');
-
-    await renderLayout();
-    await openNotesMenu();
-
-    expect(getNotesTrigger()?.getAttribute('aria-expanded')).toBe('true');
-
-    document.body.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
-    await tick();
-
-    expect(getNotesTrigger()?.getAttribute('aria-expanded')).toBe('false');
-    expect(getMenuRow('Meeting notes - Team standup')).toBeUndefined();
-  });
-
-  it('closes panels from the dropdown; single remaining panel still has close button', async () => {
-    setPanels([
-      { id: 'main', nodeId: 'proj_1' },
-      { id: 'notes', nodeId: 'note_1' },
-    ], 'main');
-
-    await renderLayout();
-    await openNotesMenu();
-
-    const noteRow = getMenuRow('Meeting notes - Team standup');
-    const closeButton = noteRow?.querySelector('button[title="Close panel"]');
-
-    expect(closeButton).not.toBeNull();
-
+    const buttons = container.querySelectorAll('button');
     flushSync(() => {
-      closeButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      buttons[1]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
     await tick();
 
-    expect(useUIStore.getState().panels).toHaveLength(1);
-    expect(useUIStore.getState().activePanelId).toBe('main');
-    // No longer in dropdown mode (single panel)
-    expect(getNotesTrigger()).toBeNull();
-    // Single panel still shows close button (all panels are closable)
-    expect(container.querySelector('button[title="Close panel"]')).not.toBeNull();
+    const nextWrappers = getViewWrappers();
+    expect(useUIStore.getState().activeView).toBe('node');
+    expect(nextWrappers[0]?.getAttribute('aria-hidden')).toBe('true');
+    expect(nextWrappers[1]?.getAttribute('aria-hidden')).toBe('false');
+    expect(container.textContent).toContain('My Project');
   });
 
-  it('shows chat panels with a sparkles icon in the dropdown', async () => {
-    setPanels([
-      { id: 'main', nodeId: 'proj_1' },
-      { id: 'chat', nodeId: 'chat:sess_test' },
-      { id: 'notes', nodeId: 'note_1' },
-    ], 'main');
+  it('ensures a hidden chat session exists without stealing node focus', async () => {
+    useUIStore.setState({
+      activeView: 'node',
+      currentChatSessionId: null,
+      currentNodeId: 'proj_1',
+      nodeHistory: ['proj_1'],
+      nodeHistoryIndex: 0,
+    });
 
-    await renderLayout();
-    await openNotesMenu();
+    flushSync(() => {
+      root.render(React.createElement(ToggleLayout));
+    });
 
-    const chatRow = getMenuRow('Chat');
-    expect(chatRow).toBeDefined();
-    expect(chatRow?.querySelector('svg')).not.toBeNull();
+    await vi.waitFor(() => {
+      expect(mockEnsureChatSession).toHaveBeenCalledTimes(1);
+      expect(useUIStore.getState().currentChatSessionId).toBe('session_auto');
+    });
+
+    expect(useUIStore.getState().activeView).toBe('node');
+    expect(useUIStore.getState().currentNodeId).toBe('proj_1');
   });
 
-  it('uses the same chat header chrome for every chat panel in wide mode', async () => {
-    MockResizeObserver.width = 900;
-    setPanels([
-      { id: 'chat-left', nodeId: 'chat:sess_left' },
-      { id: 'chat-right', nodeId: 'chat:sess_right' },
-    ], 'chat-left');
+  it('renders app panels inside the node view', async () => {
+    useUIStore.setState({
+      activeView: 'node',
+      currentChatSessionId: 'session_1',
+      currentNodeId: 'app:about',
+      nodeHistory: ['app:about'],
+      nodeHistoryIndex: 0,
+    });
 
-    await renderLayout();
+    flushSync(() => {
+      root.render(React.createElement(ToggleLayout));
+    });
+    await tick();
 
-    expect(container.querySelectorAll('button[title="Edit title"]')).toHaveLength(2);
-    expect(container.querySelectorAll('button[aria-label="Close chat"]')).toHaveLength(2);
-    expect(container.querySelector('[data-testid="toolbar"]')?.textContent).toBe('Tools');
+    expect(container.querySelector('[data-testid="app-panel"][data-panel-id="app:about"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="node-panel"]')).toBeNull();
   });
 });

@@ -41,9 +41,8 @@ import { ensureTodayNode, isDayNode } from '../../lib/journal.js';
 import { parseDayNodeName, parseYearNodeName, isToday } from '../../lib/date-utils.js';
 
 import { ensureUndoFocusAfterNavigation } from '../../lib/focus-utils.js';
-import { openChatWithPrompt, openChatPanel } from '../../lib/chat-panel-actions.js';
+import { openChatWithPrompt, openChatPanel, switchToChatSession } from '../../lib/chat-panel-actions.js';
 import { listChatSessionMetas, type ChatSessionMeta } from '../../lib/ai-persistence.js';
-import { CHAT_PANEL_PREFIX } from '../../types/index.js';
 import { t } from '../../i18n/strings.js';
 import { Kbd } from '../ui/Kbd';
 
@@ -112,15 +111,7 @@ function chatSessionToItem(
     type: 'chat',
     typeLabel: t('search.commandPalette.typeLabelChat'),
     action: () => {
-      const panelId = `${CHAT_PANEL_PREFIX}${meta.id}`;
-      const { panels, setActivePanel, openPanel } = useUIStore.getState();
-      // Reuse existing chat panel if already open, otherwise open new one
-      const existing = panels.find((p) => p.nodeId === panelId);
-      if (existing) {
-        setActivePanel(existing.id);
-      } else {
-        openPanel(panelId);
-      }
+      switchToChatSession(meta.id);
       closeAndClear();
     },
   };
@@ -466,12 +457,9 @@ export function CommandPalette() {
   }, [searchOpen]);
 
   // Global Cmd+K toggle + Esc close (works even when input loses focus)
-  const panelCount = useUIStore((s) => s.panels.length);
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        // When no panels are open, DeskLanding handles ⌘K inline
-        if (panelCount === 0) return;
         e.preventDefault();
         if (searchOpen) {
           closePalette();
@@ -489,7 +477,7 @@ export function CommandPalette() {
     }
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [searchOpen, closePalette, panelCount, aiMode]);
+  }, [searchOpen, closePalette, aiMode]);
 
   // Keyboard navigation within the palette
   const handleKeyDown = useCallback(

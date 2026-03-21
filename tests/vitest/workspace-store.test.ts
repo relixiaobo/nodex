@@ -132,7 +132,7 @@ describe('workspace-store auth and persistence', () => {
       ensureTodayNode: vi.fn().mockReturnValue('today_node'),
     }));
     vi.doMock('../../src/stores/ui-store.js', () => ({
-      useUIStore: { getState: vi.fn().mockReturnValue({ replacePanel: vi.fn() }) },
+      useUIStore: { getState: vi.fn().mockReturnValue({ replaceCurrentNode: vi.fn() }) },
     }));
     vi.doMock('../../src/lib/loro-persistence.js', () => ({
       deleteSnapshot: vi.fn().mockResolvedValue(undefined),
@@ -168,7 +168,7 @@ describe('workspace-store auth and persistence', () => {
       ensureTodayNode: vi.fn().mockReturnValue('today_node'),
     }));
     vi.doMock('../../src/stores/ui-store.js', () => ({
-      useUIStore: { getState: vi.fn().mockReturnValue({ replacePanel: vi.fn() }) },
+      useUIStore: { getState: vi.fn().mockReturnValue({ replaceCurrentNode: vi.fn() }) },
     }));
     vi.doMock('../../src/lib/loro-persistence.js', () => ({
       deleteSnapshot: vi.fn().mockResolvedValue(undefined),
@@ -203,7 +203,7 @@ describe('workspace-store auth and persistence', () => {
       ensureTodayNode: vi.fn().mockReturnValue('today_node'),
     }));
     vi.doMock('../../src/stores/ui-store.js', () => ({
-      useUIStore: { getState: vi.fn().mockReturnValue({ replacePanel: vi.fn() }) },
+      useUIStore: { getState: vi.fn().mockReturnValue({ replaceCurrentNode: vi.fn() }) },
     }));
     const mockDeleteSnapshot = vi.fn().mockResolvedValue(undefined);
     vi.doMock('../../src/lib/loro-persistence.js', () => ({
@@ -241,7 +241,7 @@ describe('workspace-store auth and persistence', () => {
       ensureTodayNode: mockEnsureToday,
     }));
     vi.doMock('../../src/stores/ui-store.js', () => ({
-      useUIStore: { getState: vi.fn().mockReturnValue({ replacePanel: vi.fn() }) },
+      useUIStore: { getState: vi.fn().mockReturnValue({ replaceCurrentNode: vi.fn() }) },
     }));
 
     await useWorkspaceStore.getState().initAuth();

@@ -129,7 +129,7 @@ describe('useDragDropRow', () => {
     expect(dropEvent.preventDefault).toHaveBeenCalledTimes(1);
     expect(dropEvent.stopPropagation).toHaveBeenCalledTimes(1);
     expect(loroDoc.getParentId('task_2')).toBe('task_1');
-    expect(expandInsideDrop).toHaveBeenCalledWith('main:proj_1:task_1');
+    expect(expandInsideDrop).toHaveBeenCalledWith('proj_1:task_1');
     expect(useUIStore.getState().dragNodeId).toBeNull();
   });
 

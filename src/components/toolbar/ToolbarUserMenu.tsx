@@ -5,7 +5,7 @@
  * - Not signed in: generic user icon, click triggers Google sign-in
  */
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { LogOut, Settings, Info, User, MessageSquare, ExternalLink, Gem } from '../../lib/icons.js';
+import { LogOut, Settings, Info, User, MessageSquare, Search, ExternalLink, Gem } from '../../lib/icons.js';
 import { GoogleIcon } from '../ui/GoogleIcon.js';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { useSyncStore } from '../../stores/sync-store';
@@ -13,7 +13,7 @@ import { useUIStore } from '../../stores/ui-store';
 import { SYSTEM_NODE_IDS, APP_PANELS } from '../../types/index.js';
 import { CHANGELOG } from '../../lib/changelog.js';
 import { t } from '../../i18n/strings.js';
-import { Tooltip } from '../ui/Tooltip';
+import { Kbd } from '../ui/Kbd.js';
 
 const TALLY_FORM_ID = '0QMVD9';
 
@@ -204,7 +204,21 @@ export function ToolbarUserMenu() {
                     <button
                         onClick={() => {
                             setOpen(false);
-                            useUIStore.getState().navigateTo(SYSTEM_NODE_IDS.SETTINGS);
+                            useUIStore.getState().openSearch();
+                        }}
+                        className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-foreground-secondary transition-colors hover:bg-foreground/4 hover:text-foreground"
+                    >
+                        <div className="flex w-4 shrink-0 items-center justify-center text-foreground-tertiary">
+                            <Search size={14} strokeWidth={1.5} />
+                        </div>
+                        <span className="flex-1 text-left">Search</span>
+                        <Kbd keys="⌘K" />
+                    </button>
+
+                    <button
+                        onClick={() => {
+                            setOpen(false);
+                            useUIStore.getState().switchToNode(SYSTEM_NODE_IDS.SETTINGS);
                         }}
                         className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-foreground-secondary transition-colors hover:bg-foreground/4 hover:text-foreground"
                     >
@@ -217,7 +231,7 @@ export function ToolbarUserMenu() {
                     <button
                         onClick={() => {
                             setOpen(false);
-                            useUIStore.getState().navigateTo(APP_PANELS.ABOUT);
+                            useUIStore.getState().switchToNode(APP_PANELS.ABOUT);
                         }}
                         className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-foreground-secondary transition-colors hover:bg-foreground/4 hover:text-foreground"
                     >

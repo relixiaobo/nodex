@@ -56,6 +56,7 @@ import type { ParsedPasteNode } from '../../lib/paste-parser.js';
 import { t } from '../../i18n/strings.js';
 import { getNodeCapabilities, isNodeInTrash } from '../../lib/node-capabilities.js';
 import { handleSparkClick } from '../../lib/ai-spark.js';
+import { buildExpandedNodeKey } from '../../lib/expanded-node-key.js';
 import { RowHost } from './RowHost.js';
 import { ViewToolbar } from './ViewToolbar.js';
 import { readViewConfig, applyViewPipeline } from '../../lib/view-pipeline.js';
@@ -229,8 +230,8 @@ export function OutlinerItem({
   );
   // Expansion is instance-scoped by design: the same target referenced from two places
   // can keep independent expanded/collapsed state, so the key stays on ref nodeId.
-  const expandKey = `${panelId}:${parentId}:${nodeId}`;
-  const isExpanded = useUIStore((s) => s.expandedNodes.has(`${panelId}:${parentId}:${nodeId}`));
+  const expandKey = buildExpandedNodeKey(parentId, nodeId);
+  const isExpanded = useUIStore((s) => s.expandedNodes.has(buildExpandedNodeKey(parentId, nodeId)));
   const focusedNodeId = useUIStore((s) => s.focusedNodeId);
   const focusedParentId = useUIStore((s) => s.focusedParentId);
   const setFocusedNode = useUIStore((s) => s.setFocusedNode);
@@ -245,7 +246,6 @@ export function OutlinerItem({
   const toggleExpanded = useUIStore((s) => s.toggleExpanded);
   const setExpanded = useUIStore((s) => s.setExpanded);
   const navigateTo = useUIStore((s) => s.navigateTo);
-  const openPanel = useUIStore((s) => s.openPanel);
   const openSearch = useUIStore((s) => s.openSearch);
   const expandedNodes = useUIStore((s) => s.expandedNodes);
   // Unified pointer handlers from OutlinerRow
@@ -1155,7 +1155,7 @@ export function OutlinerItem({
   }, [nodeId, parentId, isReference, isPendingConversion, isOptionsValueNode, setFocusedNode]);
 
   const handleToggle = useCallback(() => {
-    const ek = `${panelId}:${parentId}:${nodeId}`;
+    const ek = buildExpandedNodeKey(parentId, nodeId);
     const currentHasChildren = (useNodeStore.getState().getNode(nodeId)?.children ?? []).length > 0;
     const currentlyExpanded = useUIStore.getState().expandedNodes.has(ek);
 
@@ -1187,13 +1187,10 @@ export function OutlinerItem({
   }, [panelNavigationNodeId, navigateTo]);
 
   const handleBulletClick = useCallback((e: React.MouseEvent) => {
-    if (e.altKey) {
-      openPanel(panelNavigationNodeId);
-    } else {
-      navigateTo(panelNavigationNodeId);
-      ensureUndoFocusAfterNavigation();
-    }
-  }, [panelNavigationNodeId, navigateTo, openPanel]);
+    void e.altKey;
+    navigateTo(panelNavigationNodeId);
+    ensureUndoFocusAfterNavigation();
+  }, [panelNavigationNodeId, navigateTo]);
 
   const handleIndentLineClick = useCallback(() => {
     // Toggle expand/collapse all direct children (Tana indent guide line behavior)
@@ -1201,10 +1198,10 @@ export function OutlinerItem({
     if (currentChildIds.length === 0) return;
     const expanded = useUIStore.getState().expandedNodes;
     // Check if any child is expanded (compound key: nodeId is parent of children)
-    const anyChildExpanded = currentChildIds.some((cid) => expanded.has(`${panelId}:${nodeId}:${cid}`));
+    const anyChildExpanded = currentChildIds.some((cid) => expanded.has(buildExpandedNodeKey(nodeId, cid)));
     const next = new Set(expanded);
     for (const cid of currentChildIds) {
-      const ck = `${panelId}:${nodeId}:${cid}`;
+      const ck = buildExpandedNodeKey(nodeId, cid);
       if (anyChildExpanded) {
         next.delete(ck);
       } else {
@@ -1239,7 +1236,7 @@ export function OutlinerItem({
         return;
       }
 
-      const currentlyExpanded = useUIStore.getState().expandedNodes.has(`${panelId}:${parentId}:${nodeId}`);
+      const currentlyExpanded = useUIStore.getState().expandedNodes.has(buildExpandedNodeKey(parentId, nodeId));
       const currentHasChildren = (useNodeStore.getState().getNode(nodeId)?.children ?? []).length > 0;
 
       // Options field: register current node's name as auto-collected option
@@ -1296,7 +1293,7 @@ export function OutlinerItem({
     if (index <= 0) return; // Can't indent first child
 
     const newParentId = parent.children[index - 1];
-    setExpanded(`${panelId}:${ownerId}:${newParentId}`, true, true);
+    setExpanded(buildExpandedNodeKey(ownerId, newParentId), true, true);
     indentNode(nodeId);
     // Update focusedParentId so the node keeps focus under its new parent
     setFocusedNode(nodeId, newParentId);

@@ -20,6 +20,7 @@ import { useUIStore } from '../../stores/ui-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { SYSTEM_NODE_IDS, FIELD_TYPES, SYS_T, NDX_F, NDX_T, SYS_V } from '../../types/index.js';
 import type { InlineRefEntry, TextMark } from '../../types/index.js';
+import { buildExpandedNodeKey } from '../../lib/expanded-node-key.js';
 import { ensureDateNode } from '../../lib/journal.js';
 import { SYSTEM_SCHEMA_NODE_IDS, ensureSystemSchema } from '../../lib/system-schema-presets.js';
 import { ensureAgentNode } from '../../lib/ai-agent-node.js';
@@ -494,33 +495,29 @@ function seedBody(): void {
   // Results are auto-materialized on panel open via refreshSearchResults
 
   // ═══════════════════════════════════════════════════════════════
-  // UI State: navigation + expand defaults
+  // UI State: current node + expand defaults
   // ═══════════════════════════════════════════════════════════════
   const uiStore = useUIStore.getState();
 
   // Expand some nodes by default for testing (skipUndo=true to avoid
   // creating undo entries during seed — Bug 1 fix)
-  uiStore.setExpanded(`main:${todayDayId}:proj_1`, true, true);
-  uiStore.setExpanded('main:proj_1:task_1', true, true);
-  uiStore.setExpanded('main:proj_1:task_2', true, true);
-  uiStore.setExpanded(`main:${todayDayId}:note_rich`, true, true);
+  uiStore.setExpanded(buildExpandedNodeKey(todayDayId, 'proj_1'), true, true);
+  uiStore.setExpanded(buildExpandedNodeKey('proj_1', 'task_1'), true, true);
+  uiStore.setExpanded(buildExpandedNodeKey('proj_1', 'task_2'), true, true);
+  uiStore.setExpanded(buildExpandedNodeKey(todayDayId, 'note_rich'), true, true);
 
   // Store image nodes: expand article nodes with children
-  uiStore.setExpanded('main:si_reading_notes:si_deep_reading', true, true);
-  uiStore.setExpanded('main:si_mental_models:si_mm_sot', true, true);
-  uiStore.setExpanded('main:si_mental_models:si_mm_inv', true, true);
-  uiStore.setExpanded('main:si_mental_models:si_mm_dte', true, true);
-  uiStore.setExpanded(`main:${todayDayId}:j_pg`, true, true);
-  uiStore.setExpanded(`main:${todayDayId}:j_deep`, true, true);
-  uiStore.setExpanded('main:j_deep_2:j_deep_2a', true, true);
-  uiStore.setExpanded(`main:${todayDayId}:j_leaders`, true, true);
-  uiStore.setExpanded(`main:${todayDayId}:j_range`, true, true);
+  uiStore.setExpanded(buildExpandedNodeKey('si_reading_notes', 'si_deep_reading'), true, true);
+  uiStore.setExpanded(buildExpandedNodeKey('si_mental_models', 'si_mm_sot'), true, true);
+  uiStore.setExpanded(buildExpandedNodeKey('si_mental_models', 'si_mm_inv'), true, true);
+  uiStore.setExpanded(buildExpandedNodeKey('si_mental_models', 'si_mm_dte'), true, true);
+  uiStore.setExpanded(buildExpandedNodeKey(todayDayId, 'j_pg'), true, true);
+  uiStore.setExpanded(buildExpandedNodeKey(todayDayId, 'j_deep'), true, true);
+  uiStore.setExpanded(buildExpandedNodeKey('j_deep_2', 'j_deep_2a'), true, true);
+  uiStore.setExpanded(buildExpandedNodeKey(todayDayId, 'j_leaders'), true, true);
+  uiStore.setExpanded(buildExpandedNodeKey(todayDayId, 'j_range'), true, true);
 
-  // Navigate to Today — use replacePanel (not navigateTo) to avoid
-  // creating a Loro undo entry whose UI snapshot is the empty initial state.
-  if (uiStore.panels.length === 0) {
-    uiStore.replacePanel(todayDayId);
-  }
+  uiStore.replaceCurrentNode(todayDayId);
 }
 
 export async function seedTestData(options?: { forceFresh?: boolean }): Promise<void> {
@@ -536,7 +533,14 @@ export async function seedTestData(options?: { forceFresh?: boolean }): Promise<
     // Reset persisted UI/workspace state for deterministic test page boot.
     await useUIStore.persist.clearStorage();
     await useWorkspaceStore.persist.clearStorage();
-    useUIStore.setState({ panels: [], activePanelId: '', expandedNodes: new Set() });
+    useUIStore.setState({
+      activeView: 'chat',
+      currentNodeId: null,
+      currentChatSessionId: null,
+      nodeHistory: [],
+      nodeHistoryIndex: -1,
+      expandedNodes: new Set(),
+    });
     useWorkspaceStore.setState({ currentWorkspaceId: null, userId: null, isAuthenticated: false, authUser: null });
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem('nodex-ui');

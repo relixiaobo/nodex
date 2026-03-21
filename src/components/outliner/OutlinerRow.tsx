@@ -17,6 +17,7 @@ import {
   getNextVisibleNode,
   getNodeTextLengthById,
 } from '../../lib/tree-utils.js';
+import { buildExpandedNodeKey } from '../../lib/expanded-node-key.js';
 import {
   toggleNodeInSelection,
   computeRangeSelection,
@@ -243,7 +244,7 @@ export function OutlinerRow({ config, children }: OutlinerRowProps) {
             const index = parent.children.indexOf(id);
             if (index <= 0) continue;
             const newParentId = parent.children[index - 1];
-            setExpanded(`${panelId}:${ownerId}:${newParentId}`, true, true);
+            setExpanded(buildExpandedNodeKey(ownerId, newParentId), true, true);
             indentNode(id);
           }
         }

@@ -153,7 +153,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
                 ensureSystemNodes(targetWsId);
                 if (getStartupPagePreference() === STARTUP_PAGE.TODAY) {
                   const todayId = ensureTodayNode();
-                  useUIStore.getState().replacePanel(todayId);
+                  useUIStore.getState().replaceCurrentNode(todayId);
                 }
               } catch (e) {
                 console.warn('[workspace-store] post-sync setup failed:', e);
@@ -168,7 +168,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
                 ensureSystemNodes(targetWsId);
                 if (getStartupPagePreference() === STARTUP_PAGE.TODAY) {
                   const todayId = ensureTodayNode();
-                  useUIStore.getState().replacePanel(todayId);
+                  useUIStore.getState().replaceCurrentNode(todayId);
                 }
               } catch (e) {
                 console.warn('[workspace-store] post-error setup failed:', e);
@@ -254,7 +254,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
                 try {
                   if (getStartupPagePreference() === STARTUP_PAGE.TODAY) {
                     const todayId = ensureTodayNode();
-                    useUIStore.getState().replacePanel(todayId);
+                    useUIStore.getState().replaceCurrentNode(todayId);
                   }
                 } catch (e) {
                   console.warn('[workspace-store] deferred today navigation failed:', e);

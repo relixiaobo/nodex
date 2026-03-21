@@ -74,7 +74,7 @@ function ToggleTopBar({
         className={
           chatActive
             ? 'tab-connector-left tab-connector-right relative z-10 flex h-9 min-w-0 flex-1 items-center gap-1.5 rounded-t-xl bg-background px-3 text-[13px] text-foreground'
-            : 'group/tab flex h-9 min-w-0 flex-1 items-center px-1 py-1 outline-none'
+            : 'group/tab flex h-9 min-w-0 flex-1 items-stretch px-1 pb-1 outline-none'
         }
       >
         {chatActive ? (
@@ -83,7 +83,7 @@ function ToggleTopBar({
             <span className="min-w-0 truncate">{chatTitle?.trim() || 'Chat'}</span>
           </>
         ) : (
-          <span className="flex min-w-0 flex-1 items-center gap-1.5 rounded-lg px-2 py-1 text-[13px] text-foreground-tertiary transition-colors group-hover/tab:bg-foreground/[0.05] group-hover/tab:text-foreground">
+          <span className="flex min-w-0 flex-1 items-center gap-1.5 rounded-lg px-2 text-[13px] text-foreground-tertiary transition-colors group-hover/tab:bg-foreground/[0.05] group-hover/tab:text-foreground">
             <MessageSquare size={15} strokeWidth={1.7} className="shrink-0" />
             <span className="min-w-0 truncate">{chatTitle?.trim() || 'Chat'}</span>
           </span>
@@ -97,7 +97,7 @@ function ToggleTopBar({
         className={
           nodeActive
             ? 'tab-connector-left tab-connector-right relative z-10 flex h-9 min-w-0 flex-1 items-center gap-1.5 rounded-t-xl bg-background px-3 text-[13px] text-foreground'
-            : 'group/tab flex h-9 min-w-0 flex-1 items-center px-1 py-1 outline-none'
+            : 'group/tab flex h-9 min-w-0 flex-1 items-stretch px-1 pb-1 outline-none'
         }
       >
         {nodeActive ? (
@@ -106,7 +106,7 @@ function ToggleTopBar({
             <span className="min-w-0 truncate">{nodeTitle}</span>
           </>
         ) : (
-          <span className="flex min-w-0 flex-1 items-center gap-1.5 rounded-lg px-2 py-1 text-[13px] text-foreground-tertiary transition-colors group-hover/tab:bg-foreground/[0.05] group-hover/tab:text-foreground">
+          <span className="flex min-w-0 flex-1 items-center gap-1.5 rounded-lg px-2 text-[13px] text-foreground-tertiary transition-colors group-hover/tab:bg-foreground/[0.05] group-hover/tab:text-foreground">
             <ListTree size={15} strokeWidth={1.7} className="shrink-0" />
             <span className="min-w-0 truncate">{nodeTitle}</span>
           </span>

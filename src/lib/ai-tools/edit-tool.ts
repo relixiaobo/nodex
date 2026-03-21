@@ -183,9 +183,11 @@ function executeMergeNoCommit(targetId: string, sourceId: string): MergeResult {
   for (const tagDefId of sourceNode.tags ?? []) {
     if (!targetTags.has(tagDefId)) {
       applyTagMutationsNoCommit(targetId, tagDefId);
-      syncTemplateMutationsNoCommit(targetId);
       tagsMerged++;
     }
+  }
+  if (tagsMerged > 0) {
+    syncTemplateMutationsNoCommit(targetId);
   }
 
   // 4. Merge field entries
@@ -223,23 +225,18 @@ function executeMergeNoCommit(targetId: string, sourceId: string): MergeResult {
     }
   }
 
-  // 5. Redirect all targetId references: reference nodes AND field value nodes
+  // 5. Redirect all references (targetId + inline refs) in a single pass
   let referencesRedirected = 0;
-  const allNodeIds = loroDoc.getAllNodeIds();
-  for (const id of allNodeIds) {
+  for (const id of loroDoc.getAllNodeIds()) {
     const node = loroDoc.toNodexNode(id);
-    if (node?.targetId === sourceId) {
+    if (!node) continue;
+
+    if (node.targetId === sourceId) {
       loroDoc.setNodeData(id, 'targetId', targetId);
       referencesRedirected++;
     }
-  }
 
-  // 6. Redirect inline references
-  for (const id of allNodeIds) {
-    const node = loroDoc.toNodexNode(id);
-    if (!node?.inlineRefs?.length) continue;
-    const hasSourceRef = node.inlineRefs.some((ref) => ref.targetNodeId === sourceId);
-    if (hasSourceRef) {
+    if (node.inlineRefs?.some((ref) => ref.targetNodeId === sourceId)) {
       const updatedRefs = node.inlineRefs.map((ref) =>
         ref.targetNodeId === sourceId ? { ...ref, targetNodeId: targetId } : ref,
       );

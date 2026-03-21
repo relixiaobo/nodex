@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createTool } from '../../src/lib/ai-tools/create-tool.js';
+import { ensureTodayNode } from '../../src/lib/journal.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
+import { SYSTEM_NODE_IDS } from '../../src/types/index.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
 async function executeCreate(params: Record<string, unknown>) {
@@ -13,267 +15,260 @@ describe('node_create tool', () => {
     resetAndSeed();
   });
 
-  // ── children batch ──
+  describe('content nodes', () => {
+    it('creates a basic content node under today by default', async () => {
+      const todayId = ensureTodayNode();
+      const result = await executeCreate({ text: 'hello' });
 
-  it('creates a tree of children recursively (max depth 3)', async () => {
-    const result = await executeCreate({
-      parentId: 'proj_1',
-      name: 'Spark',
-      children: [
-        { name: 'Framework', children: [
-          { name: 'Detail 1' },
-          { name: 'Detail 2' },
-        ] },
-        { name: 'Summary' },
-      ],
+      expect(result.parentId).toBe(todayId);
+      expect(loroDoc.getParentId(result.id)).toBe(todayId);
+      expect(loroDoc.toNodexNode(result.id)?.name).toBe('hello');
     });
 
-    expect(result.childrenCreated).toBe(4);
+    it('creates under the specified parent', async () => {
+      const result = await executeCreate({
+        parentId: 'proj_1',
+        text: 'child node',
+      });
 
-    // Verify tree structure via LoroDoc
-    const spark = loroDoc.toNodexNode(result.id);
-    expect(spark?.name).toBe('Spark');
+      expect(loroDoc.getParentId(result.id)).toBe('proj_1');
+      expect(loroDoc.toNodexNode(result.id)?.name).toBe('child node');
+    });
 
-    const sparkChildren = loroDoc.getChildren(result.id);
-    expect(sparkChildren).toHaveLength(2);
-    const framework = loroDoc.toNodexNode(sparkChildren[0]);
-    expect(framework?.name).toBe('Framework');
+    it('inserts after a sibling node', async () => {
+      const beforeChildren = loroDoc.getChildren('proj_1');
+      const task1Index = beforeChildren.indexOf('task_1');
 
-    const frameworkChildren = loroDoc.getChildren(sparkChildren[0]);
-    expect(frameworkChildren).toHaveLength(2);
-    expect(loroDoc.toNodexNode(frameworkChildren[0])?.name).toBe('Detail 1');
-    expect(loroDoc.toNodexNode(frameworkChildren[1])?.name).toBe('Detail 2');
+      const result = await executeCreate({
+        parentId: 'proj_1',
+        afterId: 'task_1',
+        text: 'new sibling task',
+      });
 
-    expect(loroDoc.toNodexNode(sparkChildren[1])?.name).toBe('Summary');
+      const afterChildren = loroDoc.getChildren('proj_1');
+      expect(afterChildren.indexOf(result.id)).toBe(task1Index + 1);
+    });
+
+    it('creates tags, fields, and nested children from Tana Paste text', async () => {
+      const result = await executeCreate({
+        parentId: 'proj_1',
+        text: 'Sprint plan #task\nStatus:: To Do\nPriority:: High\n  Task A #meeting\n  Task B',
+      });
+
+      const node = loroDoc.toNodexNode(result.id);
+      expect(node?.tags).toContain('tagDef_task');
+
+      const children = loroDoc.getChildren(result.id);
+      const contentChildren = children
+        .map((id) => loroDoc.toNodexNode(id))
+        .filter((child) => child?.type !== 'fieldEntry');
+      expect(contentChildren.map((child) => child?.name)).toEqual(['Task A', 'Task B']);
+      expect(contentChildren[0]?.tags).toContain('tagDef_meeting');
+
+      const fieldEntries = children
+        .map((id) => loroDoc.toNodexNode(id))
+        .filter((child) => child?.type === 'fieldEntry');
+      expect(fieldEntries.length).toBeGreaterThanOrEqual(2);
+      expect(result.childrenCreated).toBe(2);
+    });
+
+    it('creates a reference node from an exact [[name^id]] line', async () => {
+      const result = await executeCreate({
+        parentId: 'proj_1',
+        text: '[[Meeting notes - Team standup^note_1]]',
+      });
+
+      expect(result.isReference).toBe(true);
+      expect(result.targetId).toBe('note_1');
+      expect(loroDoc.toNodexNode(result.id)?.type).toBe('reference');
+    });
+
+    it('reports unresolved fields when the node has no tags', async () => {
+      const result = await executeCreate({
+        parentId: 'proj_1',
+        text: 'Plain node\nStatus:: Todo',
+      });
+
+      expect(result.unresolvedFields).toEqual(['Status']);
+      expect(loroDoc.toNodexNode(result.id)?.name).toBe('Plain node');
+    });
+
+    it('auto-creates new field definitions under the first tag', async () => {
+      const result = await executeCreate({
+        parentId: 'proj_1',
+        text: 'Custom node #task\nCustomField:: my value',
+      });
+
+      expect(result.createdFields).toEqual(['CustomField']);
+      const tagDefChildren = loroDoc.getChildren('tagDef_task');
+      const newFieldDef = tagDefChildren
+        .map((cid) => loroDoc.toNodexNode(cid))
+        .find((child) => child?.type === 'fieldDef' && child.name === 'CustomField');
+      expect(newFieldDef).toBeTruthy();
+    });
+
+    it('applies optional data properties when creating a content node', async () => {
+      const result = await executeCreate({
+        parentId: 'proj_1',
+        text: 'Code sample',
+        data: {
+          type: 'codeBlock',
+          codeLanguage: 'ts',
+          description: 'example snippet',
+        },
+      });
+
+      const node = loroDoc.toNodexNode(result.id);
+      expect(node?.type).toBe('codeBlock');
+      expect(node?.codeLanguage).toBe('ts');
+      expect(node?.description).toBe('example snippet');
+    });
+
+    it('duplicates an existing node when duplicateId is provided', async () => {
+      const result = await executeCreate({
+        duplicateId: 'task_1',
+      });
+
+      expect(result.duplicatedFrom).toBe('task_1');
+      expect(result.name).toBe(loroDoc.toNodexNode('task_1')?.name);
+      expect(result.id).not.toBe('task_1');
+      expect(loroDoc.getParentId(result.id)).toBe(loroDoc.getParentId('task_1'));
+    });
+
+    it('errors when no text is provided for content creation', async () => {
+      await expect(createTool.execute('tool_create', {} as never)).rejects.toThrow('text is required');
+    });
   });
 
-  it('creates children with references via targetId', async () => {
-    const result = await executeCreate({
-      parentId: 'proj_1',
-      name: 'Collision',
-      children: [
-        { targetId: 'note_1' },
-        { targetId: 'note_2' },
-      ],
+  describe('search nodes', () => {
+    it('creates a search node for tag rules and materializes references', async () => {
+      const result = await executeCreate({
+        type: 'search',
+        name: 'Tasks',
+        parentId: SYSTEM_NODE_IDS.SEARCHES,
+        rules: { searchTags: ['task'] },
+      });
+
+      const searchNode = loroDoc.toNodexNode(result.id);
+      expect(searchNode?.type).toBe('search');
+      expect(searchNode?.name).toBe('Tasks');
+      expect(loroDoc.getParentId(result.id)).toBe(SYSTEM_NODE_IDS.SEARCHES);
+
+      const queryConditions = loroDoc.getChildren(result.id)
+        .map((id) => loroDoc.toNodexNode(id))
+        .filter((node) => node?.type === 'queryCondition');
+      expect(queryConditions).toHaveLength(1);
+      expect(queryConditions[0]?.queryLogic).toBe('AND');
+
+      const refChildren = loroDoc.getChildren(result.id)
+        .map((id) => loroDoc.toNodexNode(id))
+        .filter((node) => node?.type === 'reference');
+      expect(refChildren.length).toBeGreaterThan(0);
     });
 
-    expect(result.childrenCreated).toBe(2);
-    const children = loroDoc.getChildren(result.id);
-    expect(children).toHaveLength(2);
+    it('creates search rules for fields, dates, scope, and sort', async () => {
+      const result = await executeCreate({
+        type: 'search',
+        name: 'Done tasks this month',
+        rules: {
+          query: 'task',
+          searchTags: ['task'],
+          fields: { Status: 'Done' },
+          scopeId: 'proj_1',
+          after: '2026-03-01',
+          before: '2026-03-31',
+          sortBy: 'created:desc',
+        },
+      });
 
-    const ref1 = loroDoc.toNodexNode(children[0]);
-    expect(ref1?.type).toBe('reference');
-    expect(ref1?.targetId).toBe('note_1');
+      const searchNode = loroDoc.toNodexNode(result.id);
+      expect(searchNode?.type).toBe('search');
 
-    const ref2 = loroDoc.toNodexNode(children[1]);
-    expect(ref2?.type).toBe('reference');
-    expect(ref2?.targetId).toBe('note_2');
-  });
+      const rootGroup = loroDoc.getChildren(result.id)
+        .map((id) => loroDoc.toNodexNode(id))
+        .find((node) => node?.type === 'queryCondition' && node.queryLogic === 'AND');
+      expect(rootGroup).toBeTruthy();
+      const leafNodes = (rootGroup?.children ?? [])
+        .map((id) => loroDoc.toNodexNode(id))
+        .filter(Boolean);
+      expect(leafNodes.map((leaf) => leaf?.queryOp)).toEqual(expect.arrayContaining([
+        'STRING_MATCH',
+        'HAS_TAG',
+        'FIELD_IS',
+        'PARENTS_DESCENDANTS',
+        'GT',
+        'LT',
+      ]));
+      expect(result.type).toBe('search');
+      expect(result.name).toBe('Done tasks this month');
+      expect(result.rulesApplied).toMatchObject({
+        query: 'task',
+        searchTags: ['Task'],
+        fields: { Status: 'Done' },
+        scopeId: 'proj_1',
+        after: '2026-03-01',
+        before: '2026-03-31',
+        sortBy: 'created:desc',
+      });
 
-  // ── fields convenience ──
-
-  it('creates a node with tags and sets field values', async () => {
-    const result = await executeCreate({
-      parentId: 'proj_1',
-      name: 'Buy groceries',
-      tags: ['task'],
-      fields: { 'Status': 'To Do', 'Priority': 'High' },
+      const viewDef = loroDoc.getChildren(result.id)
+        .map((id) => loroDoc.toNodexNode(id))
+        .find((node) => node?.type === 'viewDef');
+      expect(viewDef).toBeTruthy();
+      const sortRule = (viewDef?.children ?? [])
+        .map((id) => loroDoc.toNodexNode(id))
+        .find((node) => node?.type === 'sortRule');
+      expect(sortRule?.sortField).toBe('createdAt');
+      expect(sortRule?.sortDirection).toBe('desc');
     });
 
-    // Verify via LoroDoc
-    const node = loroDoc.toNodexNode(result.id);
-    expect(node).toBeTruthy();
-    expect(node?.tags).toContain('tagDef_task');
+    it('reports skipped search rules when tags or sort cannot be persisted', async () => {
+      const result = await executeCreate({
+        type: 'search',
+        name: 'Unknown tags',
+        rules: {
+          searchTags: ['does-not-exist'],
+          sortBy: 'relevance:desc',
+        },
+      });
 
-    // Find the Status field entry
-    const children = loroDoc.getChildren(result.id);
-    const statusEntry = children
-      .map((cid) => loroDoc.toNodexNode(cid))
-      .find((c) => c?.type === 'fieldEntry' && c.fieldDefId === 'attrDef_status');
-    expect(statusEntry).toBeTruthy();
-  });
-
-  it('auto-collects a new option value when it does not exist', async () => {
-    await executeCreate({
-      parentId: 'proj_1',
-      name: 'Review PR',
-      tags: ['task'],
-      fields: { 'Status': 'Reviewing' },
+      expect(result.status).toBe('created');
+      expect(result.unresolvedTags).toEqual(['does-not-exist']);
+      expect(result.ignoredSortBy).toBe('relevance:desc');
+      expect(result.appliedRuleCount).toBe(0);
+      expect(result.boundary).toBeTruthy();
+      expect(result.nextStep).toBeTruthy();
+      expect(result.fallback).toBeTruthy();
     });
 
-    // "Reviewing" should have been auto-collected under attrDef_status
-    const statusOptions = loroDoc.getChildren('attrDef_status');
-    const optionNames = statusOptions
-      .map((cid) => loroDoc.toNodexNode(cid)?.name)
-      .filter(Boolean);
-    expect(optionNames).toContain('Reviewing');
-  });
+    it('does not let data override the search node type', async () => {
+      const result = await executeCreate({
+        type: 'search',
+        name: 'Locked search type',
+        rules: {
+          searchTags: ['task'],
+        },
+        data: {
+          type: 'codeBlock',
+          description: 'search metadata stays allowed',
+        },
+      });
 
-  // ── reference ──
-
-  it('creates a reference node via targetId', async () => {
-    const result = await executeCreate({
-      parentId: 'proj_1',
-      targetId: 'note_1',
+      const searchNode = loroDoc.toNodexNode(result.id);
+      expect(searchNode?.type).toBe('search');
+      expect(searchNode?.description).toBe('search metadata stays allowed');
     });
 
-    expect(result.isReference).toBe(true);
-    expect(result.targetId).toBe('note_1');
+    it('errors when required search params are missing', async () => {
+      await expect(createTool.execute('tool_create', {
+        type: 'search',
+        rules: { searchTags: ['task'] },
+      } as never)).rejects.toThrow('name is required');
 
-    const refNode = loroDoc.toNodexNode(result.id);
-    expect(refNode?.type).toBe('reference');
-    expect(refNode?.targetId).toBe('note_1');
-  });
-
-  // ── sibling ──
-
-  it('creates a sibling node after a specified node', async () => {
-    const beforeChildren = loroDoc.getChildren('proj_1');
-    const task1Index = beforeChildren.indexOf('task_1');
-
-    const result = await executeCreate({
-      afterId: 'task_1',
-      name: 'New sibling task',
+      await expect(createTool.execute('tool_create', {
+        type: 'search',
+        name: 'Tasks',
+      } as never)).rejects.toThrow('rules are required');
     });
-
-    const afterChildren = loroDoc.getChildren('proj_1');
-    const newIndex = afterChildren.indexOf(result.id);
-    expect(newIndex).toBe(task1Index + 1);
-    expect(loroDoc.toNodexNode(result.id)?.name).toBe('New sibling task');
-  });
-
-  // ── duplicate ──
-
-  it('duplicates a node via duplicateId', async () => {
-    const result = await executeCreate({
-      duplicateId: 'note_1',
-    });
-
-    expect(result.duplicatedFrom).toBe('note_1');
-    expect(result.id).not.toBe('note_1');
-
-    const duplicated = loroDoc.toNodexNode(result.id);
-    expect(duplicated?.name).toBe('Meeting notes - Team standup');
-  });
-
-  // ── children with fields ──
-
-  it('creates children with tags and fields in a single call', async () => {
-    const result = await executeCreate({
-      parentId: 'proj_1',
-      name: 'Sprint',
-      children: [
-        { name: 'Task A', tags: ['task'], fields: { 'Status': 'To Do' } },
-        { name: 'Task B', tags: ['task'], fields: { 'Status': 'Done' } },
-      ],
-    });
-
-    expect(result.childrenCreated).toBe(2);
-
-    const sprintChildren = loroDoc.getChildren(result.id);
-    expect(sprintChildren).toHaveLength(2);
-
-    const taskA = loroDoc.toNodexNode(sprintChildren[0]);
-    expect(taskA?.name).toBe('Task A');
-    expect(taskA?.tags).toContain('tagDef_task');
-
-    const taskB = loroDoc.toNodexNode(sprintChildren[1]);
-    expect(taskB?.name).toBe('Task B');
-    expect(taskB?.tags).toContain('tagDef_task');
-  });
-
-  // ── unresolved fields ──
-
-  it('reports unresolved fields when node has no tags at all', async () => {
-    const result = await executeCreate({
-      parentId: 'proj_1',
-      name: 'Plain node',
-      fields: { 'Status': 'Todo' },
-    });
-
-    expect(result.unresolvedFields).toEqual(['Status']);
-    expect(result.hint).toBeTruthy();
-
-    // Verify node was created despite unresolved fields
-    const node = loroDoc.toNodexNode(result.id);
-    expect(node?.name).toBe('Plain node');
-  });
-
-  it('auto-creates new field definitions under the tag', async () => {
-    const result = await executeCreate({
-      parentId: 'proj_1',
-      name: 'Custom node',
-      tags: ['task'],
-      fields: { 'CustomField': 'my value' },
-    });
-
-    expect(result.createdFields).toEqual(['CustomField']);
-    expect(result.unresolvedFields).toBeUndefined();
-
-    // Verify the fieldDef was created under the task tagDef
-    const tagDefChildren = loroDoc.getChildren('tagDef_task');
-    const newFieldDef = tagDefChildren
-      .map((cid) => loroDoc.toNodexNode(cid))
-      .find((c) => c?.type === 'fieldDef' && c.name === 'CustomField');
-    expect(newFieldDef).toBeTruthy();
-  });
-
-  it('resolves existing fields without creating new ones', async () => {
-    const result = await executeCreate({
-      parentId: 'proj_1',
-      name: 'Tagged node',
-      tags: ['task'],
-      fields: { 'Status': 'To Do' },
-    });
-
-    expect(result.createdFields).toBeUndefined();
-    expect(result.unresolvedFields).toBeUndefined();
-
-    // Verify tag was applied via LoroDoc
-    const node = loroDoc.toNodexNode(result.id);
-    expect(node?.tags).toContain('tagDef_task');
-  });
-
-  it('creates schema nodes through data.type and raw properties', async () => {
-    const result = await executeCreate({
-      parentId: 'tagDef_task',
-      name: 'Deadline',
-      data: {
-        type: 'fieldDef',
-        fieldType: 'date',
-        cardinality: 'single',
-        nullable: true,
-      },
-    });
-
-    const created = loroDoc.toNodexNode(result.id);
-    expect(created?.type).toBe('fieldDef');
-    expect(created?.name).toBe('Deadline');
-    expect(created?.fieldType).toBe('date');
-    expect(created?.cardinality).toBe('single');
-    expect(created?.nullable).toBe(true);
-  });
-
-  it('filters blocked data keys when creating nodes', async () => {
-    const result = await executeCreate({
-      parentId: 'tagDef_task',
-      name: 'Estimate',
-      data: {
-        type: 'fieldDef',
-        fieldType: 'number',
-        description: 'From <ref id="note_1">note</ref>',
-        name: 'Hacked',
-        createdAt: 1,
-        updatedAt: 2,
-      },
-    });
-
-    const created = loroDoc.toNodexNode(result.id);
-    expect(created?.type).toBe('fieldDef');
-    expect(created?.fieldType).toBe('number');
-    expect(created?.name).toBe('Estimate');
-    expect(created?.description).toBe('From note');
-    expect(created?.createdAt).not.toBe(1);
-    expect(created?.updatedAt).not.toBe(2);
   });
 });

@@ -19,7 +19,7 @@ import { applyParsedNodeMutationsNoCommit, setParsedNodeNameNoCommit } from './t
 
 const editToolParameters = Type.Object({
   nodeId: Type.String({ description: 'ID of the node to edit.' }),
-  text: Type.Optional(Type.String({ description: 'Structured text patch. Same format as node_create text. First line renames; #tag adds tag; field:: value sets field; field:: clears field; [X]/[ ] sets checkbox; indented lines add children.' })),
+  text: Type.Optional(Type.String({ description: 'Multi-line plain text patch. Same format as node_create text. Line 1 with plain text = rename; #tag = add tag; field:: value = set field; field:: = clear field; [X]/[ ] = checkbox; indented lines = add children.' })),
   removeTags: Type.Optional(Type.Array(Type.String(), { description: 'Tag display names to remove from the node.' })),
   data: Type.Optional(Type.Record(Type.String(), Type.Unknown(), { description: 'Optional non-content node properties such as description, color, codeLanguage, or showCheckbox.' })),
   parentId: Type.Optional(Type.String({ description: 'Move to this parent. If afterId is also provided, it must match the sibling parent.' })),

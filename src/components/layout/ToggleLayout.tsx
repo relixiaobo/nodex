@@ -60,18 +60,16 @@ function ToggleTopBar({
   );
   const nodeTitle = useNodeTitle(resolvedNodeId);
 
-  const toggleButtonClass = (active: boolean) =>
-    active
-      ? 'flex h-7 min-w-0 items-center gap-1.5 rounded-full bg-foreground/[0.06] px-2 text-sm text-foreground'
-      : 'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground';
+  const activeTabClass = 'flex h-8 min-w-0 items-center gap-1.5 rounded-t-lg bg-background px-3 text-sm text-foreground shadow-[0_-1px_2px_rgba(0,0,0,0.04)]';
+  const inactiveTabClass = 'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-foreground-tertiary transition-colors hover:text-foreground';
 
   return (
-    <div className="flex h-10 shrink-0 items-center gap-1 px-2">
+    <div className="flex shrink-0 items-end gap-0.5 px-1.5 pb-0">
       <button
         type="button"
         disabled={activeView === 'chat'}
         onClick={() => switchToChat()}
-        className={toggleButtonClass(activeView === 'chat')}
+        className={activeView === 'chat' ? activeTabClass : inactiveTabClass}
       >
         <MessageSquare size={16} strokeWidth={1.7} className="shrink-0" />
         {activeView === 'chat' && (
@@ -81,13 +79,11 @@ function ToggleTopBar({
         )}
       </button>
 
-      <div className="flex-1" />
-
       <button
         type="button"
         disabled={activeView === 'node'}
         onClick={() => switchToNode()}
-        className={toggleButtonClass(activeView === 'node')}
+        className={activeView === 'node' ? activeTabClass : inactiveTabClass}
       >
         <ListTree size={16} strokeWidth={1.7} className="shrink-0" />
         {activeView === 'node' && (
@@ -97,7 +93,11 @@ function ToggleTopBar({
         )}
       </button>
 
-      <ToolbarUserMenu />
+      <div className="flex-1" />
+
+      <div className="flex items-center pb-1">
+        <ToolbarUserMenu />
+      </div>
     </div>
   );
 }
@@ -118,13 +118,13 @@ export function ToggleLayout() {
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden p-1.5">
-      <div className="flex flex-1 flex-col overflow-hidden rounded-xl bg-background shadow-card">
-        <ToggleTopBar
-          activeView={activeView}
-          currentChatSessionId={currentChatSessionId}
-          resolvedNodeId={renderableNodeId}
-        />
+      <ToggleTopBar
+        activeView={activeView}
+        currentChatSessionId={currentChatSessionId}
+        resolvedNodeId={renderableNodeId}
+      />
 
+      <div className="flex flex-1 flex-col overflow-hidden rounded-b-xl rounded-tr-xl bg-background shadow-card">
         <div className="relative flex-1 overflow-hidden">
         <div className={activeView === 'chat' ? 'flex h-full flex-col' : hiddenViewClass} aria-hidden={activeView !== 'chat'}>
           {currentChatSessionId ? (

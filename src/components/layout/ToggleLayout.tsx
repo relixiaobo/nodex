@@ -1,4 +1,4 @@
-import { useEffect, useSyncExternalStore } from 'react';
+import { useEffect, useSyncExternalStore, type ComponentType } from 'react';
 import { ListTree, MessageSquare } from '../../lib/icons.js';
 import { getChatTitle, subscribeChatTitles } from '../../lib/ai-service.js';
 import { ensureChatSession } from '../../lib/chat-panel-actions.js';
@@ -13,8 +13,10 @@ import { ToolbarUserMenu } from '../toolbar/ToolbarUserMenu.js';
 const CHAT_PANEL_ID = 'chat-main';
 const NODE_PANEL_ID = 'node-main';
 
+// ── Helpers ──
+
 function resolveAppPanelTitle(panelId: AppPanelId): string {
-  return panelId.replace(/^app:/, '').replace(/^./, (char) => char.toUpperCase());
+  return panelId.replace(/^app:/, '').replace(/^./, (c) => c.toUpperCase());
 }
 
 function useRenderableNodeId(currentNodeId: string | null): string | null {
@@ -30,17 +32,45 @@ function useRenderableNodeId(currentNodeId: string | null): string | null {
 function useNodeTitle(nodeId: string | null): string {
   return useNodeStore((s) => {
     void s._version;
-    if (!nodeId) {
-      return 'Outliner';
-    }
-    if (isAppPanel(nodeId)) {
-      return resolveAppPanelTitle(nodeId);
-    }
-    const node = s.getNode(nodeId);
-    const rawName = node?.name ?? '';
+    if (!nodeId) return 'Outliner';
+    if (isAppPanel(nodeId)) return resolveAppPanelTitle(nodeId);
+    const rawName = s.getNode(nodeId)?.name ?? '';
     return rawName.replace(/<[^>]+>/g, '').trim() || 'Untitled';
   });
 }
+
+// ── Tab button ──
+
+const ACTIVE_TAB = 'tab-connector-left tab-connector-right relative z-10 flex h-9 min-w-0 flex-1 items-center gap-1.5 rounded-t-xl bg-background px-3 text-[13px] text-foreground';
+const INACTIVE_TAB = 'group/tab flex h-9 min-w-0 flex-1 items-stretch px-1 pb-1 outline-none';
+const INACTIVE_INNER = 'flex min-w-0 flex-1 items-center gap-1.5 rounded-lg px-2 text-[13px] text-foreground-tertiary transition-colors group-hover/tab:bg-foreground/[0.05] group-hover/tab:text-foreground';
+
+function TabButton({
+  active,
+  icon: Icon,
+  title,
+  onClick,
+}: {
+  active: boolean;
+  icon: ComponentType<{ size: number; strokeWidth: number; className?: string }>;
+  title: string;
+  onClick: () => void;
+}) {
+  const content = (
+    <>
+      <Icon size={15} strokeWidth={1.7} className="shrink-0" />
+      <span className="min-w-0 truncate">{title}</span>
+    </>
+  );
+
+  return (
+    <button type="button" onClick={onClick} className={active ? ACTIVE_TAB : INACTIVE_TAB}>
+      {active ? content : <span className={INACTIVE_INNER}>{content}</span>}
+    </button>
+  );
+}
+
+// ── Top bar ──
 
 function ToggleTopBar({
   activeView,
@@ -55,71 +85,23 @@ function ToggleTopBar({
   const switchToNode = useUIStore((s) => s.switchToNode);
   const chatTitle = useSyncExternalStore(
     subscribeChatTitles,
-    () => currentChatSessionId ? getChatTitle(currentChatSessionId) : null,
-    () => currentChatSessionId ? getChatTitle(currentChatSessionId) : null,
+    () => (currentChatSessionId ? getChatTitle(currentChatSessionId) : null),
+    () => (currentChatSessionId ? getChatTitle(currentChatSessionId) : null),
   );
   const nodeTitle = useNodeTitle(resolvedNodeId);
 
-  // Active tab: bg-background + rounded-t-xl + tab-connector for concave corner
-  // Inactive tab: transparent bg, just icon + text
-  const chatActive = activeView === 'chat';
-  const nodeActive = activeView === 'node';
-
   return (
     <div className="flex shrink-0 items-end">
-      {/* Chat tab */}
-      <button
-        type="button"
-        onClick={() => switchToChat()}
-        className={
-          chatActive
-            ? 'tab-connector-left tab-connector-right relative z-10 flex h-9 min-w-0 flex-1 items-center gap-1.5 rounded-t-xl bg-background px-3 text-[13px] text-foreground'
-            : 'group/tab flex h-9 min-w-0 flex-1 items-stretch px-1 pb-1 outline-none'
-        }
-      >
-        {chatActive ? (
-          <>
-            <MessageSquare size={15} strokeWidth={1.7} className="shrink-0" />
-            <span className="min-w-0 truncate">{chatTitle?.trim() || 'Chat'}</span>
-          </>
-        ) : (
-          <span className="flex min-w-0 flex-1 items-center gap-1.5 rounded-lg px-2 text-[13px] text-foreground-tertiary transition-colors group-hover/tab:bg-foreground/[0.05] group-hover/tab:text-foreground">
-            <MessageSquare size={15} strokeWidth={1.7} className="shrink-0" />
-            <span className="min-w-0 truncate">{chatTitle?.trim() || 'Chat'}</span>
-          </span>
-        )}
-      </button>
-
-      {/* Node tab */}
-      <button
-        type="button"
-        onClick={() => switchToNode()}
-        className={
-          nodeActive
-            ? 'tab-connector-left tab-connector-right relative z-10 flex h-9 min-w-0 flex-1 items-center gap-1.5 rounded-t-xl bg-background px-3 text-[13px] text-foreground'
-            : 'group/tab flex h-9 min-w-0 flex-1 items-stretch px-1 pb-1 outline-none'
-        }
-      >
-        {nodeActive ? (
-          <>
-            <ListTree size={15} strokeWidth={1.7} className="shrink-0" />
-            <span className="min-w-0 truncate">{nodeTitle}</span>
-          </>
-        ) : (
-          <span className="flex min-w-0 flex-1 items-center gap-1.5 rounded-lg px-2 text-[13px] text-foreground-tertiary transition-colors group-hover/tab:bg-foreground/[0.05] group-hover/tab:text-foreground">
-            <ListTree size={15} strokeWidth={1.7} className="shrink-0" />
-            <span className="min-w-0 truncate">{nodeTitle}</span>
-          </span>
-        )}
-      </button>
-
-      {/* User menu — outside the card, in warm paper area */}
+      <TabButton active={activeView === 'chat'} icon={MessageSquare} title={chatTitle?.trim() || 'Chat'} onClick={switchToChat} />
+      <TabButton active={activeView === 'node'} icon={ListTree} title={nodeTitle} onClick={() => switchToNode()} />
       <div className="flex h-9 items-center px-1">
         <ToolbarUserMenu />
       </div>
     </div>
   );
 }
+
+// ── Layout ──
 
 export function ToggleLayout() {
   const activeView = useUIStore((s) => s.activeView);
@@ -133,33 +115,25 @@ export function ToggleLayout() {
     }
   }, [currentChatSessionId]);
 
-  const hiddenViewClass = 'pointer-events-none invisible absolute inset-0 overflow-hidden';
+  const hidden = 'pointer-events-none invisible absolute inset-0 overflow-hidden';
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden p-1.5">
-      <ToggleTopBar
-        activeView={activeView}
-        currentChatSessionId={currentChatSessionId}
-        resolvedNodeId={renderableNodeId}
-      />
+      <ToggleTopBar activeView={activeView} currentChatSessionId={currentChatSessionId} resolvedNodeId={renderableNodeId} />
 
       <div className="flex flex-1 flex-col overflow-hidden rounded-xl bg-background shadow-card">
         <div className="relative flex-1 overflow-hidden">
-          <div className={activeView === 'chat' ? 'flex h-full flex-col' : hiddenViewClass} aria-hidden={activeView !== 'chat'}>
+          <div className={activeView === 'chat' ? 'flex h-full flex-col' : hidden} aria-hidden={activeView !== 'chat'}>
             {currentChatSessionId ? (
               <ChatPanel panelId={CHAT_PANEL_ID} sessionId={currentChatSessionId} hideHeader />
             ) : (
-              <div className="flex flex-1 items-center justify-center text-sm text-foreground-tertiary">
-                Loading chat…
-              </div>
+              <div className="flex flex-1 items-center justify-center text-sm text-foreground-tertiary">Loading chat…</div>
             )}
           </div>
 
-          <div className={activeView === 'node' ? 'flex h-full flex-col' : hiddenViewClass} aria-hidden={activeView !== 'node'}>
+          <div className={activeView === 'node' ? 'flex h-full flex-col' : hidden} aria-hidden={activeView !== 'node'}>
             {renderableNodeId === null ? (
-              <div className="flex flex-1 items-center justify-center text-sm text-foreground-tertiary">
-                Open the outliner to start.
-              </div>
+              <div className="flex flex-1 items-center justify-center text-sm text-foreground-tertiary">Open the outliner to start.</div>
             ) : isAppPanel(renderableNodeId) ? (
               <AppPanel panelId={renderableNodeId as AppPanelId} />
             ) : (

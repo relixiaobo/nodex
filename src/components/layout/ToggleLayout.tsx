@@ -42,7 +42,7 @@ function useNodeTitle(nodeId: string | null): string {
 // ── Tab button ──
 
 const TAB_BUTTON = 'group/tab flex h-9 min-w-0 flex-1 items-center gap-1.5 px-3 text-[13px] outline-none';
-const TAB_BUTTON_ACTIVE = `${TAB_BUTTON} tab-connector-left tab-connector-right relative z-10 rounded-t-xl bg-background text-foreground`;
+const TAB_BUTTON_ACTIVE_BASE = `${TAB_BUTTON} relative z-10 rounded-t-xl bg-background text-foreground`;
 const TAB_BUTTON_INACTIVE = `${TAB_BUTTON} relative text-foreground-tertiary transition-colors hover:text-foreground`;
 
 function TabButton({
@@ -50,14 +50,19 @@ function TabButton({
   icon: Icon,
   title,
   onClick,
+  connectors = 'both',
 }: {
   active: boolean;
   icon: ComponentType<{ size: number; strokeWidth: number; className?: string }>;
   title: string;
   onClick: () => void;
+  connectors?: 'left' | 'right' | 'both';
 }) {
+  const connectorClass = active
+    ? `${connectors === 'both' || connectors === 'left' ? 'tab-connector-left' : ''} ${connectors === 'both' || connectors === 'right' ? 'tab-connector-right' : ''}`.trim()
+    : '';
   return (
-    <button type="button" onClick={onClick} className={active ? TAB_BUTTON_ACTIVE : TAB_BUTTON_INACTIVE}>
+    <button type="button" onClick={onClick} className={active ? `${TAB_BUTTON_ACTIVE_BASE} ${connectorClass}` : TAB_BUTTON_INACTIVE}>
       {/* Hover bg indicator — inset from button edges, only for inactive */}
       {!active && (
         <span className="pointer-events-none absolute inset-x-1 bottom-1 top-0 rounded-lg transition-colors group-hover/tab:bg-foreground/[0.05]" />
@@ -90,8 +95,8 @@ function ToggleTopBar({
 
   return (
     <div className="flex shrink-0 items-end">
-      <TabButton active={activeView === 'chat'} icon={MessageSquare} title={chatTitle?.trim() || 'Chat'} onClick={switchToChat} />
-      <TabButton active={activeView === 'node'} icon={ListTree} title={nodeTitle} onClick={() => switchToNode()} />
+      <TabButton active={activeView === 'chat'} icon={MessageSquare} title={chatTitle?.trim() || 'Chat'} onClick={switchToChat} connectors="right" />
+      <TabButton active={activeView === 'node'} icon={ListTree} title={nodeTitle} onClick={() => switchToNode()} connectors="both" />
       <div className="flex h-9 items-center px-1">
         <ToolbarUserMenu />
       </div>

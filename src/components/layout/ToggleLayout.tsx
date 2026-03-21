@@ -92,7 +92,7 @@ function ToggleTopBar({
     <div className="flex shrink-0 items-end">
       <TabButton active={activeView === 'chat'} icon={MessageSquare} title={chatTitle?.trim() || 'Chat'} onClick={switchToChat} />
       <TabButton active={activeView === 'node'} icon={ListTree} title={nodeTitle} onClick={() => switchToNode()} />
-      <div className="flex h-9 items-center px-1">
+      <div className="flex h-9 items-center rounded-tr-xl bg-background px-1">
         <ToolbarUserMenu />
       </div>
     </div>
@@ -119,7 +119,7 @@ export function ToggleLayout() {
     <div className="flex flex-1 flex-col overflow-hidden p-1.5">
       <ToggleTopBar activeView={activeView} currentChatSessionId={currentChatSessionId} resolvedNodeId={renderableNodeId} />
 
-      <div className="flex flex-1 flex-col overflow-hidden bg-background">
+      <div className="flex flex-1 flex-col overflow-hidden rounded-b-xl rounded-tl-xl bg-background shadow-card">
         <div className="relative flex-1 overflow-hidden">
           <div className={activeView === 'chat' ? 'flex h-full flex-col' : hidden} aria-hidden={activeView !== 'chat'}>
             {currentChatSessionId ? (

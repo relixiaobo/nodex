@@ -71,7 +71,7 @@ const createToolParameters = Type.Object({
     '7. [[Display^nodeId]] resolves by nodeId (display text is for readability only).',
   ].join('\n') })),
   rules: Type.Optional(searchRulesSchema),
-  data: Type.Optional(Type.Record(Type.String(), Type.Unknown(), { description: 'Optional non-content node properties such as description, color, codeLanguage, showCheckbox, or type for content nodes.' })),
+  data: Type.Optional(Type.Record(Type.String(), Type.Unknown(), { description: 'Non-content node properties. Common: description, color, showCheckbox, codeLanguage, type (for content nodes only). For fieldDef nodes: fieldType ("plain"|"options"|"date"|"url"|"number"|"email"|"checkbox"|"boolean"), cardinality. Cannot set id, name, children, tags, or timestamps.' })),
   duplicateId: Type.Optional(Type.String({ description: 'Duplicate an existing node (deep copy). When provided, duplicate mode ignores text, type, and rules.' })),
   parentId: Type.Optional(Type.String({ description: 'Parent node ID. Defaults to today\'s journal node.' })),
   afterId: Type.Optional(Type.String({ description: 'Insert after this sibling node. If parentId is also provided, it must match the sibling parent.' })),

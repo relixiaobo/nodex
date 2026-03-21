@@ -64,7 +64,7 @@ const createToolParameters = Type.Object({
     '    - Alice',
     '    - Bob',
     '    - [[Charlie^id123]]',
-    '  - nihao field:: value',
+    '  - Location:: Room A',
     '  - Action items',
     '    - [X] Finish report #task',
     '    - [ ] Review budget #task',

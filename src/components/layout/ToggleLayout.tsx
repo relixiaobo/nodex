@@ -42,8 +42,7 @@ function useNodeTitle(nodeId: string | null): string {
 // ── Tab button ──
 
 const TAB_BUTTON = 'group/tab flex h-9 min-w-0 flex-1 items-center gap-1.5 px-3 text-[13px] outline-none';
-// Connector classes are added per-tab: Chat gets right, Node gets left.
-const TAB_BUTTON_ACTIVE_BASE = `${TAB_BUTTON} relative z-10 rounded-t-xl bg-background text-foreground`;
+const TAB_BUTTON_ACTIVE = `${TAB_BUTTON} tab-connector-left tab-connector-right relative z-10 rounded-t-xl bg-background text-foreground`;
 const TAB_BUTTON_INACTIVE = `${TAB_BUTTON} relative text-foreground-tertiary transition-colors hover:text-foreground`;
 
 function TabButton({
@@ -51,17 +50,14 @@ function TabButton({
   icon: Icon,
   title,
   onClick,
-  connector,
 }: {
   active: boolean;
   icon: ComponentType<{ size: number; strokeWidth: number; className?: string }>;
   title: string;
   onClick: () => void;
-  connector?: string;
 }) {
-  const activeClass = connector ? `${TAB_BUTTON_ACTIVE_BASE} ${connector}` : TAB_BUTTON_ACTIVE_BASE;
   return (
-    <button type="button" onClick={onClick} className={active ? activeClass : TAB_BUTTON_INACTIVE}>
+    <button type="button" onClick={onClick} className={active ? TAB_BUTTON_ACTIVE : TAB_BUTTON_INACTIVE}>
       {/* Hover bg indicator — inset from button edges, only for inactive */}
       {!active && (
         <span className="pointer-events-none absolute inset-x-1 bottom-1 top-0 rounded-lg transition-colors group-hover/tab:bg-foreground/[0.05]" />
@@ -94,8 +90,8 @@ function ToggleTopBar({
 
   return (
     <div className="flex shrink-0 items-end">
-      <TabButton active={activeView === 'chat'} icon={MessageSquare} title={chatTitle?.trim() || 'Chat'} onClick={switchToChat} connector="tab-connector-right" />
-      <TabButton active={activeView === 'node'} icon={ListTree} title={nodeTitle} onClick={() => switchToNode()} connector="tab-connector-left" />
+      <TabButton active={activeView === 'chat'} icon={MessageSquare} title={chatTitle?.trim() || 'Chat'} onClick={switchToChat} />
+      <TabButton active={activeView === 'node'} icon={ListTree} title={nodeTitle} onClick={() => switchToNode()} />
       <div className="flex h-9 items-center px-1">
         <ToolbarUserMenu />
       </div>
@@ -123,7 +119,7 @@ export function ToggleLayout() {
     <div className="flex flex-1 flex-col overflow-hidden p-1.5">
       <ToggleTopBar activeView={activeView} currentChatSessionId={currentChatSessionId} resolvedNodeId={renderableNodeId} />
 
-      <div className="flex flex-1 flex-col overflow-hidden rounded-xl bg-background shadow-card">
+      <div className="flex flex-1 flex-col overflow-hidden rounded-b-xl bg-background shadow-card">
         <div className="relative flex-1 overflow-hidden">
           <div className={activeView === 'chat' ? 'flex h-full flex-col' : hidden} aria-hidden={activeView !== 'chat'}>
             {currentChatSessionId ? (

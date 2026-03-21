@@ -66,7 +66,7 @@ function ToggleTopBar({
       : 'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground';
 
   return (
-    <div className="flex h-10 shrink-0 items-center gap-1 rounded-xl bg-background px-2 shadow-card">
+    <div className="flex h-10 shrink-0 items-center gap-1 px-2">
       <button
         type="button"
         disabled={activeView === 'chat'}
@@ -118,13 +118,14 @@ export function ToggleLayout() {
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden p-1.5">
-      <ToggleTopBar
-        activeView={activeView}
-        currentChatSessionId={currentChatSessionId}
-        resolvedNodeId={renderableNodeId}
-      />
+      <div className="flex flex-1 flex-col overflow-hidden rounded-xl bg-background shadow-card">
+        <ToggleTopBar
+          activeView={activeView}
+          currentChatSessionId={currentChatSessionId}
+          resolvedNodeId={renderableNodeId}
+        />
 
-      <div className="relative mt-1.5 flex-1 overflow-hidden rounded-xl bg-background shadow-card">
+        <div className="relative flex-1 overflow-hidden">
         <div className={activeView === 'chat' ? 'flex h-full flex-col' : hiddenViewClass} aria-hidden={activeView !== 'chat'}>
           {currentChatSessionId ? (
             <ChatPanel panelId={CHAT_PANEL_ID} sessionId={currentChatSessionId} hideHeader />
@@ -146,6 +147,7 @@ export function ToggleLayout() {
             <NodePanel nodeId={renderableNodeId} panelId={NODE_PANEL_ID} />
           )}
         </div>
+      </div>
       </div>
     </div>
   );

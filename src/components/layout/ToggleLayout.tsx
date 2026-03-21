@@ -129,7 +129,7 @@ export function ToggleLayout() {
         resolvedNodeId={renderableNodeId}
       />
 
-      <div className="flex flex-1 flex-col overflow-hidden rounded-b-xl bg-background shadow-card">
+      <div className="flex flex-1 flex-col overflow-hidden rounded-xl bg-background shadow-card">
         <div className="relative flex-1 overflow-hidden">
           <div className={activeView === 'chat' ? 'flex h-full flex-col' : hiddenViewClass} aria-hidden={activeView !== 'chat'}>
             {currentChatSessionId ? (

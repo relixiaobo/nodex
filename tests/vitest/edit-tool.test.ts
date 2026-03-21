@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { nanoid } from 'nanoid';
 import { editTool } from '../../src/lib/ai-tools/edit-tool.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
+import { useNodeStore } from '../../src/stores/node-store.js';
 import { SYSTEM_NODE_IDS } from '../../src/types/index.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
@@ -192,15 +194,12 @@ describe('node_edit tool', () => {
     expect(targetTags).toContain('tagDef_meeting');
   });
 
-  it('merges field entries with same fieldDefId by combining values', async () => {
-    // Both task_1 and task_2 need the same tag so they have matching field entries.
-    // First, set a field value on task_1 and task_2 for Status field.
+  it('merges field entries with same fieldDefId — skips single-value, combines multi-value', async () => {
+    // Status is an options field with default single cardinality.
+    // Single-value merge should preserve target value and skip source value.
     await executeEdit({ nodeId: 'task_1', text: 'Status:: Done' });
-
-    // Apply task tag to task_2 so it has fieldEntries, then set Status
     await executeEdit({ nodeId: 'task_2', text: '#task\nStatus:: In Progress' });
 
-    // Find the Status fieldEntry values before merge
     const task1StatusFeBefore = loroDoc.getChildren('task_1')
       .find((cid) => {
         const c = loroDoc.toNodexNode(cid);
@@ -216,7 +215,7 @@ describe('node_edit tool', () => {
 
     expect(result.merged.fieldsMerged).toBeGreaterThan(0);
 
-    // Check that the Status fieldEntry on task_1 now has combined values
+    // Single-value field: target keeps its value, source value is skipped
     const task1StatusFeAfter = loroDoc.getChildren('task_1')
       .find((cid) => {
         const c = loroDoc.toNodexNode(cid);
@@ -224,7 +223,7 @@ describe('node_edit tool', () => {
       });
     expect(task1StatusFeAfter).toBeTruthy();
     const valuesAfter = loroDoc.getChildren(task1StatusFeAfter!).length;
-    expect(valuesAfter).toBeGreaterThan(valuesBefore);
+    expect(valuesAfter).toBe(valuesBefore); // single-value: no additional values
   });
 
   it('redirects reference nodes pointing to source', async () => {
@@ -281,5 +280,76 @@ describe('node_edit tool', () => {
       nodeId: 'note_1',
       mergeFrom: SYSTEM_NODE_IDS.TRASH,
     } as never)).rejects.toThrow('Cannot merge from locked/system node');
+  });
+
+  it('rejects merging an ancestor into its descendant', async () => {
+    // note_1a is a child of note_1
+    await expect(editTool.execute('tool_edit', {
+      nodeId: 'note_1a',
+      mergeFrom: 'note_1',
+    } as never)).rejects.toThrow('descendant of source');
+  });
+
+  it('redirects field-value targetId references', async () => {
+    const store = useNodeStore.getState();
+    // Create a source and target
+    const source = store.createChild('note_1', undefined, { name: 'Source' });
+    const target = store.createChild('note_1', undefined, { name: 'Target' });
+    // Create a field value node with targetId pointing to source (simulates options field value)
+    const fieldHost = store.createChild('note_1', undefined, { name: 'Host' });
+    const feId = nanoid();
+    loroDoc.createNode(feId, fieldHost.id);
+    loroDoc.setNodeDataBatch(feId, { type: 'fieldEntry', fieldDefId: 'attrDef_status' });
+    const valId = nanoid();
+    loroDoc.createNode(valId, feId);
+    loroDoc.setNodeData(valId, 'targetId', source.id);
+    loroDoc.commitDoc();
+
+    // Verify value points to source
+    expect(loroDoc.toNodexNode(valId)?.targetId).toBe(source.id);
+
+    // Merge source into target
+    await editTool.execute('tool_edit', {
+      nodeId: target.id,
+      mergeFrom: source.id,
+    } as never);
+
+    // Value should now point to target
+    expect(loroDoc.toNodexNode(valId)?.targetId).toBe(target.id);
+  });
+
+  it('respects single-value field cardinality during merge', async () => {
+    const store = useNodeStore.getState();
+    const source = store.createChild('note_1', undefined, { name: 'Source' });
+    const target = store.createChild('note_1', undefined, { name: 'Target' });
+
+    // Create field entries on both source and target with the same fieldDefId
+    // attrDef_status is an options field (default cardinality = single)
+    const targetFe = nanoid();
+    loroDoc.createNode(targetFe, target.id);
+    loroDoc.setNodeDataBatch(targetFe, { type: 'fieldEntry', fieldDefId: 'attrDef_status' });
+    const targetVal = nanoid();
+    loroDoc.createNode(targetVal, targetFe);
+    loroDoc.setNodeData(targetVal, 'name', 'Done');
+
+    const sourceFe = nanoid();
+    loroDoc.createNode(sourceFe, source.id);
+    loroDoc.setNodeDataBatch(sourceFe, { type: 'fieldEntry', fieldDefId: 'attrDef_status' });
+    const sourceVal = nanoid();
+    loroDoc.createNode(sourceVal, sourceFe);
+    loroDoc.setNodeData(sourceVal, 'name', 'Todo');
+    loroDoc.commitDoc();
+
+    // Target field has 1 value before merge
+    expect(loroDoc.getChildren(targetFe)).toHaveLength(1);
+
+    await editTool.execute('tool_edit', {
+      nodeId: target.id,
+      mergeFrom: source.id,
+    } as never);
+
+    // Single-value field: target should still have only 1 value (source value skipped)
+    expect(loroDoc.getChildren(targetFe)).toHaveLength(1);
+    expect(loroDoc.toNodexNode(targetVal)?.name).toBe('Done');
   });
 });

@@ -19,15 +19,14 @@ import {
   createNode,
   setNodeData,
 } from '../../src/lib/loro-doc.js';
+import { buildExpandedNodeKey } from '../../src/lib/expanded-node-key.js';
 import { ensureTodayNode } from '../../src/lib/journal.js';
 import { useNodeStore } from '../../src/stores/node-store.js';
 import { useUIStore } from '../../src/stores/ui-store.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
-/** Helper: get current active panel node ID */
 function currentNodeId(): string | null {
-  const s = useUIStore.getState();
-  return s.panels.find((p) => p.id === s.activePanelId)?.nodeId ?? null;
+  return useUIStore.getState().currentNodeId;
 }
 
 beforeEach(() => {
@@ -168,25 +167,21 @@ describe('多次操作的撤销栈深度', () => {
 });
 
 describe('UI marker → undoDoc/redoDoc', () => {
-  it('导航操作通过 Loro undo/redo 恢复 panel state', () => {
+  it('节点导航使用 nodeHistory，而不是 Loro undo/redo', () => {
     const ui = useUIStore.getState();
-    const beforePanels = useUIStore.getState().panels.map((p) => ({ ...p }));
-    const beforeActivePanelId = useUIStore.getState().activePanelId;
 
     ui.navigateTo('inbox_3');
     expect(currentNodeId()).toBe('inbox_3');
 
-    expect(undoDoc()).toBe(true);
-    expect(useUIStore.getState().panels).toEqual(beforePanels);
-    expect(useUIStore.getState().activePanelId).toBe(beforeActivePanelId);
-
-    expect(redoDoc()).toBe(true);
+    expect(canUndoDoc()).toBe(false);
+    expect(undoDoc()).toBe(false);
+    expect(redoDoc()).toBe(false);
     expect(currentNodeId()).toBe('inbox_3');
   });
 
   it('展开/折叠通过 Loro undo/redo 恢复 expandedNodes', () => {
     const ui = useUIStore.getState();
-    const expandKey = `main:${ensureTodayNode()}:note_2`;
+    const expandKey = buildExpandedNodeKey(ensureTodayNode(), 'note_2');
 
     ui.setExpanded(expandKey, true);
     expect(useUIStore.getState().expandedNodes.has(expandKey)).toBe(true);
@@ -200,7 +195,7 @@ describe('UI marker → undoDoc/redoDoc', () => {
 
   it('程序性 setExpanded(skipUndo) 不创建 undo step', () => {
     const ui = useUIStore.getState();
-    const expandKey = `main:${ensureTodayNode()}:note_2`;
+    const expandKey = buildExpandedNodeKey(ensureTodayNode(), 'note_2');
 
     expect(canUndoDoc()).toBe(false);
     ui.setExpanded(expandKey, true, true);
@@ -208,47 +203,30 @@ describe('UI marker → undoDoc/redoDoc', () => {
     expect(canUndoDoc()).toBe(false);
   });
 
-  it('连续 undo 不应产生空 panels（Bug 1 回归）', () => {
+  it('replaceCurrentNode 种子导航不会创建 undo step', () => {
     const ui = useUIStore.getState();
     const todayId = ensureTodayNode();
 
-    // Simulate bootstrap: replacePanel sets initial panel without creating undo entry
-    ui.replacePanel(todayId);
-    expect(useUIStore.getState().panels[0].nodeId).toBe(todayId);
+    useUIStore.setState({
+      activeView: 'chat',
+      currentNodeId: null,
+      nodeHistory: [],
+      nodeHistoryIndex: -1,
+    });
+
+    ui.replaceCurrentNode(todayId);
+    expect(useUIStore.getState().currentNodeId).toBe(todayId);
     expect(canUndoDoc()).toBe(false);
-
-    // User navigates to two pages
-    ui.navigateTo('proj_1');
-    ui.navigateTo('note_1');
-    expect(currentNodeId()).toBe('note_1');
-
-    // Undo both navigations — should return to Today, not empty
-    undoDoc();
-    undoDoc();
-
-    const { panels } = useUIStore.getState();
-    expect(panels.length).toBeGreaterThan(0);
-    expect(currentNodeId()).toBe(todayId);
-
-    // One more undo should be a no-op (no bootstrap undo entry)
-    const before = { panels: [...useUIStore.getState().panels], activePanelId: useUIStore.getState().activePanelId };
-    undoDoc();
-    expect(useUIStore.getState().panels).toEqual(before.panels);
-    expect(useUIStore.getState().activePanelId).toBe(before.activePanelId);
-  });
-
-  it('restore 回调忽略空 panels 的 UI 快照', () => {
-    const ui = useUIStore.getState();
-    const todayId = ensureTodayNode();
-    // Set some panel state
-    ui.replacePanel(todayId);
-
-    // Directly test by setting panel state then trying undo
-    useUIStore.setState({ panels: [{ id: 'main', nodeId: todayId }], activePanelId: 'main' });
-    // Now try to undoDoc when there's nothing to undo — should be no-op
-    const result = undoDoc();
-    // canUndoDoc was false so result should be false
-    expect(result).toBe(false);
-    expect(useUIStore.getState().panels.length).toBeGreaterThan(0);
+    const before = {
+      activeView: useUIStore.getState().activeView,
+      currentNodeId: useUIStore.getState().currentNodeId,
+      nodeHistory: [...useUIStore.getState().nodeHistory],
+      nodeHistoryIndex: useUIStore.getState().nodeHistoryIndex,
+    };
+    expect(undoDoc()).toBe(false);
+    expect(useUIStore.getState().activeView).toBe(before.activeView);
+    expect(useUIStore.getState().currentNodeId).toBe(before.currentNodeId);
+    expect(useUIStore.getState().nodeHistory).toEqual(before.nodeHistory);
+    expect(useUIStore.getState().nodeHistoryIndex).toBe(before.nodeHistoryIndex);
   });
 });

@@ -10,10 +10,6 @@ import {
 import { STARTUP_PAGE, setStartupPagePreference } from '../../lib/settings-service.js';
 import { useUIStore } from '../../stores/ui-store.js';
 
-interface ChatOnboardingProps {
-  panelId: string;
-}
-
 function getActionErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message.trim().length > 0) {
     return error.message;
@@ -21,7 +17,7 @@ function getActionErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
-export function ChatOnboarding({ panelId }: ChatOnboardingProps) {
+export function ChatOnboarding() {
   const [provider, setProvider] = useState('anthropic');
   const [apiKey, setApiKey] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -48,9 +44,7 @@ export function ChatOnboarding({ panelId }: ChatOnboardingProps) {
   function handleStartWithOutliner() {
     setStartupPagePreference(STARTUP_PAGE.TODAY);
     const todayId = ensureTodayNode();
-    const uiState = useUIStore.getState();
-    uiState.setActivePanel(panelId);
-    uiState.replacePanel(todayId);
+    useUIStore.getState().switchToNode(todayId);
   }
 
   return (

@@ -60,9 +60,9 @@ describe('tree-utils', () => {
     createNode('a1_ref', 'r');
     setNodeDataBatch('a1_ref', { name: 'a1_ref' });
 
-    const expanded = new Set<string>(['main:root:a', 'main:a:a1', 'main:root:r']);
+    const expanded = new Set<string>(['root:a', 'a:a1', 'root:r']);
 
-    const flat = getFlattenedVisibleNodes(['a', 'r'], expanded, 'root', 'main');
+    const flat = getFlattenedVisibleNodes(['a', 'r'], expanded, 'root');
     expect(flat.map((x) => `${x.parentId}/${x.nodeId}`)).toEqual([
       'root/a',
       'a/a1',
@@ -84,10 +84,10 @@ describe('tree-utils', () => {
     createNode('c2', 'a');
     createNode('c3', 'a');
 
-    const expanded = new Set<string>(['main:root:a']);
+    const expanded = new Set<string>(['root:a']);
 
     // Without callback: data order
-    const flatDefault = getFlattenedVisibleNodes(['a'], expanded, 'root', 'main');
+    const flatDefault = getFlattenedVisibleNodes(['a'], expanded, 'root');
     expect(flatDefault.map((x) => x.nodeId)).toEqual(['a', 'c1', 'c2', 'c3']);
 
     // With callback: reversed visual order for node 'a'
@@ -109,7 +109,7 @@ describe('tree-utils', () => {
 
     // getLastVisibleNode skips structural nodes (fieldEntry)
     // with c2 expanded:
-    const result = getLastVisibleNode('p', new Set(['main:p:c2']), 'main');
+    const result = getLastVisibleNode('p', new Set(['p:c2']));
     expect(result).toEqual({ nodeId: 'c2a', parentId: 'c2' });
 
     // without expansion:

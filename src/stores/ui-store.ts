@@ -1,65 +1,70 @@
 /**
- * UI state store: multi-panel navigation, expanded nodes, focus.
+ * UI state store: dual-view toggle layout, expanded nodes, focus.
  *
- * Persisted to chrome.storage.local (panels, expandedNodes, viewMode).
- *
- * Navigation uses a global event timeline:
- * - panels: list of open panels, each displaying a node
- * - activePanelId: which panel receives keyboard events
- * - navHistory: ordered list of NavigationEvents (navigate / open-panel / close-panel)
- * - navIndex: pointer into navHistory (-1 = no events)
- * - goBack/goForward: undo/redo events from navHistory
- *
- * Back/Forward auto-switch activePanelId to the affected panel.
+ * Persisted to chrome.storage.local:
+ * - activeView
+ * - currentNodeId
+ * - currentChatSessionId
+ * - expandedNodes
+ * - viewMode
+ * - paletteUsage
+ * - lastVisitDate
  */
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { nanoid } from 'nanoid';
 import { chromeLocalStorage } from '../lib/chrome-storage';
 import { commitUIMarker, registerUndoUICallbacks } from '../lib/loro-doc.js';
-import { useNodeStore } from './node-store';
-import { isAppPanel, isChatPanel, type NavigationEvent, type Panel } from '../types/index.js';
+import { ensureTodayNode } from '../lib/journal.js';
+import {
+  buildExpandedNodeKey,
+  expandedNodeSetsEqual,
+  normalizeExpandedNodeKey,
+  normalizeExpandedNodeSet,
+} from '../lib/expanded-node-key.js';
+import { chatPanelSessionId, isAppPanel, isChatPanel } from '../types/index.js';
+import { useNodeStore } from './node-store.js';
+
+type ActiveView = 'chat' | 'node';
 
 interface PendingChatPrompt {
-  panelId: string;
+  sessionId: string;
   prompt: string;
 }
 
 interface UIStore {
-  // Multi-panel navigation (global event timeline)
-  panels: Panel[];
-  activePanelId: string;
-  navHistory: NavigationEvent[];
-  navIndex: number;
-  navigateTo(nodeId: string): void;
-  goBack(): void;
-  goForward(): void;
-  replacePanel(nodeId: string): void;
-  openPanel(nodeId: string, insertIndex?: number): void;
-  closePanel(panelId: string): void;
-  setActivePanel(panelId: string): void;
+  activeView: ActiveView;
+  currentNodeId: string | null;
+  currentChatSessionId: string | null;
+  nodeHistory: string[];
+  nodeHistoryIndex: number;
+  switchToChat(): void;
+  switchToNode(nodeId?: string): void;
+  navigateToNode(nodeId: string): void;
+  replaceCurrentNode(nodeId: string): void;
+  goBackNode(): void;
+  goForwardNode(): void;
+  setCurrentChatSessionId(sessionId: string | null): void;
 
-  // Expand/collapse (keys are compound: "panelId:parentId:nodeId" for per-panel per-instance state)
+  navigateTo(nodeId: string): void;
+
+  // Expand/collapse (keys are compound: "parentId:nodeId")
   expandedNodes: Set<string>;
   toggleExpanded(expandKey: string): void;
   setExpanded(expandKey: string, expanded: boolean, skipUndo?: boolean): void;
 
-  // Focus (parentId disambiguates reference nodes that appear in multiple places)
-  // setFocusedNode also sets selection to the focused node (click-time selection pattern)
-  // so that Escape only needs to clearFocus() and selection survives.
+  // Focus
   focusedNodeId: string | null;
   focusedParentId: string | null;
   setFocusedNode(nodeId: string | null, parentId?: string | null): void;
-  /** Clear focus only, preserving selection. Used by Escape to transition edit→selected. */
   clearFocus(): void;
 
-  // Selection (reference nodes: single click = select, double click = edit/focus)
+  // Selection
   selectedNodeId: string | null;
   selectedParentId: string | null;
   selectionSource: 'global' | 'ref-click' | null;
   setSelectedNode(nodeId: string | null, parentId?: string | null, source?: 'global' | 'ref-click'): void;
 
-  // Multi-selection (root-level node IDs only; ancestors cover descendants)
+  // Multi-selection
   selectedNodeIds: Set<string>;
   selectionAnchorId: string | null;
   setSelectedNodes(nodeIds: Set<string>, anchorId?: string | null): void;
@@ -72,7 +77,7 @@ interface UIStore {
   closeSearch(): void;
   setSearchQuery(query: string): void;
 
-  // Pending chat prompt (session-only, targeted to a specific chat panel)
+  // Pending chat prompt
   pendingChatPrompt: PendingChatPrompt | null;
   setPendingChatPrompt(prompt: PendingChatPrompt | null): void;
 
@@ -92,24 +97,23 @@ interface UIStore {
   viewMode: 'list' | 'table' | 'tiles' | 'cards';
   setViewMode(mode: 'list' | 'table' | 'tiles' | 'cards'): void;
 
-  // Field name editing (transient, not persisted)
+  // Field name editing
   editingFieldNameId: string | null;
   setEditingFieldName(fieldEntryId: string | null): void;
 
-  // Trigger hint: set by TrailingInput when creating a node with trigger char (#/@/)
-  // OutlinerItem reads & clears this to open the appropriate dropdown on mount
+  // Trigger hint
   triggerHint: { char: '#' | '@' | '/'; nodeId: string } | null;
   setTriggerHint(hint: { char: '#' | '@' | '/'; nodeId: string } | null): void;
 
-  // Text offset for cursor positioning (consumed by matching RichTextEditor on mount)
+  // Click-to-focus cursor positioning
   focusClickCoords: { nodeId: string; parentId: string | null; textOffset: number } | null;
   setFocusClickCoords(coords: { nodeId: string; parentId: string | null; textOffset: number } | null): void;
 
-  // Pending input character: set by selection mode keydown, consumed by target RichTextEditor on mount
+  // Pending input character
   pendingInputChar: { char: string; nodeId: string; parentId: string | null } | null;
   setPendingInputChar(payload: { char: string; nodeId: string; parentId: string | null } | null): void;
 
-  // Pending reference ↔ inline reference conversion (session-only)
+  // Pending reference ↔ inline reference conversion
   pendingRefConversion: {
     tempNodeId: string;
     refNodeId: string;
@@ -117,57 +121,51 @@ interface UIStore {
   } | null;
   setPendingRefConversion(info: { tempNodeId: string; refNodeId: string; parentId: string } | null): void;
 
-  // Hidden field temporary reveal (session-only, not persisted)
-  // Key format: "panelNodeId:fieldEntryId"
+  // Hidden field temporary reveal
   expandedHiddenFields: Set<string>;
   toggleHiddenField(panelNodeId: string, fieldEntryId: string): void;
   clearExpandedHiddenFields(): void;
 
-  // Panel title visibility (session-only, not persisted)
-  // Keyed by panelId — missing key means title is visible (default true)
-  panelTitleVisibleMap: Record<string, boolean>;
-  setPanelTitleVisible(panelId: string, visible: boolean): void;
-
-  // ⌘K palette usage tracking (persisted)
+  // ⌘K palette usage tracking
   paletteUsage: Record<string, { count: number; lastUsedAt: number }>;
   trackPaletteUsage(itemId: string): void;
 
-  // Last visit date (YYYY-MM-DD string, persisted) — used to determine "first visit of the day"
+  // Last node-view visit date (YYYY-MM-DD)
   lastVisitDate: string | null;
   setLastVisitDate(date: string): void;
 
-  // Description editing trigger (session-only, not persisted)
+  // Description editing trigger
   editingDescriptionNodeId: string | null;
   setEditingDescription(nodeId: string | null): void;
 
-  // Loading nodes (session-only): nodes whose content is being fetched asynchronously
+  // Loading nodes
   loadingNodeIds: Set<string>;
   addLoadingNode(nodeId: string): void;
   removeLoadingNode(nodeId: string): void;
 
-  // Auto-open toolbar dropdown (session-only): set by context menu, consumed by ViewToolbar
+  // Auto-open toolbar dropdown
   autoOpenToolbarDropdown: { nodeId: string; section: 'sort' | 'filter' | 'group' } | null;
   setAutoOpenToolbarDropdown(payload: { nodeId: string; section: 'sort' | 'filter' | 'group' } | null): void;
 }
 
 export interface PersistedUIStoreState {
-  panels: Panel[];
-  activePanelId: string;
+  activeView: ActiveView;
+  currentNodeId: string | null;
+  currentChatSessionId: string | null;
   expandedNodes: Set<string>;
   viewMode: 'list' | 'table' | 'tiles' | 'cards';
   paletteUsage: Record<string, { count: number; lastUsedAt: number }>;
   lastVisitDate: string | null;
 }
 
-/** Stable selector for the active panel's current node ID. */
-export const selectCurrentNodeId = (s: UIStore): string | null =>
-  s.panels.find((p) => p.id === s.activePanelId)?.nodeId ?? null;
+export const selectCurrentNodeId = (s: UIStore): string | null => s.currentNodeId;
 
 export function partializeUIStore(state: UIStore): PersistedUIStoreState {
   return {
-    panels: state.panels,
-    activePanelId: state.activePanelId,
-    expandedNodes: state.expandedNodes,
+    activeView: state.activeView,
+    currentNodeId: state.currentNodeId,
+    currentChatSessionId: state.currentChatSessionId,
+    expandedNodes: normalizeExpandedNodeSet(state.expandedNodes),
     viewMode: state.viewMode,
     paletteUsage: state.paletteUsage,
     lastVisitDate: state.lastVisitDate,
@@ -175,17 +173,96 @@ export function partializeUIStore(state: UIStore): PersistedUIStoreState {
 }
 
 function hasBackingNode(nodeId: string): boolean {
-  if (isAppPanel(nodeId) || isChatPanel(nodeId)) return true;
+  if (isAppPanel(nodeId)) return true;
   try {
     return useNodeStore.getState().getNode(nodeId) !== null;
   } catch {
-    // Some low-level UI store tests reset ui-store without initializing LoroDoc.
-    // Fail-open here so history semantics remain testable in isolation.
     return true;
   }
 }
 
-/** Fresh focus/selection reset fields — must be a function so each call gets its own Set instance. */
+function getTodayDateKey(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function resolvePreferredExistingNodeTarget(
+  state: Pick<UIStore, 'currentNodeId' | 'lastVisitDate'>,
+  requestedNodeId?: string,
+): string | null {
+  if (requestedNodeId && hasBackingNode(requestedNodeId)) {
+    return requestedNodeId;
+  }
+
+  if (!state.currentNodeId || !hasBackingNode(state.currentNodeId)) {
+    return null;
+  }
+
+  if (state.lastVisitDate !== getTodayDateKey()) {
+    return null;
+  }
+
+  return state.currentNodeId;
+}
+
+function pushNodeHistory(
+  state: Pick<UIStore, 'currentNodeId' | 'nodeHistory' | 'nodeHistoryIndex'>,
+  nodeId: string,
+): Pick<UIStore, 'currentNodeId' | 'nodeHistory' | 'nodeHistoryIndex'> {
+  const currentHistoryNode = state.nodeHistory[state.nodeHistoryIndex] ?? null;
+  if (currentHistoryNode === nodeId) {
+    if (state.nodeHistory.length === 0) {
+      return {
+        currentNodeId: nodeId,
+        nodeHistory: [nodeId],
+        nodeHistoryIndex: 0,
+      };
+    }
+    return {
+      currentNodeId: nodeId,
+      nodeHistory: state.nodeHistory,
+      nodeHistoryIndex: state.nodeHistoryIndex,
+    };
+  }
+
+  const nextHistory = state.nodeHistory.slice(0, state.nodeHistoryIndex + 1);
+  nextHistory.push(nodeId);
+  return {
+    currentNodeId: nodeId,
+    nodeHistory: nextHistory,
+    nodeHistoryIndex: nextHistory.length - 1,
+  };
+}
+
+function replaceNodeHistory(
+  state: Pick<UIStore, 'nodeHistory' | 'nodeHistoryIndex'>,
+  nodeId: string,
+): Pick<UIStore, 'currentNodeId' | 'nodeHistory' | 'nodeHistoryIndex'> {
+  const nextHistory = state.nodeHistory.slice(0, Math.max(state.nodeHistoryIndex + 1, 0));
+  if (nextHistory.length === 0) {
+    nextHistory.push(nodeId);
+  } else {
+    nextHistory[nextHistory.length - 1] = nodeId;
+  }
+  return {
+    currentNodeId: nodeId,
+    nodeHistory: nextHistory,
+    nodeHistoryIndex: nextHistory.length - 1,
+  };
+}
+
+function findHistoryIndex(history: string[], fromIndex: number, step: -1 | 1): number {
+  for (let index = fromIndex; index >= 0 && index < history.length; index += step) {
+    if (hasBackingNode(history[index]!)) {
+      return index;
+    }
+  }
+  return -1;
+}
+
 function clearedFocus() {
   return {
     focusedNodeId: null as string | null,
@@ -198,280 +275,130 @@ function clearedFocus() {
   };
 }
 
-/**
- * Apply a NavigationEvent in the given direction (back = undo, forward = redo).
- * Returns the new panels + activePanelId, or null if the event can't be applied
- * (e.g. target panel no longer exists).
- */
-function applyNavEvent(
-  panels: Panel[],
-  event: NavigationEvent,
-  direction: 'back' | 'forward',
-): { panels: Panel[]; activePanelId: string } | null {
-  const result = [...panels];
-  let activePanelId: string;
+function normalizeExpandedNodesState(expandedNodes: Set<string> | string[] | undefined): Set<string> {
+  if (!expandedNodes) return new Set<string>();
+  return normalizeExpandedNodeSet(expandedNodes);
+}
 
-  switch (event.action) {
-    case 'navigate': {
-      const idx = result.findIndex((p) => p.id === event.panelId);
-      if (idx < 0) return null;
-      result[idx] = { ...result[idx], nodeId: direction === 'back' ? event.fromNodeId : event.toNodeId };
-      activePanelId = event.panelId;
-      break;
-    }
-    case 'open-panel': {
-      if (direction === 'back') {
-        // Undo opening = close the panel
-        const idx = result.findIndex((p) => p.id === event.panelId);
-        if (idx >= 0) result.splice(idx, 1);
-        activePanelId = event.prevActivePanelId;
-      } else {
-        // Redo opening = re-insert the panel
-        const insertAt = Math.min(event.insertIndex, result.length);
-        result.splice(insertAt, 0, { id: event.panelId, nodeId: event.nodeId });
-        activePanelId = event.panelId;
-      }
-      break;
-    }
-    case 'close-panel': {
-      if (direction === 'back') {
-        // Undo closing = reopen from snapshot
-        const insertAt = Math.min(event.insertIndex, result.length);
-        result.splice(insertAt, 0, { ...event.snapshot });
-        activePanelId = event.snapshot.id;
-      } else {
-        // Redo closing = close the panel again
-        const idx = result.findIndex((p) => p.id === event.panelId);
-        if (idx >= 0) result.splice(idx, 1);
-        activePanelId = event.nextActivePanelId;
-      }
-      break;
-    }
-  }
+function coerceExpandedNodeKey(expandKey: string): string {
+  const normalizedKey = normalizeExpandedNodeKey(expandKey);
+  const parts = normalizedKey.split(':');
+  return buildExpandedNodeKey(parts[0] ?? '', parts.slice(1).join(':'));
+}
 
-  // Ensure activePanelId points to an existing panel
-  if (!result.some((p) => p.id === activePanelId) && result.length > 0) {
-    activePanelId = result[0].id;
-  }
-
-  return { panels: result, activePanelId };
+function migrateExpandedNodes(state: Record<string, unknown>) {
+  const normalized = normalizeExpandedNodesState(
+    state.expandedNodes as Set<string> | string[] | undefined,
+  );
+  state.expandedNodes = normalized;
 }
 
 export const useUIStore = create<UIStore>()(
   persist(
-    (set) => ({
-      // Multi-panel navigation
-      panels: [],
-      activePanelId: '',
-      navHistory: [],
-      navIndex: -1,
+    (set): UIStore => ({
+      activeView: 'chat',
+      currentNodeId: null,
+      currentChatSessionId: null,
+      nodeHistory: [],
+      nodeHistoryIndex: -1,
 
-      navigateTo: (nodeId) =>
+      switchToChat: () => set({ activeView: 'chat' }),
+
+      switchToNode: (nodeId) =>
+        set((s) => {
+          const targetNodeId = resolvePreferredExistingNodeTarget(s, nodeId) ?? ensureTodayNode();
+          const nextNodeState = pushNodeHistory(s, targetNodeId);
+          return {
+            activeView: 'node',
+            lastVisitDate: getTodayDateKey(),
+            ...nextNodeState,
+            ...clearedFocus(),
+          };
+        }),
+
+      navigateToNode: (nodeId) =>
         set((s) => {
           if (!hasBackingNode(nodeId)) return {};
-          const panelIdx = s.panels.findIndex((p) => p.id === s.activePanelId);
-          if (panelIdx < 0) return {};
-          const panel = s.panels[panelIdx];
-          if (panel.nodeId === nodeId) return {};
-
-          // Don't replace a chat panel with a node — open a new panel instead.
-          if (isChatPanel(panel.nodeId) && !isChatPanel(nodeId)) {
-            // Defer to openPanel (can't call within set); schedule microtask.
-            queueMicrotask(() => useUIStore.getState().openPanel(nodeId));
-            return {};
-          }
-
-          commitUIMarker();
-
-          // Truncate forward history
-          const newNavHistory = s.navHistory.slice(0, s.navIndex + 1);
-          newNavHistory.push({
-            action: 'navigate',
-            panelId: panel.id,
-            fromNodeId: panel.nodeId,
-            toNodeId: nodeId,
-          });
-
-          const newPanels = [...s.panels];
-          newPanels[panelIdx] = { ...panel, nodeId };
-
           return {
-            panels: newPanels,
-            navHistory: newNavHistory,
-            navIndex: newNavHistory.length - 1,
+            ...pushNodeHistory(s, nodeId),
             ...clearedFocus(),
           };
         }),
 
-      goBack: () =>
-        set((s) => {
-          if (s.navIndex < 0) return {};
-          const event = s.navHistory[s.navIndex];
-          if (!event) return {};
-
-          commitUIMarker();
-          const applied = applyNavEvent(s.panels, event, 'back');
-          if (!applied) return {};
-
-          return {
-            ...applied,
-            navIndex: s.navIndex - 1,
-            ...clearedFocus(),
-          };
-        }),
-
-      goForward: () =>
-        set((s) => {
-          if (s.navIndex >= s.navHistory.length - 1) return {};
-          const newNavIndex = s.navIndex + 1;
-          const event = s.navHistory[newNavIndex];
-          if (!event) return {};
-
-          commitUIMarker();
-          const applied = applyNavEvent(s.panels, event, 'forward');
-          if (!applied) return {};
-
-          return {
-            ...applied,
-            navIndex: newNavIndex,
-            ...clearedFocus(),
-          };
-        }),
-
-      replacePanel: (nodeId) =>
+      replaceCurrentNode: (nodeId) =>
         set((s) => {
           if (!hasBackingNode(nodeId)) return {};
-          if (s.panels.length === 0) {
-            return {
-              panels: [{ id: 'main', nodeId }],
-              activePanelId: 'main',
-              ...clearedFocus(),
-            };
-          }
-          const panelIdx = s.panels.findIndex((p) => p.id === s.activePanelId);
-          if (panelIdx < 0) return {};
-          const newPanels = [...s.panels];
-          newPanels[panelIdx] = { ...newPanels[panelIdx], nodeId };
           return {
-            panels: newPanels,
+            activeView: 'node',
+            ...replaceNodeHistory(s, nodeId),
+            lastVisitDate: getTodayDateKey(),
             ...clearedFocus(),
           };
         }),
 
-      openPanel: (nodeId, insertIndex) =>
+      goBackNode: () =>
         set((s) => {
-          if (!hasBackingNode(nodeId)) return {};
-          commitUIMarker();
-
-          const newPanelId = nanoid();
-          const newPanel: Panel = { id: newPanelId, nodeId };
-          const idx = insertIndex ?? s.panels.length;
-          const newPanels = [...s.panels];
-          newPanels.splice(idx, 0, newPanel);
-
-          // Truncate forward history
-          const newNavHistory = s.navHistory.slice(0, s.navIndex + 1);
-          newNavHistory.push({
-            action: 'open-panel',
-            panelId: newPanelId,
-            nodeId,
-            insertIndex: idx,
-            prevActivePanelId: s.activePanelId,
-          });
-
+          const nextIndex = findHistoryIndex(s.nodeHistory, s.nodeHistoryIndex - 1, -1);
+          if (nextIndex < 0) return {};
           return {
-            panels: newPanels,
-            activePanelId: newPanelId,
-            navHistory: newNavHistory,
-            navIndex: newNavHistory.length - 1,
+            activeView: 'node',
+            currentNodeId: s.nodeHistory[nextIndex] ?? null,
+            nodeHistoryIndex: nextIndex,
+            lastVisitDate: getTodayDateKey(),
             ...clearedFocus(),
           };
         }),
 
-      closePanel: (panelId) =>
+      goForwardNode: () =>
         set((s) => {
-          const idx = s.panels.findIndex((p) => p.id === panelId);
-          if (idx < 0) return {};
-
-          commitUIMarker();
-
-          const snapshot = { ...s.panels[idx] };
-          const newPanels = [...s.panels];
-          newPanels.splice(idx, 1);
-
-          // Determine new active panel
-          let nextActivePanelId = s.activePanelId;
-          if (s.activePanelId === panelId) {
-            if (newPanels.length === 0) {
-              nextActivePanelId = '';
-            } else {
-              // Prefer the panel to the right (same index), otherwise the one before
-              const nextIdx = Math.min(idx, newPanels.length - 1);
-              nextActivePanelId = newPanels[nextIdx].id;
-            }
-          }
-
-          // Truncate forward history
-          const newNavHistory = s.navHistory.slice(0, s.navIndex + 1);
-          newNavHistory.push({
-            action: 'close-panel',
-            panelId,
-            snapshot,
-            insertIndex: idx,
-            nextActivePanelId,
-          });
-
+          const nextIndex = findHistoryIndex(s.nodeHistory, s.nodeHistoryIndex + 1, 1);
+          if (nextIndex < 0) return {};
           return {
-            panels: newPanels,
-            activePanelId: nextActivePanelId,
-            navHistory: newNavHistory,
-            navIndex: newNavHistory.length - 1,
+            activeView: 'node',
+            currentNodeId: s.nodeHistory[nextIndex] ?? null,
+            nodeHistoryIndex: nextIndex,
+            lastVisitDate: getTodayDateKey(),
             ...clearedFocus(),
           };
         }),
 
-      setActivePanel: (panelId) =>
-        set((s) => {
-          if (s.activePanelId === panelId) return {};
-          if (!s.panels.some((p) => p.id === panelId)) return {};
-          return {
-            activePanelId: panelId,
-            ...clearedFocus(),
-          };
-        }),
+      setCurrentChatSessionId: (sessionId) => set({ currentChatSessionId: sessionId }),
 
-      // Expand/collapse
+      navigateTo: (nodeId) => {
+        if (isChatPanel(nodeId)) {
+          useUIStore.getState().setCurrentChatSessionId(chatPanelSessionId(nodeId));
+          useUIStore.getState().switchToChat();
+          return;
+        }
+        useUIStore.getState().switchToNode(nodeId);
+      },
+
       expandedNodes: new Set<string>(),
       toggleExpanded: (expandKey) =>
         set((s) => {
           commitUIMarker();
+          const key = coerceExpandedNodeKey(expandKey);
           const next = new Set(s.expandedNodes);
-          if (next.has(expandKey)) next.delete(expandKey);
-          else next.add(expandKey);
+          if (next.has(key)) next.delete(key);
+          else next.add(key);
           return { expandedNodes: next };
         }),
       setExpanded: (expandKey, expanded, skipUndo) =>
         set((s) => {
+          const key = coerceExpandedNodeKey(expandKey);
           const next = new Set(s.expandedNodes);
-          const had = next.has(expandKey);
+          const had = next.has(key);
           if (had === expanded) return {};
           if (!skipUndo) commitUIMarker();
-          if (expanded) next.add(expandKey);
-          else next.delete(expandKey);
+          if (expanded) next.add(key);
+          else next.delete(key);
           return { expandedNodes: next };
         }),
 
-      // Focus
       focusedNodeId: null,
       focusedParentId: null,
       setFocusedNode: (nodeId, parentId) => {
         if (nodeId) {
-          // Entering edit mode: set focus AND collapse multi-select to this single node.
-          // This is intentional — clicking a node (or pressing Enter from selection) means
-          // the user is now editing ONE node, so multi-select is discarded. Callers that
-          // need to preserve multi-select state should use clearFocus() instead.
-          // Selection is set at click-time so Escape only needs clearFocus()
-          // and the node stays in selectedNodeIds → highlight shows.
           set({
             focusedNodeId: nodeId,
             focusedParentId: parentId ?? null,
@@ -481,25 +408,23 @@ export const useUIStore = create<UIStore>()(
             selectedNodeIds: new Set([nodeId]),
             selectionAnchorId: nodeId,
           });
-        } else {
-          // Clearing focus (blur/navigation away): also clear all selection
-          set({
-            focusedNodeId: null,
-            focusedParentId: null,
-            selectedNodeId: null,
-            selectedParentId: null,
-            selectionSource: null,
-            selectedNodeIds: new Set(),
-            selectionAnchorId: null,
-          });
+          return;
         }
+        set({
+          focusedNodeId: null,
+          focusedParentId: null,
+          selectedNodeId: null,
+          selectedParentId: null,
+          selectionSource: null,
+          selectedNodeIds: new Set(),
+          selectionAnchorId: null,
+        });
       },
       clearFocus: () => set({
         focusedNodeId: null,
         focusedParentId: null,
       }),
 
-      // Selection (single)
       selectedNodeId: null,
       selectedParentId: null,
       selectionSource: null,
@@ -509,22 +434,18 @@ export const useUIStore = create<UIStore>()(
         selectionSource: nodeId ? source : null,
         selectedNodeIds: nodeId ? new Set([nodeId]) : new Set(),
         selectionAnchorId: nodeId,
-        // Clear focus when selecting (exit edit mode)
         focusedNodeId: null,
         focusedParentId: null,
       }),
 
-      // Multi-selection
       selectedNodeIds: new Set<string>(),
       selectionAnchorId: null,
       setSelectedNodes: (nodeIds, anchorId) => set({
         selectedNodeIds: nodeIds,
         selectionAnchorId: anchorId ?? null,
-        // Sync single-select fields from multi-select state.
         selectedNodeId: nodeIds.size === 1 ? [...nodeIds][0] : null,
         selectedParentId: null,
         selectionSource: nodeIds.size > 0 ? 'global' : null,
-        // Clear focus
         focusedNodeId: null,
         focusedParentId: null,
       }),
@@ -536,12 +457,10 @@ export const useUIStore = create<UIStore>()(
         selectionAnchorId: null,
       }),
 
-      // Batch tag selector
       batchTagSelectorOpen: false,
       openBatchTagSelector: () => set({ batchTagSelectorOpen: true }),
       closeBatchTagSelector: () => set({ batchTagSelectorOpen: false }),
 
-      // Search
       searchOpen: false,
       searchQuery: '',
       openSearch: () => set({ searchOpen: true }),
@@ -551,38 +470,30 @@ export const useUIStore = create<UIStore>()(
       pendingChatPrompt: null,
       setPendingChatPrompt: (prompt) => set({ pendingChatPrompt: prompt }),
 
-      // Drag and drop
       dragNodeId: null,
       dropTargetId: null,
       dropPosition: null,
       setDrag: (nodeId) => set({ dragNodeId: nodeId, dropTargetId: null, dropPosition: null }),
       setDropTarget: (nodeId, position) => set({ dropTargetId: nodeId, dropPosition: position }),
 
-      // View mode
       viewMode: 'list',
       setViewMode: (mode) => set({ viewMode: mode }),
 
-      // Field name editing
       editingFieldNameId: null,
       setEditingFieldName: (fieldEntryId) => set({ editingFieldNameId: fieldEntryId }),
 
-      // Trigger hint
       triggerHint: null,
       setTriggerHint: (hint) => set({ triggerHint: hint }),
 
-      // Click coordinates for cursor positioning
       focusClickCoords: null,
       setFocusClickCoords: (coords) => set({ focusClickCoords: coords }),
 
-      // Pending input character (session-only, consumed by target RichTextEditor on mount)
       pendingInputChar: null,
       setPendingInputChar: (payload) => set({ pendingInputChar: payload }),
 
-      // Pending reference conversion (session-only)
       pendingRefConversion: null,
       setPendingRefConversion: (info) => set({ pendingRefConversion: info }),
 
-      // Hidden field temporary reveal (session-only)
       expandedHiddenFields: new Set<string>(),
       toggleHiddenField: (panelNodeId, fieldEntryId) =>
         set((s) => {
@@ -594,14 +505,6 @@ export const useUIStore = create<UIStore>()(
         }),
       clearExpandedHiddenFields: () => set({ expandedHiddenFields: new Set<string>() }),
 
-      // Panel title visibility (per-panel)
-      panelTitleVisibleMap: {},
-      setPanelTitleVisible: (panelId, visible) =>
-        set((s) => ({
-          panelTitleVisibleMap: { ...s.panelTitleVisibleMap, [panelId]: visible },
-        })),
-
-      // ⌘K palette usage tracking
       paletteUsage: {},
       trackPaletteUsage: (itemId) =>
         set((s) => {
@@ -617,15 +520,12 @@ export const useUIStore = create<UIStore>()(
           };
         }),
 
-      // Last visit date
       lastVisitDate: null,
       setLastVisitDate: (date) => set({ lastVisitDate: date }),
 
-      // Description editing trigger (session-only)
       editingDescriptionNodeId: null,
       setEditingDescription: (nodeId) => set({ editingDescriptionNodeId: nodeId }),
 
-      // Loading nodes (session-only)
       loadingNodeIds: new Set<string>(),
       addLoadingNode: (nodeId) => set((s) => {
         const next = new Set(s.loadingNodeIds);
@@ -638,116 +538,98 @@ export const useUIStore = create<UIStore>()(
         return { loadingNodeIds: next };
       }),
 
-      // Auto-open toolbar dropdown (session-only)
       autoOpenToolbarDropdown: null,
       setAutoOpenToolbarDropdown: (payload) => set({ autoOpenToolbarDropdown: payload }),
     }),
     {
       name: 'nodex-ui',
-      version: 5,
+      version: 6,
       storage: chromeLocalStorage,
       partialize: partializeUIStore,
       migrate: (persisted: unknown, version: number) => {
         const state = persisted as Record<string, unknown>;
-        if (version < 4) {
-          // v3→v4: panelHistory/panelIndex → panels/activePanelId
-          const panelHistory = (state.panelHistory as string[] | undefined) ?? [];
-          const panelIndex = (state.panelIndex as number | undefined) ?? -1;
-          const currentNodeId = panelHistory[panelIndex] ?? '';
+        if (version < 6) {
+          const panels = Array.isArray(state.panels)
+            ? state.panels as Array<{ id?: string; nodeId?: string }>
+            : [];
+          const activePanelId = typeof state.activePanelId === 'string' ? state.activePanelId : '';
+          const activePanel = panels.find((panel) => panel.id === activePanelId) ?? panels[0] ?? null;
+          const activeNodeId = typeof activePanel?.nodeId === 'string' ? activePanel.nodeId : null;
+          const fallbackNodeId = panels.find((panel) => typeof panel.nodeId === 'string' && !isChatPanel(panel.nodeId))?.nodeId ?? null;
+          const fallbackChatNodeId = panels.find((panel) => typeof panel.nodeId === 'string' && isChatPanel(panel.nodeId))?.nodeId ?? null;
 
-          state.panels = currentNodeId ? [{ id: 'main', nodeId: currentNodeId }] : [];
-          state.activePanelId = 'main';
-          delete state.panelHistory;
-          delete state.panelIndex;
+          state.activeView = activeNodeId && !isChatPanel(activeNodeId) ? 'node' : 'chat';
+          state.currentNodeId = activeNodeId && !isChatPanel(activeNodeId) ? activeNodeId : fallbackNodeId;
+          state.currentChatSessionId = activeNodeId && isChatPanel(activeNodeId)
+            ? chatPanelSessionId(activeNodeId)
+            : fallbackChatNodeId
+              ? chatPanelSessionId(fallbackChatNodeId)
+              : null;
+          state.nodeHistory = [];
+          state.nodeHistoryIndex = -1;
+          delete state.panels;
+          delete state.activePanelId;
+          delete state.navHistory;
+          delete state.navIndex;
         }
-        if (version < 5) {
-          // v4→v5: expandedNodes key format "parentId:nodeId" → "main:parentId:nodeId"
-          const oldNodes = state.expandedNodes as Set<string> | undefined;
-          if (oldNodes && oldNodes instanceof Set) {
-            const migrated = new Set<string>();
-            for (const key of oldNodes) {
-              // Only prefix if the key doesn't already have 3+ colon-separated parts
-              const parts = key.split(':');
-              if (parts.length === 2) {
-                migrated.add(`main:${key}`);
-              } else {
-                migrated.add(key);
-              }
-            }
-            state.expandedNodes = migrated;
-          }
-        }
+        migrateExpandedNodes(state);
         return state;
+      },
+      onRehydrateStorage: () => (state) => {
+        const rawExpandedNodes = state?.expandedNodes;
+        const rawSet = rawExpandedNodes instanceof Set
+          ? rawExpandedNodes as Set<string>
+          : Array.isArray(rawExpandedNodes)
+            ? new Set(rawExpandedNodes as string[])
+            : new Set<string>();
+        const expandedNodes = normalizeExpandedNodesState(rawExpandedNodes);
+        if (!expandedNodeSetsEqual(expandedNodes, rawSet)) {
+          useUIStore.setState({ expandedNodes });
+        }
       },
     },
   ),
 );
 
-// ── Loro undo/redo UI state capture ──
-
-interface UndoUISnapshotV2 {
-  v: 2;
-  panels: Panel[];
-  activePanelId: string;
+interface UndoUISnapshotV3 {
+  v: 3;
   expandedNodes: string[];
 }
 
-function isUndoUISnapshotV2(value: unknown): value is UndoUISnapshotV2 {
+function isUndoUISnapshotV3(value: unknown): value is UndoUISnapshotV3 {
   if (!value || typeof value !== 'object') return false;
-  const v = value as Partial<UndoUISnapshotV2>;
-  return v.v === 2
-    && Array.isArray(v.panels)
-    && typeof v.activePanelId === 'string'
-    && Array.isArray(v.expandedNodes);
+  const v = value as Partial<UndoUISnapshotV3>;
+  return v.v === 3 && Array.isArray(v.expandedNodes);
 }
 
-// Also accept v1 snapshots from before the migration (graceful upgrade)
-interface UndoUISnapshotV1 {
-  v: 1;
-  panelHistory: string[];
-  panelIndex: number;
-  expandedNodes: string[];
-}
-
-function isUndoUISnapshotV1(value: unknown): value is UndoUISnapshotV1 {
-  if (!value || typeof value !== 'object') return false;
-  const v = value as Partial<UndoUISnapshotV1>;
-  return v.v === 1
-    && Array.isArray(v.panelHistory)
-    && typeof v.panelIndex === 'number'
-    && Array.isArray(v.expandedNodes);
+interface UndoUISnapshotLegacy {
+  v?: number;
+  expandedNodes?: string[];
 }
 
 registerUndoUICallbacks({
   capture: () => {
     const s = useUIStore.getState();
     return {
-      v: 2,
-      panels: s.panels.map((p) => ({ ...p })),
-      activePanelId: s.activePanelId,
-      expandedNodes: [...s.expandedNodes],
-    } satisfies UndoUISnapshotV2;
+      v: 3,
+      expandedNodes: [...normalizeExpandedNodeSet(s.expandedNodes)],
+    } satisfies UndoUISnapshotV3;
   },
   restore: (meta) => {
-    if (isUndoUISnapshotV2(meta)) {
-      if (meta.panels.length === 0) return;
+    if (isUndoUISnapshotV3(meta)) {
       useUIStore.setState({
-        panels: meta.panels.map((p) => ({ ...p })),
-        activePanelId: meta.activePanelId,
-        expandedNodes: new Set(meta.expandedNodes),
+        expandedNodes: normalizeExpandedNodeSet(meta.expandedNodes),
       });
-    } else if (isUndoUISnapshotV1(meta)) {
-      // Graceful upgrade: convert v1 snapshot to new panel model
-      if (meta.panelHistory.length === 0) return;
-      const nodeId = meta.panelHistory[meta.panelIndex] ?? meta.panelHistory[0];
-      if (!nodeId) return;
-      useUIStore.setState({
-        panels: [{ id: 'main', nodeId }],
-        activePanelId: 'main',
-        expandedNodes: new Set(meta.expandedNodes),
-      });
-    } else if (import.meta.env.DEV) {
-      console.warn('[undo-ui] type guard failed, received:', meta);
+      return;
+    }
+
+    if (meta && typeof meta === 'object') {
+      const legacy = meta as UndoUISnapshotLegacy;
+      if (Array.isArray(legacy.expandedNodes)) {
+        useUIStore.setState({
+          expandedNodes: normalizeExpandedNodeSet(legacy.expandedNodes),
+        });
+      }
     }
   },
 });

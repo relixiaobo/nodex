@@ -4,6 +4,7 @@
  * Uses LoroDoc as the source of truth. All node lookups go through loroDoc.toNodexNode().
  */
 import type { NodexNode } from '../types/index.js';
+import { buildExpandedNodeKey } from './expanded-node-key.js';
 import { isOutlinerContentNodeType, resolveEffectiveId } from './node-type-utils.js';
 import * as loroDoc from './loro-doc.js';
 
@@ -110,6 +111,7 @@ export function getFlattenedVisibleNodes(
   panelId: string = 'main',
   getVisualChildIds?: (nodeId: string) => string[],
 ): Array<{ nodeId: string; depth: number; parentId: string }> {
+  void panelId;
   const result: Array<{ nodeId: string; depth: number; parentId: string }> = [];
 
   function traverse(childIds: string[], depth: number, currentParentId: string) {
@@ -120,7 +122,7 @@ export function getFlattenedVisibleNodes(
       result.push({ nodeId: childId, depth, parentId: currentParentId });
 
       if (
-        expandedNodes.has(`${panelId}:${currentParentId}:${childId}`) &&
+        expandedNodes.has(buildExpandedNodeKey(currentParentId, childId)) &&
         node.children.length > 0
       ) {
         const nextChildIds = getVisualChildIds
@@ -176,6 +178,7 @@ export function getLastVisibleNode(
   expandedNodes: Set<string>,
   panelId: string = 'main',
 ): { nodeId: string; parentId: string } | null {
+  void panelId;
   const parentChildren = loroDoc.getChildren(parentId);
   if (!parentChildren.length) return null;
 
@@ -191,7 +194,7 @@ export function getLastVisibleNode(
   let currentParentId = parentId;
 
   while (true) {
-    const expandKey = `${panelId}:${currentParentId}:${currentId}`;
+    const expandKey = buildExpandedNodeKey(currentParentId, currentId);
     if (!expandedNodes.has(expandKey)) break;
 
     const childrenIds = loroDoc.getChildren(currentId);

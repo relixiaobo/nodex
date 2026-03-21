@@ -1,98 +1,93 @@
-import {
-  partializeUIStore,
-} from '../../src/stores/ui-store.js';
+import { chromeLocalStorage } from '../../src/lib/chrome-storage.js';
+import { partializeUIStore, useUIStore } from '../../src/stores/ui-store.js';
+import { resetStores } from './helpers/test-state.js';
 
 describe('ui-store persistence helpers', () => {
-  it('partialize keeps only persisted keys', () => {
-    const expanded = new Set<string>(['main:a:b']);
+  beforeEach(async () => {
+    resetStores();
+    await useUIStore.persist.clearStorage();
+  });
+
+  it('partialize keeps only persisted keys and normalizes expanded node keys', () => {
+    const expanded = new Set<string>(['main:a:b', 'a:c']);
+    const usage = { cmd_1: { count: 3, lastUsedAt: 1000 } };
     const result = partializeUIStore({
-      panels: [{ id: 'main', nodeId: 'note_1' }],
-      activePanelId: 'main',
+      activeView: 'node',
+      currentNodeId: 'note_1',
+      currentChatSessionId: 'session_1',
       expandedNodes: expanded,
       viewMode: 'cards',
+      paletteUsage: usage,
+      lastVisitDate: '2026-03-21',
       searchOpen: true,
       searchQuery: 'x',
       focusedNodeId: 'note_1',
     } as never);
 
     expect(result).toEqual({
-      panels: [{ id: 'main', nodeId: 'note_1' }],
-      activePanelId: 'main',
-      expandedNodes: expanded,
+      activeView: 'node',
+      currentNodeId: 'note_1',
+      currentChatSessionId: 'session_1',
+      expandedNodes: new Set(['a:b', 'a:c']),
       viewMode: 'cards',
-      paletteUsage: undefined,
-      lastVisitDate: undefined,
+      paletteUsage: usage,
+      lastVisitDate: '2026-03-21',
     });
-  });
-
-  it('keeps current persisted shape for panel fields', () => {
-    const persisted = partializeUIStore({
-      panels: [{ id: 'main', nodeId: 'LIBRARY' }],
-      activePanelId: 'main',
-      expandedNodes: new Set<string>(),
-      viewMode: 'list',
-    } as never);
-
-    expect(persisted.panels).toEqual([{ id: 'main', nodeId: 'LIBRARY' }]);
-    expect(persisted.activePanelId).toBe('main');
   });
 });
 
-describe('ui-store persist migration v4→v5', () => {
-  it('prefixes 2-part expand keys with main:', async () => {
-    // Simulate v4 persisted state with old 2-part expand keys
-    const { chromeLocalStorage } = await import('../../src/lib/chrome-storage.js');
-    if (!chromeLocalStorage) return;
-
-    const v4State = {
-      state: {
-        panels: [{ id: 'main', nodeId: 'note_1' }],
-        activePanelId: 'main',
-        expandedNodes: new Set(['proj_1:task_1', 'note_1:note_2']),
-        viewMode: 'list',
-      },
-      version: 4,
-    };
-
-    await chromeLocalStorage.setItem('nodex-ui', v4State);
-
-    // Import the store fresh to trigger migration
-    const { useUIStore } = await import('../../src/stores/ui-store.js');
-    // Trigger rehydration by calling persist rehydrate
-    await useUIStore.persist.rehydrate();
-
-    const { expandedNodes } = useUIStore.getState();
-    // Old 2-part keys should now have 'main:' prefix
-    expect(expandedNodes.has('main:proj_1:task_1')).toBe(true);
-    expect(expandedNodes.has('main:note_1:note_2')).toBe(true);
-    // Old keys should not exist
-    expect(expandedNodes.has('proj_1:task_1')).toBe(false);
-    expect(expandedNodes.has('note_1:note_2')).toBe(false);
+describe('ui-store persist migration v5→v6', () => {
+  beforeEach(async () => {
+    resetStores();
+    await useUIStore.persist.clearStorage();
   });
 
-  it('preserves already-migrated 3-part keys', async () => {
-    const { chromeLocalStorage } = await import('../../src/lib/chrome-storage.js');
-    if (!chromeLocalStorage) return;
-
-    const v4State = {
+  it('migrates a node-active panel layout into the toggle model', async () => {
+    await chromeLocalStorage?.setItem('nodex-ui', {
       state: {
-        panels: [{ id: 'main', nodeId: 'note_1' }],
+        panels: [
+          { id: 'main', nodeId: 'note_1' },
+          { id: 'chat', nodeId: 'chat:session_old' },
+        ],
         activePanelId: 'main',
         expandedNodes: new Set(['main:proj_1:task_1', 'proj_1:task_2']),
         viewMode: 'list',
       },
-      version: 4,
-    };
+      version: 5,
+    });
 
-    await chromeLocalStorage.setItem('nodex-ui', v4State);
-
-    const { useUIStore } = await import('../../src/stores/ui-store.js');
     await useUIStore.persist.rehydrate();
 
-    const { expandedNodes } = useUIStore.getState();
-    // Already 3-part key stays as-is
-    expect(expandedNodes.has('main:proj_1:task_1')).toBe(true);
-    // 2-part key gets prefixed
-    expect(expandedNodes.has('main:proj_1:task_2')).toBe(true);
+    const state = useUIStore.getState();
+    expect(state.activeView).toBe('node');
+    expect(state.currentNodeId).toBe('note_1');
+    expect(state.currentChatSessionId).toBe('session_old');
+    expect(state.expandedNodes).toEqual(new Set(['proj_1:task_1', 'proj_1:task_2']));
+    expect(state.nodeHistory).toEqual([]);
+    expect(state.nodeHistoryIndex).toBe(-1);
+  });
+
+  it('migrates a chat-active panel layout while preserving the fallback node view target', async () => {
+    await chromeLocalStorage?.setItem('nodex-ui', {
+      state: {
+        panels: [
+          { id: 'main', nodeId: 'note_1' },
+          { id: 'chat', nodeId: 'chat:session_focus' },
+        ],
+        activePanelId: 'chat',
+        expandedNodes: new Set(['main:today:proj_1']),
+        viewMode: 'tiles',
+      },
+      version: 5,
+    });
+
+    await useUIStore.persist.rehydrate();
+
+    const state = useUIStore.getState();
+    expect(state.activeView).toBe('chat');
+    expect(state.currentNodeId).toBe('note_1');
+    expect(state.currentChatSessionId).toBe('session_focus');
+    expect(state.expandedNodes).toEqual(new Set(['today:proj_1']));
+    expect(state.viewMode).toBe('tiles');
   });
 });

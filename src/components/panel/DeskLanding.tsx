@@ -102,7 +102,7 @@ export function DeskLanding() {
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  const replacePanel = useUIStore((s) => s.replacePanel);
+  const replaceCurrentNode = useUIStore((s) => s.replaceCurrentNode);
   const createChild = useNodeStore((s) => s.createChild);
   const _version = useNodeStore((s) => s._version);
   const paletteUsage = useUIStore((s) => s.paletteUsage);
@@ -119,11 +119,11 @@ export function DeskLanding() {
 
   const navigate = useCallback((nodeId: string) => {
     trackPaletteUsage(nodeId);
-    replacePanel(nodeId);
+    replaceCurrentNode(nodeId);
     dismiss();
-  }, [trackPaletteUsage, replacePanel, dismiss]);
+  }, [trackPaletteUsage, replaceCurrentNode, dismiss]);
 
-  // Command context — uses replacePanel (navigateTo doesn't work with empty panels)
+  // Command context for the empty-state launcher.
   const ctx: CommandContext = useMemo(() => ({
     navigateTo: navigate,
     closeSearch: dismiss,

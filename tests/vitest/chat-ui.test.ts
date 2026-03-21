@@ -9,8 +9,8 @@ import { ChatPanelHeader } from '../../src/components/chat/ChatPanelHeader.js';
 import { ChatMessage } from '../../src/components/chat/ChatMessage.js';
 import { ChatPanel, shouldStickChatScroll } from '../../src/components/chat/ChatPanel.js';
 import { extractInlineMarkup, splitMarkdownBlocks } from '../../src/components/chat/MarkdownRenderer.js';
-import { DeskLayout } from '../../src/components/layout/DeskLayout.js';
-import { appendMessage, editMessage, getLinearPath, linearToTree, switchBranch as switchChatBranch } from '../../src/lib/ai-chat-tree.js';
+import { ToggleLayout } from '../../src/components/layout/ToggleLayout.js';
+import { appendMessage, createSession, editMessage, getLinearPath, linearToTree, switchBranch as switchChatBranch } from '../../src/lib/ai-chat-tree.js';
 import { resetChatPersistenceForTests, saveChatSession } from '../../src/lib/ai-persistence.js';
 import { resetAIAgentForTests } from '../../src/lib/ai-service.js';
 import { findProviderOptionNodeId, getApiKeyForProvider } from '../../src/lib/ai-provider-config.js';
@@ -539,7 +539,7 @@ describe('chat ui', () => {
     resetAndSeed();
     await deleteDB(DB_NAME);
     resetChatPersistenceForTests();
-    useUIStore.getState().replacePanel('chat:session-startup');
+    useUIStore.getState().navigateTo('chat:session-startup');
 
     flushSync(() => {
       root.render(React.createElement(ChatPanel, { panelId: 'main', sessionId: 'session-startup' }));
@@ -558,7 +558,8 @@ describe('chat ui', () => {
 
     await vi.waitFor(() => {
       expect(getStartupPagePreference()).toBe(STARTUP_PAGE.TODAY);
-      expect(useUIStore.getState().panels[0]?.nodeId).toBe(ensureTodayNode());
+      expect(useUIStore.getState().activeView).toBe('node');
+      expect(useUIStore.getState().currentNodeId).toBe(ensureTodayNode());
     });
   });
 
@@ -755,16 +756,30 @@ describe('chat ui', () => {
     expect(textarea.value).toBe('');
   });
 
-  it('keeps the panel layout visible on narrow screens instead of swapping to a chat-only view', () => {
+  it('keeps the toggle layout visible on narrow screens instead of swapping to a chat-only view', async () => {
+    resetAndSeed();
     window.innerWidth = 480;
-
-    flushSync(() => {
-      root.render(React.createElement(DeskLayout));
+    const session = createSession();
+    await saveChatSession(session);
+    useUIStore.setState({
+      activeView: 'chat',
+      currentChatSessionId: session.id,
+      currentNodeId: ensureTodayNode(),
+      nodeHistory: [ensureTodayNode()],
+      nodeHistoryIndex: 0,
     });
 
-    // Empty desk state renders DeskLanding with a search input (placeholder is an attribute, not text)
-    expect(container.querySelector('input[placeholder]')).not.toBeNull();
-    expect(container.textContent).not.toContain('Loading chat…');
+    flushSync(() => {
+      root.render(React.createElement(ToggleLayout));
+    });
+
+    await vi.waitFor(() => {
+      const layout = container.firstElementChild as HTMLDivElement | null;
+      const viewContainer = layout?.children[1] as HTMLDivElement | undefined;
+      expect(viewContainer?.children).toHaveLength(2);
+      expect((viewContainer?.children[0] as HTMLElement | undefined)?.getAttribute('aria-hidden')).toBe('false');
+      expect((viewContainer?.children[1] as HTMLElement | undefined)?.getAttribute('aria-hidden')).toBe('true');
+    });
   });
 });
 

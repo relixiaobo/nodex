@@ -30,10 +30,6 @@ vi.mock('../../src/hooks/use-nav-undo-keyboard', () => ({
   useNavUndoKeyboard: vi.fn(),
 }));
 
-vi.mock('../../src/hooks/use-panel-keyboard.js', () => ({
-  usePanelKeyboard: vi.fn(),
-}));
-
 vi.mock('../../src/hooks/use-chat-shortcut.js', () => ({
   useChatShortcut: vi.fn(),
 }));
@@ -49,8 +45,8 @@ vi.mock('../../src/hooks/use-global-selection-dismiss.js', () => ({
   }),
 }));
 
-vi.mock('../../src/components/layout/DeskLayout.js', () => ({
-  DeskLayout: () => React.createElement('div', { 'data-testid': 'desk-layout' }),
+vi.mock('../../src/components/layout/ToggleLayout.js', () => ({
+  ToggleLayout: () => React.createElement('div', { 'data-testid': 'toggle-layout' }),
 }));
 
 vi.mock('../../src/components/search/CommandPalette', () => ({
@@ -63,6 +59,7 @@ vi.mock('../../src/components/tags/BatchTagSelector', () => ({
 
 vi.mock('../../src/components/ui/Tooltip', () => ({
   TooltipProvider: ({ children }: { children: React.ReactNode }) => React.createElement(React.Fragment, null, children),
+  Tooltip: ({ children }: { children: React.ReactNode }) => React.createElement(React.Fragment, null, children),
 }));
 
 import { App } from '../../src/entrypoints/sidepanel/App.js';
@@ -84,6 +81,7 @@ describe('App bootstrap', () => {
     mockGetCurrentUser.mockReset();
     mockGetStartupPagePreference.mockReset();
     mockGetStartupPagePreference.mockReturnValue(STARTUP_PAGE.CHAT);
+
     originalChrome = globalThis.chrome;
     vi.stubGlobal('chrome', {
       runtime: {
@@ -125,7 +123,7 @@ describe('App bootstrap', () => {
     });
   });
 
-  it('opens Today on bootstrap when startup preference is Today', async () => {
+  it('opens Today on bootstrap when startup preference is Today while keeping node view active', async () => {
     mockGetCurrentUser.mockResolvedValue({
       id: 'user_app_bootstrap',
       email: 'app@example.com',
@@ -138,8 +136,13 @@ describe('App bootstrap', () => {
     });
 
     await vi.waitFor(() => {
-      expect(useUIStore.getState().panels[0]?.nodeId).toBe(ensureTodayNode());
-      expect(container.querySelector('[data-testid="desk-layout"]')).not.toBeNull();
+      const state = useUIStore.getState();
+      expect(state.activeView).toBe('node');
+      expect(state.currentNodeId).toBe(ensureTodayNode());
+      expect(container.querySelector('[data-testid="toggle-layout"]')).not.toBeNull();
     });
+
+    expect(useUIStore.getState().activeView).toBe('node');
+    expect(useUIStore.getState().currentChatSessionId).toBeNull();
   });
 });

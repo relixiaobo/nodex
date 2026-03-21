@@ -20,18 +20,23 @@ export function resetStores(): void {
   });
 
   useUIStore.setState({
-    panels: [],
-    activePanelId: '',
-    navHistory: [],
-    navIndex: -1,
+    activeView: 'chat',
+    currentNodeId: null,
+    currentChatSessionId: null,
+    nodeHistory: [],
+    nodeHistoryIndex: -1,
     expandedNodes: new Set<string>(),
     focusedNodeId: null,
     focusedParentId: null,
     selectedNodeId: null,
     selectedParentId: null,
+    selectionSource: null,
+    selectedNodeIds: new Set<string>(),
+    selectionAnchorId: null,
     searchOpen: false,
     searchQuery: '',
     pendingChatPrompt: null,
+    batchTagSelectorOpen: false,
     dragNodeId: null,
     dropTargetId: null,
     dropPosition: null,
@@ -39,8 +44,14 @@ export function resetStores(): void {
     editingFieldNameId: null,
     triggerHint: null,
     focusClickCoords: null,
+    pendingInputChar: null,
     pendingRefConversion: null,
     expandedHiddenFields: new Set<string>(),
+    paletteUsage: {},
+    lastVisitDate: null,
+    editingDescriptionNodeId: null,
+    loadingNodeIds: new Set<string>(),
+    autoOpenToolbarDropdown: null,
   });
 }
 

@@ -60,19 +60,22 @@ function ToggleTopBar({
   );
   const nodeTitle = useNodeTitle(resolvedNodeId);
 
-  const tabClass = (active: boolean) =>
-    `flex h-9 min-w-0 flex-1 items-center gap-1.5 border-b-2 px-3 text-[13px] transition-colors ${
-      active
-        ? 'border-transparent text-foreground'
-        : 'border-border/60 text-foreground-tertiary hover:text-foreground'
-    }`;
+  // Active tab: bg-background + rounded-t-xl + tab-connector for concave corner
+  // Inactive tab: transparent bg, just icon + text
+  const chatActive = activeView === 'chat';
+  const nodeActive = activeView === 'node';
 
   return (
-    <div className="flex shrink-0 items-stretch">
+    <div className="flex shrink-0 items-end">
+      {/* Chat tab */}
       <button
         type="button"
         onClick={() => switchToChat()}
-        className={tabClass(activeView === 'chat')}
+        className={
+          chatActive
+            ? 'tab-connector-right relative z-10 flex h-9 min-w-0 flex-1 items-center gap-1.5 rounded-t-xl bg-background pl-3 pr-2 text-[13px] text-foreground'
+            : 'flex h-8 min-w-0 flex-1 items-center gap-1.5 px-3 text-[13px] text-foreground-tertiary transition-colors hover:text-foreground'
+        }
       >
         <MessageSquare size={15} strokeWidth={1.7} className="shrink-0" />
         <span className="min-w-0 truncate">
@@ -80,10 +83,15 @@ function ToggleTopBar({
         </span>
       </button>
 
+      {/* Node tab */}
       <button
         type="button"
         onClick={() => switchToNode()}
-        className={tabClass(activeView === 'node')}
+        className={
+          nodeActive
+            ? 'tab-connector-left relative z-10 flex h-9 min-w-0 flex-1 items-center gap-1.5 rounded-t-xl bg-background pl-3 pr-2 text-[13px] text-foreground'
+            : 'flex h-8 min-w-0 flex-1 items-center gap-1.5 px-3 text-[13px] text-foreground-tertiary transition-colors hover:text-foreground'
+        }
       >
         <ListTree size={15} strokeWidth={1.7} className="shrink-0" />
         <span className="min-w-0 truncate">
@@ -91,7 +99,8 @@ function ToggleTopBar({
         </span>
       </button>
 
-      <div className="flex items-center border-b-2 border-border/60 px-1">
+      {/* User menu — sits at same height as active tab */}
+      <div className="flex h-9 items-center rounded-t-xl bg-background px-1">
         <ToolbarUserMenu />
       </div>
     </div>
@@ -114,35 +123,36 @@ export function ToggleLayout() {
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden p-1.5">
-      <div className="flex flex-1 flex-col overflow-hidden rounded-xl bg-background shadow-card">
-        <ToggleTopBar
-          activeView={activeView}
-          currentChatSessionId={currentChatSessionId}
-          resolvedNodeId={renderableNodeId}
-        />
-        <div className="relative flex-1 overflow-hidden">
-        <div className={activeView === 'chat' ? 'flex h-full flex-col' : hiddenViewClass} aria-hidden={activeView !== 'chat'}>
-          {currentChatSessionId ? (
-            <ChatPanel panelId={CHAT_PANEL_ID} sessionId={currentChatSessionId} hideHeader />
-          ) : (
-            <div className="flex flex-1 items-center justify-center text-sm text-foreground-tertiary">
-              Loading chat…
-            </div>
-          )}
-        </div>
+      <ToggleTopBar
+        activeView={activeView}
+        currentChatSessionId={currentChatSessionId}
+        resolvedNodeId={renderableNodeId}
+      />
 
-        <div className={activeView === 'node' ? 'flex h-full flex-col' : hiddenViewClass} aria-hidden={activeView !== 'node'}>
-          {renderableNodeId === null ? (
-            <div className="flex flex-1 items-center justify-center text-sm text-foreground-tertiary">
-              Open the outliner to start.
-            </div>
-          ) : isAppPanel(renderableNodeId) ? (
-            <AppPanel panelId={renderableNodeId as AppPanelId} />
-          ) : (
-            <NodePanel nodeId={renderableNodeId} panelId={NODE_PANEL_ID} />
-          )}
+      <div className="flex flex-1 flex-col overflow-hidden rounded-b-xl bg-background shadow-card">
+        <div className="relative flex-1 overflow-hidden">
+          <div className={activeView === 'chat' ? 'flex h-full flex-col' : hiddenViewClass} aria-hidden={activeView !== 'chat'}>
+            {currentChatSessionId ? (
+              <ChatPanel panelId={CHAT_PANEL_ID} sessionId={currentChatSessionId} hideHeader />
+            ) : (
+              <div className="flex flex-1 items-center justify-center text-sm text-foreground-tertiary">
+                Loading chat…
+              </div>
+            )}
+          </div>
+
+          <div className={activeView === 'node' ? 'flex h-full flex-col' : hiddenViewClass} aria-hidden={activeView !== 'node'}>
+            {renderableNodeId === null ? (
+              <div className="flex flex-1 items-center justify-center text-sm text-foreground-tertiary">
+                Open the outliner to start.
+              </div>
+            ) : isAppPanel(renderableNodeId) ? (
+              <AppPanel panelId={renderableNodeId as AppPanelId} />
+            ) : (
+              <NodePanel nodeId={renderableNodeId} panelId={NODE_PANEL_ID} />
+            )}
+          </div>
         </div>
-      </div>
       </div>
     </div>
   );

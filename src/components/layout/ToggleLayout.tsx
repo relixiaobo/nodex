@@ -74,13 +74,20 @@ function ToggleTopBar({
         className={
           chatActive
             ? 'tab-connector-left tab-connector-right relative z-10 flex h-9 min-w-0 flex-1 items-center gap-1.5 rounded-t-xl bg-background px-3 text-[13px] text-foreground'
-            : 'flex h-9 min-w-0 flex-1 items-center gap-1.5 rounded-lg px-3 text-[13px] text-foreground-tertiary outline-none transition-colors hover:bg-foreground/[0.04] hover:text-foreground'
+            : 'group/tab flex h-9 min-w-0 flex-1 items-center px-1 py-1 outline-none'
         }
       >
-        <MessageSquare size={15} strokeWidth={1.7} className="shrink-0" />
-        <span className="min-w-0 truncate">
-          {chatTitle?.trim() || 'Chat'}
-        </span>
+        {chatActive ? (
+          <>
+            <MessageSquare size={15} strokeWidth={1.7} className="shrink-0" />
+            <span className="min-w-0 truncate">{chatTitle?.trim() || 'Chat'}</span>
+          </>
+        ) : (
+          <span className="flex min-w-0 flex-1 items-center gap-1.5 rounded-lg px-2 py-1 text-[13px] text-foreground-tertiary transition-colors group-hover/tab:bg-foreground/[0.05] group-hover/tab:text-foreground">
+            <MessageSquare size={15} strokeWidth={1.7} className="shrink-0" />
+            <span className="min-w-0 truncate">{chatTitle?.trim() || 'Chat'}</span>
+          </span>
+        )}
       </button>
 
       {/* Node tab */}
@@ -90,13 +97,20 @@ function ToggleTopBar({
         className={
           nodeActive
             ? 'tab-connector-left tab-connector-right relative z-10 flex h-9 min-w-0 flex-1 items-center gap-1.5 rounded-t-xl bg-background px-3 text-[13px] text-foreground'
-            : 'flex h-9 min-w-0 flex-1 items-center gap-1.5 rounded-lg px-3 text-[13px] text-foreground-tertiary outline-none transition-colors hover:bg-foreground/[0.04] hover:text-foreground'
+            : 'group/tab flex h-9 min-w-0 flex-1 items-center px-1 py-1 outline-none'
         }
       >
-        <ListTree size={15} strokeWidth={1.7} className="shrink-0" />
-        <span className="min-w-0 truncate">
-          {nodeTitle}
-        </span>
+        {nodeActive ? (
+          <>
+            <ListTree size={15} strokeWidth={1.7} className="shrink-0" />
+            <span className="min-w-0 truncate">{nodeTitle}</span>
+          </>
+        ) : (
+          <span className="flex min-w-0 flex-1 items-center gap-1.5 rounded-lg px-2 py-1 text-[13px] text-foreground-tertiary transition-colors group-hover/tab:bg-foreground/[0.05] group-hover/tab:text-foreground">
+            <ListTree size={15} strokeWidth={1.7} className="shrink-0" />
+            <span className="min-w-0 truncate">{nodeTitle}</span>
+          </span>
+        )}
       </button>
 
       {/* User menu — outside the card, in warm paper area */}

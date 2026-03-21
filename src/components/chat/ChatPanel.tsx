@@ -70,14 +70,16 @@ export function isToolCallOnlyMessage(message: ChatConversationMessage): message
 
 function mergeToolCallOnlyEntries(entries: ToolCallOnlyEntry[]): ChatMessageEntry {
   const lastEntry = entries[entries.length - 1]!;
-  const thinkingBlocks = entries.flatMap((entry) => entry.message.content.filter((block) => block.type === 'thinking'));
-  const toolCallBlocks = entries.flatMap((entry) => entry.message.content.filter((block) => block.type === 'toolCall'));
+  // Preserve original order of all blocks (thinking + toolCall interleaved)
+  const mergedContent = entries.flatMap((entry) =>
+    entry.message.content.filter((block) => block.type === 'thinking' || block.type === 'toolCall'),
+  );
 
   return {
     ...lastEntry,
     message: {
       ...lastEntry.message,
-      content: [...thinkingBlocks, ...toolCallBlocks],
+      content: mergedContent,
     },
   };
 }

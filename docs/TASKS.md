@@ -18,13 +18,13 @@
 |--------|------|------|------|
 | nodex-claude | — | 空闲 | — |
 | nodex-gemini | — | 空闲 | — |
-| nodex-codex | codex/toggle-layout | Toggle Layout — Chat/Node 双视角切换 (#171) | 待启动 |
+| nodex-codex | — | 空闲 | — |
 
 ---
 
 ## 进行中
 
-- [ ] **Toggle Layout — Chat/Node 双视角切换** (#171, Codex) — 替换多面板为双视角 toggle，顶部栏切换 Chat/Node，状态保持。设计：`docs/plans/layout-design.md`
+（无进行中任务）
 
 ---
 
@@ -125,6 +125,7 @@
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-21 | Toggle Layout — Chat/Node 双视角切换 + 状态保持 | codex | #171 |
 | 2026-03-21 | Node 工具重构 — Tana Paste 统一格式 + search node 创建 | codex | #170 |
 | 2026-03-20 | v0.2.0 发版 — Think with your AI | nodex | — |
 | 2026-03-20 | AI 人格设计文档 + system prompt 重写 + skills 升级 | nodex | — |

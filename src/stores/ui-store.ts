@@ -45,12 +45,7 @@ interface UIStore {
   goForwardNode(): void;
   setCurrentChatSessionId(sessionId: string | null): void;
 
-  // Compatibility wrappers for callers that still use the old navigation naming.
   navigateTo(nodeId: string): void;
-  goBack(): void;
-  goForward(): void;
-  replacePanel(nodeId: string): void;
-  openPanel(nodeId: string): void;
 
   // Expand/collapse (keys are compound: "parentId:nodeId")
   expandedNodes: Set<string>;
@@ -194,18 +189,20 @@ function getTodayDateKey(): string {
   return `${year}-${month}-${day}`;
 }
 
-function resolvePreferredNodeTarget(state: Pick<UIStore, 'currentNodeId' | 'lastVisitDate'>, requestedNodeId?: string): string {
+function resolvePreferredExistingNodeTarget(
+  state: Pick<UIStore, 'currentNodeId' | 'lastVisitDate'>,
+  requestedNodeId?: string,
+): string | null {
   if (requestedNodeId && hasBackingNode(requestedNodeId)) {
     return requestedNodeId;
   }
 
-  const todayId = ensureTodayNode();
   if (!state.currentNodeId || !hasBackingNode(state.currentNodeId)) {
-    return todayId;
+    return null;
   }
 
   if (state.lastVisitDate !== getTodayDateKey()) {
-    return todayId;
+    return null;
   }
 
   return state.currentNodeId;
@@ -309,7 +306,7 @@ export const useUIStore = create<UIStore>()(
 
       switchToNode: (nodeId) =>
         set((s) => {
-          const targetNodeId = resolvePreferredNodeTarget(s, nodeId);
+          const targetNodeId = resolvePreferredExistingNodeTarget(s, nodeId) ?? ensureTodayNode();
           const nextNodeState = pushNodeHistory(s, targetNodeId);
           return {
             activeView: 'node',
@@ -332,6 +329,7 @@ export const useUIStore = create<UIStore>()(
         set((s) => {
           if (!hasBackingNode(nodeId)) return {};
           return {
+            activeView: 'node',
             ...replaceNodeHistory(s, nodeId),
             lastVisitDate: getTodayDateKey(),
             ...clearedFocus(),
@@ -367,33 +365,6 @@ export const useUIStore = create<UIStore>()(
       setCurrentChatSessionId: (sessionId) => set({ currentChatSessionId: sessionId }),
 
       navigateTo: (nodeId) => {
-        if (isChatPanel(nodeId)) {
-          useUIStore.getState().setCurrentChatSessionId(chatPanelSessionId(nodeId));
-          useUIStore.getState().switchToChat();
-          return;
-        }
-        useUIStore.getState().switchToNode(nodeId);
-      },
-
-      goBack: () => useUIStore.getState().goBackNode(),
-      goForward: () => useUIStore.getState().goForwardNode(),
-
-      replacePanel: (nodeId) => {
-        if (isChatPanel(nodeId)) {
-          useUIStore.getState().setCurrentChatSessionId(chatPanelSessionId(nodeId));
-          useUIStore.getState().switchToChat();
-          return;
-        }
-        if (!hasBackingNode(nodeId)) return;
-        set((s) => ({
-          activeView: 'node',
-          lastVisitDate: getTodayDateKey(),
-          ...replaceNodeHistory(s, nodeId),
-          ...clearedFocus(),
-        }));
-      },
-
-      openPanel: (nodeId) => {
         if (isChatPanel(nodeId)) {
           useUIStore.getState().setCurrentChatSessionId(chatPanelSessionId(nodeId));
           useUIStore.getState().switchToChat();

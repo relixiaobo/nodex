@@ -539,7 +539,7 @@ describe('chat ui', () => {
     resetAndSeed();
     await deleteDB(DB_NAME);
     resetChatPersistenceForTests();
-    useUIStore.getState().replacePanel('chat:session-startup');
+    useUIStore.getState().navigateTo('chat:session-startup');
 
     flushSync(() => {
       root.render(React.createElement(ChatPanel, { panelId: 'main', sessionId: 'session-startup' }));

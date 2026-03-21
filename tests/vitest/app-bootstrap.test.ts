@@ -4,10 +4,9 @@ import { createRoot, type Root } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 
-const { mockGetCurrentUser, mockGetStartupPagePreference, mockEnsureChatSession } = vi.hoisted(() => ({
+const { mockGetCurrentUser, mockGetStartupPagePreference } = vi.hoisted(() => ({
   mockGetCurrentUser: vi.fn(),
   mockGetStartupPagePreference: vi.fn(),
-  mockEnsureChatSession: vi.fn<() => Promise<string>>(),
 }));
 
 vi.mock('../../src/lib/auth.js', async () => {
@@ -26,10 +25,6 @@ vi.mock('../../src/lib/startup-page-preference.js', async () => {
     getStartupPagePreference: mockGetStartupPagePreference,
   };
 });
-
-vi.mock('../../src/lib/chat-panel-actions.js', () => ({
-  ensureChatSession: mockEnsureChatSession,
-}));
 
 vi.mock('../../src/hooks/use-nav-undo-keyboard', () => ({
   useNavUndoKeyboard: vi.fn(),
@@ -85,12 +80,7 @@ describe('App bootstrap', () => {
     await useUIStore.persist.rehydrate();
     mockGetCurrentUser.mockReset();
     mockGetStartupPagePreference.mockReset();
-    mockEnsureChatSession.mockReset();
     mockGetStartupPagePreference.mockReturnValue(STARTUP_PAGE.CHAT);
-    mockEnsureChatSession.mockImplementation(async () => {
-      useUIStore.getState().setCurrentChatSessionId('session_bootstrap');
-      return 'session_bootstrap';
-    });
 
     originalChrome = globalThis.chrome;
     vi.stubGlobal('chrome', {
@@ -152,9 +142,7 @@ describe('App bootstrap', () => {
       expect(container.querySelector('[data-testid="toggle-layout"]')).not.toBeNull();
     });
 
-    await vi.waitFor(() => {
-      expect(useUIStore.getState().currentChatSessionId).toBe('session_bootstrap');
-    });
     expect(useUIStore.getState().activeView).toBe('node');
+    expect(useUIStore.getState().currentChatSessionId).toBeNull();
   });
 });

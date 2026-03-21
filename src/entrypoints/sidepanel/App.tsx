@@ -50,7 +50,6 @@ import { ensureSystemNodes } from '../../lib/bootstrap-system-nodes.js';
 import { Toaster, toast } from 'sonner';
 import { TooltipProvider } from '../../components/ui/Tooltip';
 import { isAppPanel, isChatPanel } from '../../types/index.js';
-import { ensureChatSession } from '../../lib/chat-panel-actions.js';
 
 // ─── Error Boundary ───
 // Prevents white screen — catches render errors and shows a recovery UI.
@@ -130,7 +129,7 @@ function useBootstrap(skip: boolean): BootstrapResult {
 
    const { hadSnapshot } = await seedWorkspace(currentWsId);
 
-   // Wait for UIStore persist hydration before checking panel validity
+   // Wait for UIStore persist hydration before checking node-view validity
    // (persist.getItem is async, so the initial render may have stale default state)
    if (!useUIStore.persist.hasHydrated()) {
     await new Promise<void>((resolve) => {
@@ -142,7 +141,6 @@ function useBootstrap(skip: boolean): BootstrapResult {
    // - New users default to Chat unless startup preference explicitly prefers Today
    // - Returning users restore the last active view
    // - First node visit of a new day resets the node view to Today
-   // - Hidden Chat view still gets a session so switching preserves state immediately
    const uiState = useUIStore.getState();
    const today = new Date();
    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
@@ -151,10 +149,6 @@ function useBootstrap(skip: boolean): BootstrapResult {
    const hasInvalidCurrentNode = !!currentNodeId
     && !isAppPanel(currentNodeId)
     && !loroDoc.hasNode(currentNodeId);
-
-   if (!uiState.currentChatSessionId) {
-    void ensureChatSession();
-   }
 
    if (uiState.activeView === 'node') {
     if (hasInvalidCurrentNode || !currentNodeId || isFirstNodeVisitOfDay) {

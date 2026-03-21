@@ -23,7 +23,7 @@ interface NodePanelProps {
 
 export function NodePanel({ nodeId, panelId }: NodePanelProps) {
   const node = useNode(nodeId);
-  const goBack = useUIStore((s) => s.goBack);
+  const goBackNode = useUIStore((s) => s.goBackNode);
 
   if (!node) {
     return (
@@ -32,7 +32,7 @@ export function NodePanel({ nodeId, panelId }: NodePanelProps) {
           <div className="text-sm text-foreground-tertiary">This page is unavailable.</div>
           <button
             type="button"
-            onClick={goBack}
+            onClick={goBackNode}
             className="mt-3 text-sm text-primary hover:underline"
           >
             Go back
@@ -82,13 +82,13 @@ export function NodePanel({ nodeId, panelId }: NodePanelProps) {
 
   const handleDelete = useCallback(() => {
     useNodeStore.getState().trashNode(nodeId);
-    goBack();
-  }, [nodeId, goBack]);
+    goBackNode();
+  }, [nodeId, goBackNode]);
 
   const handleRestore = useCallback(() => {
     useNodeStore.getState().restoreNode(nodeId);
-    goBack();
-  }, [nodeId, goBack]);
+    goBackNode();
+  }, [nodeId, goBackNode]);
 
   const handleHardDelete = useCallback(() => {
     if (!confirmHardDelete) {
@@ -96,8 +96,8 @@ export function NodePanel({ nodeId, panelId }: NodePanelProps) {
       return;
     }
     useNodeStore.getState().hardDeleteNode(nodeId);
-    goBack();
-  }, [confirmHardDelete, nodeId, goBack]);
+    goBackNode();
+  }, [confirmHardDelete, nodeId, goBackNode]);
 
   const handleEmptyTrash = useCallback(() => {
     if (!confirmEmptyTrash) {

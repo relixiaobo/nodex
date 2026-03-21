@@ -33,13 +33,13 @@ describe('ui-store navigation and UI state', () => {
     ui.navigateTo('inbox_3');
     expect(currentNodeId()).toBe('inbox_3');
 
-    ui.goBack();
+    ui.goBackNode();
     expect(currentNodeId()).toBe(todayId);
 
-    ui.goForward();
+    ui.goForwardNode();
     expect(currentNodeId()).toBe('inbox_3');
 
-    ui.replacePanel('note_2');
+    ui.replaceCurrentNode('note_2');
     expect(currentNodeId()).toBe('note_2');
 
     const beforeInvalidNavigate = useUIStore.getState();
@@ -49,7 +49,7 @@ describe('ui-store navigation and UI state', () => {
     expect(state.nodeHistory).toEqual(beforeInvalidNavigate.nodeHistory);
     expect(state.nodeHistoryIndex).toBe(beforeInvalidNavigate.nodeHistoryIndex);
 
-    ui.replacePanel('missing_node_for_panel_navigation');
+    ui.replaceCurrentNode('missing_node_for_panel_navigation');
     state = useUIStore.getState();
     expect(state.currentNodeId).toBe(beforeInvalidNavigate.currentNodeId);
     expect(state.nodeHistory).toEqual(beforeInvalidNavigate.nodeHistory);
@@ -77,7 +77,7 @@ describe('ui-store navigation and UI state', () => {
     expect(useUIStore.getState().searchOpen).toBe(false);
     expect(useUIStore.getState().searchQuery).toBe('');
 
-    ui.openPanel('chat:session_test');
+    ui.navigateTo('chat:session_test');
     expect(useUIStore.getState().activeView).toBe('chat');
     expect(useUIStore.getState().currentChatSessionId).toBe('session_test');
     expect(useUIStore.getState().currentNodeId).toBe('note_2');
@@ -114,9 +114,9 @@ describe('ui-store navigation and UI state', () => {
     expect(useUIStore.getState().nodeHistory).toEqual(['note_1']);
   });
 
-  it('replacePanel seeds the node view when no current node exists', () => {
+  it('replaceCurrentNode seeds the node view when no current node exists', () => {
     resetStores();
-    useUIStore.getState().replacePanel('note_1');
+    useUIStore.getState().replaceCurrentNode('note_1');
 
     const state = useUIStore.getState();
     expect(state.activeView).toBe('node');

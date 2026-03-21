@@ -11,7 +11,7 @@ beforeEach(() => {
   resetAndSeed();
 });
 
-describe('node history wrappers', () => {
+describe('node history navigation', () => {
   it('seed initializes the node view with Today', () => {
     const s = useUIStore.getState();
     expect(s.activeView).toBe('node');
@@ -28,41 +28,41 @@ describe('node history wrappers', () => {
     expect(s.nodeHistoryIndex).toBe(1);
   });
 
-  it('goBack restores the previous node id', () => {
+  it('goBackNode restores the previous node id', () => {
     useUIStore.getState().navigateTo('proj_1');
     useUIStore.getState().navigateTo('note_1');
-    useUIStore.getState().goBack();
+    useUIStore.getState().goBackNode();
 
     expect(currentNodeId()).toBe('proj_1');
   });
 
-  it('goForward restores the forward node id', () => {
+  it('goForwardNode restores the forward node id', () => {
     useUIStore.getState().navigateTo('proj_1');
     useUIStore.getState().navigateTo('note_1');
-    useUIStore.getState().goBack();
-    useUIStore.getState().goForward();
+    useUIStore.getState().goBackNode();
+    useUIStore.getState().goForwardNode();
 
     expect(currentNodeId()).toBe('note_1');
   });
 
-  it('goBack is a no-op at the start of history', () => {
+  it('goBackNode is a no-op at the start of history', () => {
     const todayId = ensureTodayNode();
-    useUIStore.getState().goBack();
+    useUIStore.getState().goBackNode();
     expect(currentNodeId()).toBe(todayId);
   });
 
-  it('goForward is a no-op at the end of history', () => {
+  it('goForwardNode is a no-op at the end of history', () => {
     useUIStore.getState().navigateTo('proj_1');
-    useUIStore.getState().goForward();
+    useUIStore.getState().goForwardNode();
     expect(currentNodeId()).toBe('proj_1');
   });
 
-  it('navigateTo after goBack truncates forward history', () => {
+  it('navigateTo after goBackNode truncates forward history', () => {
     const todayId = ensureTodayNode();
     useUIStore.getState().navigateTo('proj_1');
     useUIStore.getState().navigateTo('note_1');
     useUIStore.getState().navigateTo('note_2');
-    useUIStore.getState().goBack();
+    useUIStore.getState().goBackNode();
     useUIStore.getState().navigateTo('person_1');
 
     expect(currentNodeId()).toBe('person_1');

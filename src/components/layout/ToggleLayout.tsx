@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useSyncExternalStore } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 import { ListTree, MessageSquare } from '../../lib/icons.js';
-import { ensureTodayNode } from '../../lib/journal.js';
 import { getChatTitle, subscribeChatTitles } from '../../lib/ai-service.js';
 import { ensureChatSession } from '../../lib/chat-panel-actions.js';
 import { useNodeStore } from '../../stores/node-store.js';
@@ -18,21 +17,22 @@ function resolveAppPanelTitle(panelId: AppPanelId): string {
   return panelId.replace(/^app:/, '').replace(/^./, (char) => char.toUpperCase());
 }
 
-function useResolvedNodeId(currentNodeId: string | null): string {
-  const version = useNodeStore((s) => s._version);
-
-  return useMemo(() => {
-    void version;
-    if (currentNodeId && (isAppPanel(currentNodeId) || useNodeStore.getState().getNode(currentNodeId))) {
-      return currentNodeId;
-    }
-    return ensureTodayNode();
-  }, [currentNodeId, version]);
-}
-
-function useNodeTitle(nodeId: string): string {
+function useRenderableNodeId(currentNodeId: string | null): string | null {
   return useNodeStore((s) => {
     void s._version;
+    if (currentNodeId && (isAppPanel(currentNodeId) || s.getNode(currentNodeId))) {
+      return currentNodeId;
+    }
+    return null;
+  });
+}
+
+function useNodeTitle(nodeId: string | null): string {
+  return useNodeStore((s) => {
+    void s._version;
+    if (!nodeId) {
+      return 'Outliner';
+    }
     if (isAppPanel(nodeId)) {
       return resolveAppPanelTitle(nodeId);
     }
@@ -49,7 +49,7 @@ function ToggleTopBar({
 }: {
   activeView: 'chat' | 'node';
   currentChatSessionId: string | null;
-  resolvedNodeId: string;
+  resolvedNodeId: string | null;
 }) {
   const switchToChat = useUIStore((s) => s.switchToChat);
   const switchToNode = useUIStore((s) => s.switchToNode);
@@ -106,7 +106,7 @@ export function ToggleLayout() {
   const activeView = useUIStore((s) => s.activeView);
   const currentNodeId = useUIStore((s) => s.currentNodeId);
   const currentChatSessionId = useUIStore((s) => s.currentChatSessionId);
-  const resolvedNodeId = useResolvedNodeId(currentNodeId);
+  const renderableNodeId = useRenderableNodeId(currentNodeId);
 
   useEffect(() => {
     if (!currentChatSessionId) {
@@ -121,7 +121,7 @@ export function ToggleLayout() {
       <ToggleTopBar
         activeView={activeView}
         currentChatSessionId={currentChatSessionId}
-        resolvedNodeId={resolvedNodeId}
+        resolvedNodeId={renderableNodeId}
       />
 
       <div className="relative mt-1.5 flex-1 overflow-hidden rounded-xl bg-background shadow-card">
@@ -136,10 +136,14 @@ export function ToggleLayout() {
         </div>
 
         <div className={activeView === 'node' ? 'flex h-full flex-col' : hiddenViewClass} aria-hidden={activeView !== 'node'}>
-          {isAppPanel(resolvedNodeId) ? (
-            <AppPanel panelId={resolvedNodeId as AppPanelId} />
+          {renderableNodeId === null ? (
+            <div className="flex flex-1 items-center justify-center text-sm text-foreground-tertiary">
+              Open the outliner to start.
+            </div>
+          ) : isAppPanel(renderableNodeId) ? (
+            <AppPanel panelId={renderableNodeId as AppPanelId} />
           ) : (
-            <NodePanel nodeId={resolvedNodeId} panelId={NODE_PANEL_ID} />
+            <NodePanel nodeId={renderableNodeId} panelId={NODE_PANEL_ID} />
           )}
         </div>
       </div>

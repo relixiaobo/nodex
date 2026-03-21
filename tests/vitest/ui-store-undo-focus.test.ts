@@ -11,7 +11,7 @@ describe('ui-store navigation + focus/selection semantics', () => {
     resetAndSeed();
   });
 
-  it('supports goBack/goForward via nodeHistory and truncates forward history on new navigation', () => {
+  it('supports goBackNode/goForwardNode via nodeHistory and truncates forward history on new navigation', () => {
     const ui = useUIStore.getState();
     const todayId = ensureTodayNode();
 
@@ -21,13 +21,13 @@ describe('ui-store navigation + focus/selection semantics', () => {
     ui.navigateTo('task_1');
     expect(currentNodeId()).toBe('task_1');
 
-    ui.goBack();
+    ui.goBackNode();
     expect(currentNodeId()).toBe('note_2');
 
-    ui.goBack();
+    ui.goBackNode();
     expect(currentNodeId()).toBe(todayId);
 
-    ui.goForward();
+    ui.goForwardNode();
     expect(currentNodeId()).toBe('note_2');
 
     ui.navigateTo('inbox_3');
@@ -35,7 +35,7 @@ describe('ui-store navigation + focus/selection semantics', () => {
     expect(state.nodeHistory).toEqual([todayId, 'note_2', 'inbox_3']);
     expect(state.nodeHistoryIndex).toBe(2);
 
-    ui.goForward();
+    ui.goForwardNode();
     expect(useUIStore.getState().nodeHistoryIndex).toBe(2);
     expect(currentNodeId()).toBe('inbox_3');
   });

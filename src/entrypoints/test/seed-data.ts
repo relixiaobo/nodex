@@ -517,7 +517,7 @@ function seedBody(): void {
   uiStore.setExpanded(buildExpandedNodeKey(todayDayId, 'j_leaders'), true, true);
   uiStore.setExpanded(buildExpandedNodeKey(todayDayId, 'j_range'), true, true);
 
-  uiStore.replacePanel(todayDayId);
+  uiStore.replaceCurrentNode(todayDayId);
 }
 
 export async function seedTestData(options?: { forceFresh?: boolean }): Promise<void> {

@@ -1,5 +1,6 @@
 import 'fake-indexeddb/auto';
 import { deleteDB } from 'idb';
+import * as aiPersistence from '../../src/lib/ai-persistence.js';
 import { getChatSession, resetChatPersistenceForTests } from '../../src/lib/ai-persistence.js';
 import { useUIStore } from '../../src/stores/ui-store.js';
 import {
@@ -15,7 +16,7 @@ const DB_NAME = 'soma-ai-chat';
 describe('chat-panel-actions', () => {
   beforeEach(async () => {
     resetAndSeed();
-    useUIStore.getState().replacePanel('proj_1');
+    useUIStore.getState().replaceCurrentNode('proj_1');
     resetChatPersistenceForTests();
     await deleteDB(DB_NAME);
     resetChatPersistenceForTests();
@@ -31,6 +32,19 @@ describe('chat-panel-actions', () => {
 
     const persisted = await getChatSession(sessionId);
     expect(persisted?.id).toBe(sessionId);
+  });
+
+  it('dedupes concurrent ensureChatSession calls into one persisted session', async () => {
+    const saveChatSessionSpy = vi.spyOn(aiPersistence, 'saveChatSession');
+
+    const [firstSessionId, secondSessionId] = await Promise.all([
+      ensureChatSession(),
+      ensureChatSession(),
+    ]);
+
+    expect(firstSessionId).toBe(secondSessionId);
+    expect(saveChatSessionSpy).toHaveBeenCalledTimes(1);
+    expect(useUIStore.getState().currentChatSessionId).toBe(firstSessionId);
   });
 
   it('openChatPanel creates a new persisted session and switches to chat view', async () => {

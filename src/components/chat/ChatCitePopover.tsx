@@ -8,8 +8,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { MessageSquare } from '../../lib/icons.js';
 import { getChatSession } from '../../lib/ai-persistence.js';
 import { getLinearPath, type ChatSession } from '../../lib/ai-chat-tree.js';
-import { useUIStore } from '../../stores/ui-store.js';
-import { CHAT_PANEL_PREFIX } from '../../types/index.js';
+import { switchToChatSession } from '../../lib/chat-panel-actions.js';
 import { PopoverShell } from './PopoverShell.js';
 
 const SYSTEM_REMINDER_PATTERN = /<system-reminder>[\s\S]*?<\/system-reminder>/g;
@@ -78,7 +77,6 @@ function formatDate(timestamp: number): string {
 export function ChatCitePopover({ sessionId, anchorRect, onClose }: ChatCitePopoverProps) {
   const [preview, setPreview] = useState<SessionPreview | null>(null);
   const [notFound, setNotFound] = useState(false);
-  const openPanel = useUIStore((s) => s.openPanel);
 
   useEffect(() => {
     let cancelled = false;
@@ -94,9 +92,9 @@ export function ChatCitePopover({ sessionId, anchorRect, onClose }: ChatCitePopo
   }, [sessionId]);
 
   const handleOpenChat = useCallback(() => {
-    openPanel(`${CHAT_PANEL_PREFIX}${sessionId}`);
+    switchToChatSession(sessionId);
     onClose();
-  }, [openPanel, sessionId, onClose]);
+  }, [sessionId, onClose]);
 
   return (
     <PopoverShell anchorRect={anchorRect} onClose={onClose}>

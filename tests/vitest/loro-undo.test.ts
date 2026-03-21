@@ -203,7 +203,7 @@ describe('UI marker → undoDoc/redoDoc', () => {
     expect(canUndoDoc()).toBe(false);
   });
 
-  it('replacePanel 种子导航不会创建 undo step', () => {
+  it('replaceCurrentNode 种子导航不会创建 undo step', () => {
     const ui = useUIStore.getState();
     const todayId = ensureTodayNode();
 
@@ -214,7 +214,7 @@ describe('UI marker → undoDoc/redoDoc', () => {
       nodeHistoryIndex: -1,
     });
 
-    ui.replacePanel(todayId);
+    ui.replaceCurrentNode(todayId);
     expect(useUIStore.getState().currentNodeId).toBe(todayId);
     expect(canUndoDoc()).toBe(false);
     const before = {

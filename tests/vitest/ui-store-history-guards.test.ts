@@ -23,27 +23,27 @@ describe('ui-store history guard behaviors', () => {
     expect(after.nodeHistoryIndex).toBe(before.nodeHistoryIndex);
   });
 
-  it('goBack/goForward at boundaries are no-ops', () => {
+  it('goBackNode/goForwardNode at boundaries are no-ops', () => {
     const ui = useUIStore.getState();
 
     const beforeBack = useUIStore.getState();
-    ui.goBack();
+    ui.goBackNode();
     const afterBack = useUIStore.getState();
     expect(afterBack.nodeHistoryIndex).toBe(beforeBack.nodeHistoryIndex);
     expect(afterBack.nodeHistory).toEqual(beforeBack.nodeHistory);
 
     ui.navigateTo('note_2');
     const beforeForward = useUIStore.getState();
-    ui.goForward();
+    ui.goForwardNode();
     const afterForward = useUIStore.getState();
     expect(afterForward.nodeHistoryIndex).toBe(beforeForward.nodeHistoryIndex);
     expect(afterForward.nodeHistory).toEqual(beforeForward.nodeHistory);
   });
 
-  it('replacePanel seeds the node view when state is empty', () => {
+  it('replaceCurrentNode seeds the node view when state is empty', () => {
     resetStores();
     const ui = useUIStore.getState();
-    ui.replacePanel('note_1');
+    ui.replaceCurrentNode('note_1');
 
     const state = useUIStore.getState();
     expect(state.activeView).toBe('node');

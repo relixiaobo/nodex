@@ -2,6 +2,8 @@ import { createSession } from './ai-chat-tree.js';
 import { saveChatSession } from './ai-persistence.js';
 import { useUIStore } from '../stores/ui-store.js';
 
+let pendingEnsureChatSession: Promise<string> | null = null;
+
 async function createChatSession(): Promise<string> {
   const session = createSession();
   try {
@@ -13,22 +15,41 @@ async function createChatSession(): Promise<string> {
   return session.id;
 }
 
+function selectChatSession(sessionId: string, switchView: boolean): void {
+  const ui = useUIStore.getState();
+  ui.setCurrentChatSessionId(sessionId);
+  if (switchView) {
+    ui.switchToChat();
+  }
+}
+
 export async function ensureChatSession(): Promise<string> {
   const existingSessionId = useUIStore.getState().currentChatSessionId;
   if (existingSessionId) {
     return existingSessionId;
   }
 
-  const sessionId = await createChatSession();
-  useUIStore.getState().setCurrentChatSessionId(sessionId);
-  return sessionId;
+  if (!pendingEnsureChatSession) {
+    pendingEnsureChatSession = createChatSession()
+      .then((sessionId) => {
+        const currentSessionId = useUIStore.getState().currentChatSessionId;
+        if (!currentSessionId) {
+          selectChatSession(sessionId, false);
+          return sessionId;
+        }
+        return currentSessionId;
+      })
+      .finally(() => {
+        pendingEnsureChatSession = null;
+      });
+  }
+
+  return pendingEnsureChatSession;
 }
 
 export async function openChatPanel(): Promise<string> {
   const sessionId = await createChatSession();
-  const ui = useUIStore.getState();
-  ui.setCurrentChatSessionId(sessionId);
-  ui.switchToChat();
+  selectChatSession(sessionId, true);
   return sessionId;
 }
 
@@ -43,9 +64,7 @@ export async function focusOrOpenChat(): Promise<void> {
 }
 
 export function switchToChatSession(sessionId: string): void {
-  const ui = useUIStore.getState();
-  ui.setCurrentChatSessionId(sessionId);
-  ui.switchToChat();
+  selectChatSession(sessionId, true);
 }
 
 export async function openChatWithPrompt(prompt: string): Promise<void> {
@@ -54,8 +73,7 @@ export async function openChatWithPrompt(prompt: string): Promise<void> {
 
   if (!sessionId) {
     sessionId = await createChatSession();
-    ui.setCurrentChatSessionId(sessionId);
-    ui.switchToChat();
+    selectChatSession(sessionId, true);
   } else {
     ui.switchToChat();
   }

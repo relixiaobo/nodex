@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { editTool } from '../../src/lib/ai-tools/edit-tool.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
+import { SYSTEM_NODE_IDS } from '../../src/types/index.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
 async function executeEdit(params: Record<string, unknown>) {
@@ -148,5 +149,137 @@ describe('node_edit tool', () => {
       nodeId: 'search_task',
       text: 'New search text',
     } as never)).rejects.toThrow('Editing search node rules via node_edit is not supported yet');
+  });
+
+  // ─── mergeFrom tests ───
+
+  it('merges source children into target and trashes source', async () => {
+    // note_2 has children: idea_1, idea_2
+    // note_1 has children: note_1a, note_1b, note_1c
+    const targetChildrenBefore = loroDoc.getChildren('note_1').length;
+
+    const result = await executeEdit({
+      nodeId: 'note_1',
+      mergeFrom: 'note_2',
+    });
+
+    expect(result.status).toBe('updated');
+    expect(result.merged).toBeTruthy();
+    expect(result.merged.from).toBe('note_2');
+    expect(result.merged.childrenMoved).toBe(2); // idea_1, idea_2
+
+    // Children moved to target
+    const targetChildren = loroDoc.getChildren('note_1');
+    expect(targetChildren.length).toBe(targetChildrenBefore + 2);
+    expect(targetChildren).toContain('idea_1');
+    expect(targetChildren).toContain('idea_2');
+
+    // Source trashed
+    expect(loroDoc.getParentId('note_2')).toBe(SYSTEM_NODE_IDS.TRASH);
+  });
+
+  it('merges tags from source to target (deduplicated)', async () => {
+    // task_1 has tag: tagDef_task
+    // meeting_1 has tag: tagDef_meeting
+    const result = await executeEdit({
+      nodeId: 'task_1',
+      mergeFrom: 'meeting_1',
+    });
+
+    expect(result.merged.tagsMerged).toBe(1);
+    const targetTags = loroDoc.toNodexNode('task_1')?.tags ?? [];
+    expect(targetTags).toContain('tagDef_task');
+    expect(targetTags).toContain('tagDef_meeting');
+  });
+
+  it('merges field entries with same fieldDefId by combining values', async () => {
+    // Both task_1 and task_2 need the same tag so they have matching field entries.
+    // First, set a field value on task_1 and task_2 for Status field.
+    await executeEdit({ nodeId: 'task_1', text: 'Status:: Done' });
+
+    // Apply task tag to task_2 so it has fieldEntries, then set Status
+    await executeEdit({ nodeId: 'task_2', text: '#task\nStatus:: In Progress' });
+
+    // Find the Status fieldEntry values before merge
+    const task1StatusFeBefore = loroDoc.getChildren('task_1')
+      .find((cid) => {
+        const c = loroDoc.toNodexNode(cid);
+        return c?.type === 'fieldEntry' && c.fieldDefId === 'attrDef_status';
+      });
+    expect(task1StatusFeBefore).toBeTruthy();
+    const valuesBefore = loroDoc.getChildren(task1StatusFeBefore!).length;
+
+    const result = await executeEdit({
+      nodeId: 'task_1',
+      mergeFrom: 'task_2',
+    });
+
+    expect(result.merged.fieldsMerged).toBeGreaterThan(0);
+
+    // Check that the Status fieldEntry on task_1 now has combined values
+    const task1StatusFeAfter = loroDoc.getChildren('task_1')
+      .find((cid) => {
+        const c = loroDoc.toNodexNode(cid);
+        return c?.type === 'fieldEntry' && c.fieldDefId === 'attrDef_status';
+      });
+    expect(task1StatusFeAfter).toBeTruthy();
+    const valuesAfter = loroDoc.getChildren(task1StatusFeAfter!).length;
+    expect(valuesAfter).toBeGreaterThan(valuesBefore);
+  });
+
+  it('redirects reference nodes pointing to source', async () => {
+    // Create a reference node pointing to note_2
+    loroDoc.createNode('ref_to_note2', 'note_1');
+    loroDoc.setNodeDataBatch('ref_to_note2', { type: 'reference', targetId: 'note_2' });
+    loroDoc.commitDoc();
+
+    const result = await executeEdit({
+      nodeId: 'note_1',
+      mergeFrom: 'note_2',
+    });
+
+    expect(result.merged.referencesRedirected).toBeGreaterThanOrEqual(1);
+    // Reference now points to target
+    const refNode = loroDoc.toNodexNode('ref_to_note2');
+    expect(refNode?.targetId).toBe('note_1');
+  });
+
+  it('redirects inline references pointing to source', async () => {
+    // si_mm_dte_1 has an inline ref pointing to si_mm_sot
+    // Merge si_mm_sot into note_1 — the inline ref should redirect
+    const before = loroDoc.toNodexNode('si_mm_dte_1');
+    expect(before?.inlineRefs?.some((r) => r.targetNodeId === 'si_mm_sot')).toBe(true);
+
+    const result = await executeEdit({
+      nodeId: 'note_1',
+      mergeFrom: 'si_mm_sot',
+    });
+
+    expect(result.merged.referencesRedirected).toBeGreaterThanOrEqual(1);
+    const after = loroDoc.toNodexNode('si_mm_dte_1');
+    expect(after?.inlineRefs?.some((r) => r.targetNodeId === 'note_1')).toBe(true);
+    expect(after?.inlineRefs?.some((r) => r.targetNodeId === 'si_mm_sot')).toBe(false);
+  });
+
+  it('rejects mergeFrom + text used simultaneously', async () => {
+    await expect(editTool.execute('tool_edit', {
+      nodeId: 'note_1',
+      mergeFrom: 'note_2',
+      text: 'New name',
+    } as never)).rejects.toThrow('mergeFrom and text cannot be used together');
+  });
+
+  it('rejects mergeFrom with non-existent source', async () => {
+    await expect(editTool.execute('tool_edit', {
+      nodeId: 'note_1',
+      mergeFrom: 'nonexistent_node',
+    } as never)).rejects.toThrow('Source node not found');
+  });
+
+  it('rejects merging locked/system nodes', async () => {
+    await expect(editTool.execute('tool_edit', {
+      nodeId: 'note_1',
+      mergeFrom: SYSTEM_NODE_IDS.TRASH,
+    } as never)).rejects.toThrow('Cannot merge from locked/system node');
   });
 });

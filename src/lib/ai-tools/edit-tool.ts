@@ -6,6 +6,8 @@ import { Type } from '@mariozechner/pi-ai';
 import * as loroDoc from '../loro-doc.js';
 import { AI_COMMIT_ORIGIN, commitDoc, withCommitOrigin } from '../loro-doc.js';
 import { useNodeStore } from '../../stores/node-store.js';
+import { applyTagMutationsNoCommit, syncTemplateMutationsNoCommit } from '../../stores/node-store.js';
+import { isLockedNode } from '../node-capabilities.js';
 import {
   findTagDefIdByName,
   formatResultText,
@@ -39,9 +41,10 @@ const editToolParameters = Type.Object({
     'Add children without rename: "#task\\n  - Subtask 1\\n  - Subtask 2"',
   ].join('\n') })),
   removeTags: Type.Optional(Type.Array(Type.String(), { description: 'Tag display names to remove from the node.' })),
-  data: Type.Optional(Type.Record(Type.String(), Type.Unknown(), { description: 'Optional non-content node properties such as description, color, codeLanguage, or showCheckbox.' })),
+  data: Type.Optional(Type.Record(Type.String(), Type.Unknown(), { description: 'Non-content node properties. Common: description, color, showCheckbox, codeLanguage. For fieldDef nodes: fieldType ("plain"|"options"|"date"|"url"|"number"|"email"|"checkbox"|"boolean"), cardinality. Cannot set id, name, children, tags, or timestamps.' })),
   parentId: Type.Optional(Type.String({ description: 'Move to this parent. If afterId is also provided, it must match the sibling parent.' })),
   afterId: Type.Optional(Type.String({ description: 'Move after this sibling node.' })),
+  mergeFrom: Type.Optional(Type.String({ description: 'Merge another node into this one. Source children, tags, and fields are absorbed into nodeId. All references to the source are redirected to nodeId. Source is moved to trash.' })),
 });
 
 type EditToolParams = typeof editToolParameters.static;
@@ -115,6 +118,131 @@ function resolveMoveTarget(parentId: string | undefined, afterId: string | undef
   };
 }
 
+// ─── Merge logic ───
+
+interface MergeResult {
+  from: string;
+  childrenMoved: number;
+  tagsMerged: number;
+  fieldsMerged: number;
+  referencesRedirected: number;
+}
+
+function executeMergeNoCommit(targetId: string, sourceId: string): MergeResult {
+  const targetNode = loroDoc.toNodexNode(targetId);
+  if (!targetNode) {
+    throw new Error(`Target node not found: ${targetId}. Use node_search to find the correct ID.`);
+  }
+  const sourceNode = loroDoc.toNodexNode(sourceId);
+  if (!sourceNode) {
+    throw new Error(`Source node not found: ${sourceId}. Use node_search to find the correct ID.`);
+  }
+  if (isLockedNode(targetId)) {
+    throw new Error(`Cannot merge into locked/system node: ${targetId}.`);
+  }
+  if (isLockedNode(sourceId)) {
+    throw new Error(`Cannot merge from locked/system node: ${sourceId}.`);
+  }
+  if (targetId === sourceId) {
+    throw new Error('Cannot merge a node into itself.');
+  }
+
+  const store = useNodeStore.getState();
+
+  // 1. Categorize source children into content vs field entries
+  const sourceChildren = loroDoc.getChildren(sourceId);
+  const contentChildren: string[] = [];
+  const sourceFieldEntries: string[] = [];
+  for (const childId of sourceChildren) {
+    const child = loroDoc.toNodexNode(childId);
+    if (!child) continue;
+    if (child.type === 'fieldEntry') {
+      sourceFieldEntries.push(childId);
+    } else {
+      contentChildren.push(childId);
+    }
+  }
+
+  // 2. Move content children from source to target
+  for (const childId of contentChildren) {
+    store.moveNodeTo(childId, targetId, undefined, { commit: false });
+  }
+
+  // 3. Merge tags from source to target (deduplicated)
+  let tagsMerged = 0;
+  const targetTags = new Set(targetNode.tags ?? []);
+  for (const tagDefId of sourceNode.tags ?? []) {
+    if (!targetTags.has(tagDefId)) {
+      applyTagMutationsNoCommit(targetId, tagDefId);
+      syncTemplateMutationsNoCommit(targetId);
+      tagsMerged++;
+    }
+  }
+
+  // 4. Merge field entries
+  const targetChildren = loroDoc.getChildren(targetId);
+  const targetFieldMap = new Map<string, string>(); // fieldDefId → fieldEntryId
+  for (const childId of targetChildren) {
+    const child = loroDoc.toNodexNode(childId);
+    if (child?.type === 'fieldEntry' && child.fieldDefId) {
+      targetFieldMap.set(child.fieldDefId, child.id);
+    }
+  }
+
+  for (const feId of sourceFieldEntries) {
+    const fe = loroDoc.toNodexNode(feId);
+    if (!fe?.fieldDefId) continue;
+
+    const existingTargetFe = targetFieldMap.get(fe.fieldDefId);
+    if (existingTargetFe) {
+      // Move source field values into existing target field entry
+      const sourceValues = loroDoc.getChildren(feId);
+      for (const valueId of sourceValues) {
+        store.moveNodeTo(valueId, existingTargetFe, undefined, { commit: false });
+      }
+    } else {
+      // Move entire field entry to target
+      store.moveNodeTo(feId, targetId, undefined, { commit: false });
+    }
+  }
+
+  // 5. Redirect references: scan ALL nodes, find reference nodes pointing to source
+  let referencesRedirected = 0;
+  const allNodeIds = loroDoc.getAllNodeIds();
+  for (const id of allNodeIds) {
+    const node = loroDoc.toNodexNode(id);
+    if (node?.type === 'reference' && node.targetId === sourceId) {
+      loroDoc.setNodeData(id, 'targetId', targetId);
+      referencesRedirected++;
+    }
+  }
+
+  // 6. Redirect inline references
+  for (const id of allNodeIds) {
+    const node = loroDoc.toNodexNode(id);
+    if (!node?.inlineRefs?.length) continue;
+    const hasSourceRef = node.inlineRefs.some((ref) => ref.targetNodeId === sourceId);
+    if (hasSourceRef) {
+      const updatedRefs = node.inlineRefs.map((ref) =>
+        ref.targetNodeId === sourceId ? { ...ref, targetNodeId: targetId } : ref,
+      );
+      loroDoc.setNodeRichTextContent(id, node.name ?? '', node.marks ?? [], updatedRefs);
+      referencesRedirected++;
+    }
+  }
+
+  // 7. Trash the source node
+  store.trashNode(sourceId, { commit: false });
+
+  return {
+    from: sourceId,
+    childrenMoved: contentChildren.length,
+    tagsMerged,
+    fieldsMerged: sourceFieldEntries.length,
+    referencesRedirected,
+  };
+}
+
 async function executeEditTool(params: EditToolParams): Promise<AgentToolResult<unknown>> {
   const node = loroDoc.toNodexNode(params.nodeId);
   if (!node) {
@@ -122,6 +250,9 @@ async function executeEditTool(params: EditToolParams): Promise<AgentToolResult<
   }
   if (node.type === 'search' && params.text?.trim()) {
     throw new Error('Editing search node rules via node_edit is not supported yet. Recreate the search node with node_create(type: "search").');
+  }
+  if (params.mergeFrom && params.text?.trim()) {
+    throw new Error('mergeFrom and text cannot be used together — merge changes node structure, simultaneous text edits would be confusing.');
   }
 
   const before = snapshotNodeState(params.nodeId);
@@ -132,9 +263,16 @@ async function executeEditTool(params: EditToolParams): Promise<AgentToolResult<
   let createdFields: string[] = [];
   let unresolvedFields: string[] = [];
   let shouldCommit = false;
+  let mergeResult: MergeResult | null = null;
 
   withCommitOrigin(AI_COMMIT_ORIGIN, () => {
     const store = useNodeStore.getState();
+
+    // Run merge BEFORE other edits
+    if (params.mergeFrom) {
+      shouldCommit = true;
+      mergeResult = executeMergeNoCommit(params.nodeId, params.mergeFrom);
+    }
 
     if (params.text?.trim()) {
       shouldCommit = true;
@@ -203,16 +341,20 @@ async function executeEditTool(params: EditToolParams): Promise<AgentToolResult<
   }
 
   const freshName = freshNode?.name ?? '';
-  if (updated.size > 0) {
+  if (updated.size > 0 || mergeResult) {
     pushAiOp('node_edit', params.nodeId, freshName);
   }
 
   const result: Record<string, unknown> = {
-    status: updated.size > 0 ? 'updated' : 'unchanged',
+    status: (updated.size > 0 || mergeResult) ? 'updated' : 'unchanged',
     updated: Array.from(updated),
   };
 
-  if (updated.size === 0) {
+  if (mergeResult) {
+    result.merged = mergeResult;
+  }
+
+  if (updated.size === 0 && !mergeResult) {
     result.nextStep = 'Change the requested values or send only the mutations you still want to apply.';
     result.fallback = 'If you expected a change, read the node again and compare the current state before retrying.';
     result.hint = 'No changes applied — all provided values match the current state.';
@@ -250,6 +392,8 @@ export const editTool: AgentTool<typeof editToolParameters, unknown> = {
     'Use removeTags to remove tags (text cannot express deletion).',
     'Use parentId + afterId to move the node.',
     'Use data for non-content properties (description, color, codeLanguage, showCheckbox).',
+    'Use mergeFrom to merge another node into this one — children, tags, fields are combined,',
+    'all references to the source are redirected, and the source is trashed.',
     'Search node rule editing is not supported — delete and recreate with node_create(type: "search").',
     '',
     'All write operations are undoable with the undo tool.',

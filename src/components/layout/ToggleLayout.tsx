@@ -73,7 +73,7 @@ function ToggleTopBar({
         onClick={() => switchToChat()}
         className={
           chatActive
-            ? 'tab-connector-left tab-connector-right relative z-10 flex h-9 min-w-0 flex-1 items-center gap-1.5 rounded-t-xl bg-background pl-3 pr-2 text-[13px] text-foreground'
+            ? 'tab-connector-left tab-connector-right relative z-10 flex h-9 min-w-0 flex-1 items-center gap-1.5 rounded-t-xl bg-background px-3 text-[13px] text-foreground'
             : 'flex h-9 min-w-0 flex-1 items-center gap-1.5 px-3 text-[13px] text-foreground-tertiary transition-colors hover:text-foreground'
         }
       >
@@ -89,7 +89,7 @@ function ToggleTopBar({
         onClick={() => switchToNode()}
         className={
           nodeActive
-            ? 'tab-connector-left tab-connector-right relative z-10 flex h-9 min-w-0 flex-1 items-center gap-1.5 rounded-t-xl bg-background pl-3 pr-2 text-[13px] text-foreground'
+            ? 'tab-connector-left tab-connector-right relative z-10 flex h-9 min-w-0 flex-1 items-center gap-1.5 rounded-t-xl bg-background px-3 text-[13px] text-foreground'
             : 'flex h-9 min-w-0 flex-1 items-center gap-1.5 px-3 text-[13px] text-foreground-tertiary transition-colors hover:text-foreground'
         }
       >

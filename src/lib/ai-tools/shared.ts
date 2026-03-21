@@ -14,6 +14,7 @@ import { isOutlinerContentNodeType } from '../node-type-utils.js';
 import { resolveDataType } from '../field-utils.js';
 import { computeNodeFields } from '../../hooks/use-node-fields.js';
 import { applyTagMutationsNoCommit, syncTemplateMutationsNoCommit, useNodeStore } from '../../stores/node-store.js';
+import type { ParsedTanaPasteField, ParsedTanaPasteValue } from './tana-paste-parser.js';
 
 // ─── Constants ───
 
@@ -182,6 +183,21 @@ function findFieldDefByName(nodeId: string, fieldName: string): string | null {
   return null;
 }
 
+export function findFieldDefIdInSchema(fieldName: string): string | null {
+  const normalized = fieldName.trim().toLowerCase();
+  for (const tagDefId of loroDoc.getChildren(SYSTEM_NODE_IDS.SCHEMA)) {
+    const tagDef = loroDoc.toNodexNode(tagDefId);
+    if (tagDef?.type !== 'tagDef') continue;
+    for (const childId of loroDoc.getChildren(tagDefId)) {
+      const child = loroDoc.toNodexNode(childId);
+      if (child?.type === 'fieldDef' && (child.name ?? '').trim().toLowerCase() === normalized) {
+        return child.id;
+      }
+    }
+  }
+  return null;
+}
+
 /**
  * Find the fieldEntry ID for a given fieldDef on a node.
  */
@@ -209,6 +225,39 @@ function findOptionByName(fieldDefId: string, optionName: string): string | null
     }
   }
   return null;
+}
+
+function ensureFieldEntryIdNoCommit(nodeId: string, fieldDefId: string): string {
+  const existing = findFieldEntryId(nodeId, fieldDefId);
+  if (existing) return existing;
+  const fieldEntryId = nanoid();
+  loroDoc.createNode(fieldEntryId, nodeId);
+  loroDoc.setNodeDataBatch(fieldEntryId, { type: 'fieldEntry', fieldDefId });
+  return fieldEntryId;
+}
+
+function clearFieldEntryChildrenNoCommit(fieldEntryId: string): void {
+  const oldChildren = loroDoc.getChildren(fieldEntryId);
+  for (const oldId of oldChildren) {
+    loroDoc.deleteNode(oldId);
+  }
+}
+
+function createValueNodeNoCommit(parentId: string, value: ParsedTanaPasteValue): void {
+  const valueNodeId = nanoid();
+  loroDoc.createNode(valueNodeId, parentId);
+
+  if (value.targetId) {
+    loroDoc.setNodeData(valueNodeId, 'targetId', value.targetId);
+    return;
+  }
+
+  if (value.inlineRefs.length > 0) {
+    loroDoc.setNodeRichTextContent(valueNodeId, value.text, [], value.inlineRefs);
+    return;
+  }
+
+  loroDoc.setNodeData(valueNodeId, 'name', value.text);
 }
 
 export interface FieldSetResult {
@@ -270,6 +319,94 @@ function createFieldDefNoCommit(fieldName: string, tagDefId: string, value: stri
   return id;
 }
 
+function ensureFieldDefIdForNode(
+  nodeId: string,
+  fieldName: string,
+  sampleValue: string,
+): { fieldDefId: string | null; created: boolean } {
+  let fieldDefId = findFieldDefByName(nodeId, fieldName);
+  if (fieldDefId) {
+    return { fieldDefId, created: false };
+  }
+
+  const node = loroDoc.toNodexNode(nodeId);
+  const firstTagId = node?.tags?.[0];
+  if (!firstTagId) {
+    return { fieldDefId: null, created: false };
+  }
+
+  fieldDefId = createFieldDefNoCommit(fieldName, firstTagId, sampleValue);
+  syncTemplateMutationsNoCommit(nodeId);
+  return { fieldDefId, created: true };
+}
+
+function setFieldValuesNoCommit(
+  nodeId: string,
+  fieldDefId: string,
+  values: ParsedTanaPasteValue[],
+): void {
+  const dataType = resolveDataType(fieldDefId);
+  const fieldEntryId = ensureFieldEntryIdNoCommit(nodeId, fieldDefId);
+  clearFieldEntryChildrenNoCommit(fieldEntryId);
+
+  if (values.length === 0) {
+    return;
+  }
+
+  const shouldUseOptionsTargets = (
+    dataType === FIELD_TYPES.OPTIONS || dataType === FIELD_TYPES.OPTIONS_FROM_SUPERTAG
+  ) && values.every((value) => !value.targetId && value.inlineRefs.length === 0);
+
+  if (shouldUseOptionsTargets) {
+    for (const value of values) {
+      const optionName = value.text.trim();
+      if (!optionName) continue;
+      let optionId = findOptionByName(fieldDefId, optionName);
+      if (!optionId) {
+        optionId = nanoid();
+        loroDoc.createNode(optionId, fieldDefId);
+        loroDoc.setNodeDataBatch(optionId, { name: optionName, autoCollected: true });
+      }
+
+      const valueNodeId = nanoid();
+      loroDoc.createNode(valueNodeId, fieldEntryId);
+      loroDoc.setNodeData(valueNodeId, 'targetId', optionId);
+    }
+    return;
+  }
+
+  for (const value of values) {
+    createValueNodeNoCommit(fieldEntryId, value);
+  }
+}
+
+export function resolveAndApplyFieldMutationsNoCommit(
+  nodeId: string,
+  fields: ParsedTanaPasteField[],
+): FieldSetResult {
+  const resolved: string[] = [];
+  const created: string[] = [];
+  const unresolved: string[] = [];
+
+  for (const field of fields) {
+    const sampleValue = field.values[0]?.text ?? '';
+    const ensured = ensureFieldDefIdForNode(nodeId, field.name, sampleValue);
+    if (!ensured.fieldDefId) {
+      unresolved.push(field.name);
+      continue;
+    }
+
+    if (ensured.created) {
+      created.push(field.name);
+    }
+
+    setFieldValuesNoCommit(nodeId, ensured.fieldDefId, field.clear ? [] : field.values);
+    resolved.push(field.name);
+  }
+
+  return { resolved, created, unresolved };
+}
+
 /**
  * Resolve and set fields on a node by display name → value.
  * Handles type dispatch: options → selectFieldOption + autoCollect; plain → setFieldValue.
@@ -284,56 +421,36 @@ export function resolveAndSetFields(
   nodeId: string,
   fields: Record<string, string>,
 ): FieldSetResult {
-  const store = useNodeStore.getState();
-  const resolved: string[] = [];
-  const created: string[] = [];
-  const unresolved: string[] = [];
+  const parsedFields: ParsedTanaPasteField[] = Object.entries(fields).map(([fieldName, value]) => ({
+    name: fieldName,
+    values: [{ text: value, inlineRefs: [] }],
+    clear: false,
+  }));
+  return resolveAndApplyFieldMutationsNoCommit(nodeId, parsedFields);
+}
 
-  for (const [fieldName, value] of Object.entries(fields)) {
-    let fieldDefId = findFieldDefByName(nodeId, fieldName);
+export interface ParsedSortBy {
+  field: 'relevance' | 'created' | 'modified' | 'name' | 'refCount';
+  order: 'asc' | 'desc';
+}
 
-    // Auto-create: if field doesn't exist but node has a tag, create the fieldDef
-    if (!fieldDefId) {
-      const node = loroDoc.toNodexNode(nodeId);
-      const firstTagId = node?.tags?.[0];
-      if (firstTagId) {
-        fieldDefId = createFieldDefNoCommit(fieldName, firstTagId, value);
-        // Sync template so the node picks up the new field definition
-        syncTemplateMutationsNoCommit(nodeId);
-        created.push(fieldName);
-      } else {
-        unresolved.push(fieldName);
-        continue;
-      }
-    }
+export function parseSortBy(sortBy: string | undefined): ParsedSortBy | null {
+  if (!sortBy) return null;
+  const trimmed = sortBy.trim();
+  if (!trimmed) return null;
 
-    const dataType = resolveDataType(fieldDefId);
-
-    if (dataType === FIELD_TYPES.OPTIONS || dataType === FIELD_TYPES.OPTIONS_FROM_SUPERTAG) {
-      // Options field: find or auto-collect the option, then select it
-      const feId = findFieldEntryId(nodeId, fieldDefId);
-      const existingOption = findOptionByName(fieldDefId, value);
-
-      if (existingOption) {
-        // Option exists — select it via the fieldEntry
-        if (feId) {
-          store.selectFieldOption(feId, existingOption);
-        } else {
-          // No fieldEntry yet — use setOptionsFieldValue which creates one
-          store.setOptionsFieldValue(nodeId, fieldDefId, existingOption);
-        }
-      } else {
-        // Option doesn't exist — auto-collect (creates option + sets value)
-        store.autoCollectOption(nodeId, fieldDefId, value.trim());
-      }
-    } else {
-      // Plain/URL/password/etc — set as text value
-      store.setFieldValue(nodeId, fieldDefId, [value]);
-    }
-    resolved.push(fieldName);
+  const [rawField, rawOrder] = trimmed.split(':');
+  const field = rawField?.trim() as ParsedSortBy['field'] | undefined;
+  if (!field || !['relevance', 'created', 'modified', 'name', 'refCount'].includes(field)) {
+    throw new Error(`Invalid sortBy field: ${rawField}`);
   }
 
-  return { resolved, created, unresolved };
+  const order = (rawOrder?.trim() || 'desc') as ParsedSortBy['order'];
+  if (order !== 'asc' && order !== 'desc') {
+    throw new Error(`Invalid sortBy order: ${rawOrder}`);
+  }
+
+  return { field, order };
 }
 
 // ─── AI operation log (for undo reporting) ───

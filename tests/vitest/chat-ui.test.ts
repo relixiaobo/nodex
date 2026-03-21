@@ -376,7 +376,7 @@ describe('chat ui', () => {
     expect(html).not.toContain('<strong>');
   });
 
-  it('shows streaming cursor on the last text block', () => {
+  it('does not render the legacy inline streaming cursor on the last text block', () => {
     const html = renderToStaticMarkup(
       React.createElement(ChatMessage, {
         entry: {
@@ -396,8 +396,10 @@ describe('chat ui', () => {
         streaming: true,
       }),
     );
-    expect(html).toContain('animate-pulse');
-    expect(html).toContain('bg-primary');
+    expect(html).toContain('Streaming response...');
+    expect(html).toContain('chat-prose');
+    expect(html).not.toContain('animate-pulse');
+    expect(html).not.toContain('bg-primary');
   });
 
   it('keeps composer in working state without turning it into a stop action', () => {

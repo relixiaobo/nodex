@@ -19,8 +19,7 @@ describe('undo tool', () => {
 
     const aiNode = await createTool.execute('tool_create', {
       parentId: 'proj_1',
-      name: 'AI note',
-      tags: ['meeting'],
+      text: 'AI note #meeting',
     } as never);
 
     expect(loroDoc.getChildren('proj_1')).toContain(userNode.id);
@@ -46,8 +45,7 @@ describe('undo tool', () => {
 
     await editTool.execute('tool_edit', {
       nodeId: 'task_1',
-      name: 'Design the graph model',
-      addTags: ['meeting'],
+      text: 'Design the graph model #meeting',
       removeTags: ['task'],
       parentId: 'note_2',
     } as never);
@@ -72,11 +70,11 @@ describe('undo tool', () => {
   it('can undo multiple AI steps in sequence and reports reverted ops', async () => {
     const first = await createTool.execute('tool_create_1', {
       parentId: 'proj_1',
-      name: 'AI task 1',
+      text: 'AI task 1',
     } as never);
     const second = await createTool.execute('tool_create_2', {
       parentId: 'proj_1',
-      name: 'AI task 2',
+      text: 'AI task 2',
     } as never);
 
     const result = await undoTool.execute('tool_undo', { steps: 2 } as never);

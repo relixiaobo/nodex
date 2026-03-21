@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { editTool } from '../../src/lib/ai-tools/edit-tool.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
-import { useNodeStore } from '../../src/stores/node-store.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
 async function executeEdit(params: Record<string, unknown>) {
@@ -9,154 +8,145 @@ async function executeEdit(params: Record<string, unknown>) {
   return JSON.parse(result.content[0].text as string);
 }
 
-describe('node_edit tool — fields convenience', () => {
+describe('node_edit tool', () => {
   beforeEach(() => {
     resetAndSeed();
   });
 
-  it('sets an options field value on a tagged node', async () => {
-    // task_1 is already tagged with #task and has template fields (Status, Priority, etc.)
+  it('renames a node from the first text line', async () => {
     const result = await executeEdit({
       nodeId: 'task_1',
-      fields: { 'Status': 'In Progress' },
-    });
-
-    expect(result.updated).toContain('fields');
-
-    // Verify the field was set by checking field entries
-    const children = loroDoc.getChildren('task_1');
-    const statusEntry = children
-      .map((cid) => loroDoc.toNodexNode(cid))
-      .find((c) => c?.type === 'fieldEntry' && c.fieldDefId === 'attrDef_status');
-    expect(statusEntry).toBeTruthy();
-
-    // The value node should reference the "In Progress" option
-    if (statusEntry) {
-      const valueChildren = loroDoc.getChildren(statusEntry.id);
-      expect(valueChildren.length).toBeGreaterThan(0);
-      const valueNode = loroDoc.toNodexNode(valueChildren[0]);
-      expect(valueNode?.targetId).toBe('opt_in_progress');
-    }
-  });
-
-  it('auto-collects a new option when the value does not exist', async () => {
-    const result = await executeEdit({
-      nodeId: 'task_1',
-      fields: { 'Status': 'Blocked' },
-    });
-
-    expect(result.updated).toContain('fields');
-
-    // "Blocked" should have been created as a new option under attrDef_status
-    const statusOptions = loroDoc.getChildren('attrDef_status');
-    const optionNames = statusOptions
-      .map((cid) => loroDoc.toNodexNode(cid)?.name)
-      .filter(Boolean);
-    expect(optionNames).toContain('Blocked');
-  });
-
-  it('sets multiple fields in one call', async () => {
-    const result = await executeEdit({
-      nodeId: 'task_1',
-      fields: { 'Status': 'Done', 'Priority': 'Low' },
-    });
-
-    expect(result.updated).toContain('fields');
-  });
-
-  it('combines name change with fields and tags', async () => {
-    const result = await executeEdit({
-      nodeId: 'task_1',
-      name: 'Redesign the model',
-      addTags: ['meeting'],
-      fields: { 'Status': 'To Do' },
+      text: 'Redesign the graph model',
     });
 
     expect(result.updated).toContain('name');
-    expect(result.updated).toContain('tags');
-    expect(result.updated).toContain('fields');
-    expect(loroDoc.toNodexNode('task_1')?.name).toBe('Redesign the model');
+    expect(loroDoc.toNodexNode('task_1')?.name).toBe('Redesign the graph model');
   });
 
-  it('reports unresolved fields when node has no tags at all', async () => {
-    // note_1 is a plain content node without any tags — can't create fields
-    const result = await executeEdit({
-      nodeId: 'note_1',
-      fields: { 'Status': 'Todo' },
-    });
-
-    expect(result.updated).not.toContain('fields');
-    expect(result.unresolvedFields).toEqual(['Status']);
-    expect(result.hint).toBeTruthy();
-  });
-
-  it('auto-creates field definition when tagged node has no such field', async () => {
-    // task_1 has #task tag — "NewField" doesn't exist but will be auto-created
+  it('adds tags, sets fields, and checks the node from Tana Paste text', async () => {
     const result = await executeEdit({
       nodeId: 'task_1',
-      fields: { 'NewField': 'some value' },
+      text: '#meeting\nStatus:: In Progress\n[X]',
+    });
+
+    expect(result.updated).toEqual(expect.arrayContaining(['tags', 'fields', 'checked']));
+    expect(loroDoc.toNodexNode('task_1')?.tags).toContain('tagDef_meeting');
+
+    const statusEntry = loroDoc.getChildren('task_1')
+      .map((cid) => loroDoc.toNodexNode(cid))
+      .find((child) => child?.type === 'fieldEntry' && child.fieldDefId === 'attrDef_status');
+    expect(statusEntry).toBeTruthy();
+    expect(loroDoc.toNodexNode('task_1')?.completedAt).toBeGreaterThan(0);
+  });
+
+  it('clears a field with an empty field line', async () => {
+    await executeEdit({
+      nodeId: 'task_1',
+      text: 'Status:: Done',
+    });
+
+    const result = await executeEdit({
+      nodeId: 'task_1',
+      text: 'Status::',
     });
 
     expect(result.updated).toContain('fields');
-    expect(result.createdFields).toEqual(['NewField']);
-    expect(result.unresolvedFields).toBeUndefined();
+    const statusEntryId = loroDoc.getChildren('task_1')
+      .find((cid) => loroDoc.toNodexNode(cid)?.type === 'fieldEntry' && loroDoc.toNodexNode(cid)?.fieldDefId === 'attrDef_status');
+    expect(statusEntryId).toBeTruthy();
+    expect(loroDoc.getChildren(statusEntryId!)).toEqual([]);
   });
 
-  it('auto-creates field with addTags in the same call', async () => {
-    // note_1 has no tags, but we add one and set a field in the same call
-    const result = await executeEdit({
+  it('adds child nodes from indented lines', async () => {
+    const beforeChildren = loroDoc.getChildren('note_1').length;
+
+    await executeEdit({
       nodeId: 'note_1',
-      addTags: ['meeting'],
-      fields: { 'Location': 'Room A' },
+      text: 'Meeting notes - Team standup\n  Follow up with design\n  Share notes',
+    });
+
+    const afterChildren = loroDoc.getChildren('note_1');
+    expect(afterChildren.length).toBe(beforeChildren + 2);
+    const appendedNames = afterChildren.slice(-2).map((id) => loroDoc.toNodexNode(id)?.name);
+    expect(appendedNames).toEqual(['Follow up with design', 'Share notes']);
+  });
+
+  it('removes tags by display name', async () => {
+    const result = await executeEdit({
+      nodeId: 'task_1',
+      removeTags: ['task'],
     });
 
     expect(result.updated).toContain('tags');
-    expect(result.updated).toContain('fields');
-    expect(result.createdFields).toEqual(['Location']);
+    expect(loroDoc.toNodexNode('task_1')?.tags).not.toContain('tagDef_task');
   });
 
-  it('updates raw schema properties through data', async () => {
+  it('moves the node after a sibling', async () => {
     const result = await executeEdit({
-      nodeId: 'attrDef_status',
-      data: { fieldType: 'date' },
+      nodeId: 'task_1',
+      afterId: 'task_2',
     });
 
-    expect(result.updated).toContain('data');
-    expect(loroDoc.toNodexNode('attrDef_status')?.fieldType).toBe('date');
+    expect(result.updated).toContain('position');
+    const siblings = loroDoc.getChildren('proj_1');
+    expect(siblings.indexOf('task_1')).toBe(siblings.indexOf('task_2') + 1);
   });
 
-  it('updates description through data and strips reference markup', async () => {
+  it('applies optional data properties and reports data as updated', async () => {
     const result = await executeEdit({
-      nodeId: 'note_1',
-      data: { description: 'See <ref id="task_1">Task</ref> details' },
-    });
-
-    expect(result.updated).toContain('data');
-    expect(loroDoc.toNodexNode('note_1')?.description).toBe('See Task details');
-  });
-
-  it('filters blocked data keys while applying allowed updates', async () => {
-    const before = loroDoc.toNodexNode('tagDef_task');
-
-    const result = await executeEdit({
-      nodeId: 'tagDef_task',
+      nodeId: 'task_1',
       data: {
-        color: 'amber',
-        type: 'fieldDef',
-        name: 'Hacked',
-        tags: ['tagDef_person'],
-        createdAt: 1,
-        updatedAt: 2,
+        description: 'updated description',
+        color: 'red',
       },
     });
 
-    const after = loroDoc.toNodexNode('tagDef_task');
     expect(result.updated).toContain('data');
-    expect(after?.color).toBe('amber');
-    expect(after?.type).toBe('tagDef');
-    expect(after?.name).toBe(before?.name);
-    expect(after?.tags).toEqual(before?.tags ?? []);
-    expect(after?.createdAt).toBe(before?.createdAt);
-    expect(after?.updatedAt).not.toBe(2);
+    expect(loroDoc.toNodexNode('task_1')?.description).toBe('updated description');
+    expect(loroDoc.toNodexNode('task_1')?.color).toBe('red');
+  });
+
+  it('combines rename, tag, field, and move in one call', async () => {
+    const result = await executeEdit({
+      nodeId: 'task_1',
+      text: 'Updated task #meeting\nStatus:: Done',
+      parentId: 'note_2',
+    });
+
+    expect(result.updated).toEqual(expect.arrayContaining(['name', 'tags', 'fields', 'position']));
+    expect(loroDoc.toNodexNode('task_1')?.name).toBe('Updated task');
+    expect(loroDoc.toNodexNode('task_1')?.tags).toContain('tagDef_meeting');
+    expect(loroDoc.getParentId('task_1')).toBe('note_2');
+  });
+
+  it('reports unresolved fields when the node has no tags', async () => {
+    const result = await executeEdit({
+      nodeId: 'note_1',
+      text: 'Status:: Todo',
+    });
+
+    expect(result.unresolvedFields).toEqual(['Status']);
+    expect(result.hint).toBeTruthy();
+    expect(result.boundary).toBeTruthy();
+    expect(result.nextStep).toBeTruthy();
+    expect(result.fallback).toBeTruthy();
+  });
+
+  it('reports unchanged when the requested patch matches current state', async () => {
+    const result = await executeEdit({
+      nodeId: 'note_1',
+      text: 'Meeting notes - Team standup',
+    });
+
+    expect(result.status).toBe('unchanged');
+    expect(result.updated).toEqual([]);
+    expect(result.hint).toBeTruthy();
+  });
+
+  it('rejects text-based search node edits and asks the caller to recreate the node', async () => {
+    await expect(editTool.execute('tool_edit', {
+      nodeId: 'search_task',
+      text: 'New search text',
+    } as never)).rejects.toThrow('Editing search node rules via node_edit is not supported yet');
   });
 });

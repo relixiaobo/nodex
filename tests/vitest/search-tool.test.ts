@@ -16,56 +16,36 @@ describe('node_search tool', () => {
     resetAndSeed();
   });
 
-  // ── Field value filtering ──
-
-  it('filters by field value (options field)', async () => {
-    // First set a Status field value on task_1
+  it('filters by field value', async () => {
     await editTool.execute('tool_edit', {
       nodeId: 'task_1',
-      fields: { 'Status': 'In Progress' },
+      text: 'Status:: In Progress',
     } as never);
 
     const result = await executeSearch({
       searchTags: ['task'],
-      fields: { 'Status': 'In Progress' },
+      fields: { Status: 'In Progress' },
     });
 
     expect(result.total).toBeGreaterThan(0);
-    expect(result.items.map((i: { id: string }) => i.id)).toContain('task_1');
+    expect(result.items.map((item: { id: string }) => item.id)).toContain('task_1');
   });
 
-  it('returns empty when field value does not match', async () => {
-    const result = await executeSearch({
-      searchTags: ['task'],
-      fields: { 'Status': 'NonExistentValue' },
-    });
-
-    expect(result.total).toBe(0);
-    expect(result.items).toHaveLength(0);
-  });
-
-  // ── linkedTo (backlinks) ──
-
-  it('finds nodes that reference a target via linkedTo', async () => {
-    // Create a reference to note_1
+  it('finds backlinks via linkedTo', async () => {
     await createTool.execute('tool_create', {
       parentId: 'proj_1',
-      targetId: 'note_1',
+      text: '[[Meeting notes - Team standup^note_1]]',
     } as never);
 
     const result = await executeSearch({
       linkedTo: 'note_1',
     });
 
-    // proj_1 should appear as it now contains a reference to note_1
     expect(result.total).toBeGreaterThan(0);
-    const ids = result.items.map((i: { id: string }) => i.id);
-    expect(ids).toContain('proj_1');
+    expect(result.items.map((item: { id: string }) => item.id)).toContain('proj_1');
   });
 
-  // ── count mode ──
-
-  it('returns only total count when count=true', async () => {
+  it('supports count-only mode', async () => {
     const result = await executeSearch({
       searchTags: ['task'],
       count: true,
@@ -75,44 +55,43 @@ describe('node_search tool', () => {
     expect(result.items).toBeUndefined();
   });
 
-  it('count mode with text query still filters', async () => {
+  it('keeps count-only mode compact when tag names do not resolve', async () => {
     const result = await executeSearch({
-      query: 'Design the data model',
+      searchTags: ['does-not-exist'],
       count: true,
     });
 
-    expect(result.total).toBeGreaterThan(0);
+    expect(result.total).toBe(0);
+    expect(result.items).toBeUndefined();
+    expect(result.unresolvedTags).toEqual(['does-not-exist']);
+    expect(result.boundary).toBeTruthy();
+    expect(result.nextStep).toBeTruthy();
+    expect(result.fallback).toBeTruthy();
   });
 
-  // ── sort ──
-
-  it('sorts results by name ascending', async () => {
+  it('sorts by sortBy string with explicit order', async () => {
     const result = await executeSearch({
       searchTags: ['meeting'],
-      sort: { field: 'name', order: 'asc' },
+      sortBy: 'name:asc',
     });
 
-    expect(result.total).toBeGreaterThan(0);
-    const names: string[] = result.items.map((i: { name: string }) => i.name);
-    const sorted = [...names].sort((a, b) => a.localeCompare(b));
-    expect(names).toEqual(sorted);
+    const names: string[] = result.items.map((item: { name: string }) => item.name);
+    expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b)));
   });
 
-  it('sorts results by created date descending', async () => {
+  it('defaults sortBy order to desc', async () => {
     const result = await executeSearch({
       query: 'note',
-      sort: { field: 'created', order: 'desc' },
+      sortBy: 'created',
     });
 
     if (result.items.length >= 2) {
-      const dates: string[] = result.items.map((i: { createdAt: string }) => i.createdAt);
+      const dates: string[] = result.items.map((item: { createdAt: string }) => item.createdAt);
       for (let i = 0; i < dates.length - 1; i++) {
         expect(new Date(dates[i]).getTime()).toBeGreaterThanOrEqual(new Date(dates[i + 1]).getTime());
       }
     }
   });
-
-  // ── subtree scoping ──
 
   it('limits search to a subtree via parentId', async () => {
     const result = await executeSearch({
@@ -121,57 +100,51 @@ describe('node_search tool', () => {
     });
 
     expect(result.total).toBeGreaterThan(0);
-    // All results should be within proj_1 subtree
     for (const item of result.items) {
-      // Verify ancestor chain includes proj_1
       let cursor: string | null = item.id;
       let foundProj = false;
       while (cursor) {
-        if (cursor === 'proj_1') { foundProj = true; break; }
+        if (cursor === 'proj_1') {
+          foundProj = true;
+          break;
+        }
         cursor = loroDoc.getParentId(cursor);
       }
       expect(foundProj).toBe(true);
     }
   });
 
-  // ── search results include fields ──
-
-  it('includes fields in search result items', async () => {
-    // Set a field value first
+  it('includes field values in search result items', async () => {
     await editTool.execute('tool_edit', {
       nodeId: 'task_1',
-      fields: { 'Status': 'Done' },
+      text: 'Status:: Done',
     } as never);
 
     const result = await executeSearch({
       searchTags: ['task'],
     });
 
-    const task1Item = result.items.find((i: { id: string }) => i.id === 'task_1');
-    expect(task1Item).toBeTruthy();
-    expect(task1Item.fields).toBeDefined();
-    // The Status field value should be present
-    expect(task1Item.fields['Status']).toBe('Done');
+    const taskItem = result.items.find((item: { id: string }) => item.id === 'task_1');
+    expect(taskItem?.fields['Status']).toBe('Done');
   });
 
-  // ── date range ──
-
-  it('filters by date range', async () => {
+  it('filters by after/before date strings', async () => {
     const today = new Date();
     const todayStr = [
       today.getFullYear(),
       String(today.getMonth() + 1).padStart(2, '0'),
       String(today.getDate()).padStart(2, '0'),
     ].join('-');
+
     const createdToday = useNodeStore.getState().createChild('proj_1', undefined, {
-      name: 'Created today for date range filter',
+      name: 'Created today for date filter',
     });
 
     const result = await executeSearch({
-      dateRange: { from: todayStr, to: todayStr },
+      after: todayStr,
+      before: todayStr,
     });
 
-    expect(result.items.map((i: { id: string }) => i.id)).toContain(createdToday.id);
-    expect(result.total).toBeGreaterThan(0);
+    expect(result.items.map((item: { id: string }) => item.id)).toContain(createdToday.id);
   });
 });

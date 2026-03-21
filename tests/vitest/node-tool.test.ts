@@ -44,8 +44,7 @@ describe('node tools (Phase 1.5)', () => {
     const todayId = ensureTodayNode();
 
     const details = await executeCreate({
-      name: 'AI generated note',
-      tags: ['meeting'],
+      text: 'AI generated note #meeting',
     }) as {
       id: string;
       parentId: string;
@@ -164,8 +163,7 @@ describe('node tools (Phase 1.5)', () => {
   it('updates node name and tags using display names', async () => {
     const details = await executeEdit({
       nodeId: 'task_1',
-      name: 'Design the graph model',
-      addTags: ['meeting'],
+      text: 'Design the graph model #meeting',
       removeTags: ['task'],
     }) as {
       updated: string[];

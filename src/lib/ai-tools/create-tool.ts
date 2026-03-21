@@ -17,23 +17,13 @@ import {
   parseSortBy,
   pushAiOp,
   sanitizeDirectNodeDataPatch,
+  searchRulesSchema,
+  type SearchRules,
 } from './shared.js';
 import { parseTanaPaste } from './tana-paste-parser.js';
 import { createParsedNodeNoCommit } from './tana-paste-apply.js';
 
 const CREATED_AT_FIELD_SENTINEL = '__createdAt__';
-
-const searchRulesSchema = Type.Object({
-  query: Type.Optional(Type.String({ description: 'Text filter on node name and description. Persisted as a live query condition.' })),
-  searchTags: Type.Optional(Type.Array(Type.String(), { description: 'Tag display names. AND logic — results must have ALL tags. Unknown tags are skipped and reported.' })),
-  fields: Type.Optional(Type.Record(Type.String(), Type.String(), { description: 'Field value filters by display name, e.g. {"Status": "Done", "Priority": "High"}. Unknown fields are skipped and reported.' })),
-  linkedTo: Type.Optional(Type.String({ description: 'Node ID — find nodes that reference (link to) this node.' })),
-  scopeId: Type.Optional(Type.String({ description: 'Node ID — restrict results to this node and its descendants.' })),
-  parentId: Type.Optional(Type.String({ description: 'Deprecated alias for scopeId.' })),
-  after: Type.Optional(Type.String({ description: 'Creation date lower bound (inclusive). Format: YYYY-MM-DD, e.g. "2026-03-01".' })),
-  before: Type.Optional(Type.String({ description: 'Creation date upper bound (inclusive). Format: YYYY-MM-DD, e.g. "2026-03-31".' })),
-  sortBy: Type.Optional(Type.String({ description: 'Persisted sort order. Format: "field" or "field:order". Fields: created, modified, name, refCount. Order: asc or desc (default desc). Example: "created:desc". Note: "relevance" is NOT supported (runtime-only).' })),
-}, { description: 'Structured search rules for the live query node. At least one field should be provided. Example: { searchTags: ["task"], fields: {"Status": "Todo"} }' });
 
 const createToolParameters = Type.Object({
   type: Type.Optional(Type.Literal('search', { description: 'Set to "search" to create a search node. Omit for normal content nodes.' })),
@@ -89,7 +79,7 @@ const createToolParameters = Type.Object({
 });
 
 type CreateToolParams = typeof createToolParameters.static;
-type CreateSearchRules = NonNullable<CreateToolParams['rules']>;
+type CreateSearchRules = SearchRules;
 
 interface Location {
   parentId: string;

@@ -27,17 +27,12 @@ import {
   isSearchCandidate,
   formatResultText,
   parseSortBy,
+  searchRulesSchema,
+  type SearchRules,
 } from './shared.js';
 
 const searchToolParameters = Type.Object({
-  query: Type.Optional(Type.String({ description: 'Fuzzy text search across node names and descriptions. CJK-aware.' })),
-  searchTags: Type.Optional(Type.Array(Type.String(), { description: 'Filter to nodes with ALL these tags (AND logic). Use display names. Every tag must resolve to an existing tag name.' })),
-  fields: Type.Optional(Type.Record(Type.String(), Type.String(), { description: 'Filter by exact field display values, e.g. {"Status": "Todo"}. Unknown field names are ignored with guidance.' })),
-  linkedTo: Type.Optional(Type.String({ description: 'Find all nodes that reference this node ID (backlinks).' })),
-  parentId: Type.Optional(Type.String({ description: 'Restrict search to this node and its descendants.' })),
-  after: Type.Optional(Type.String({ description: 'Creation date lower bound (inclusive), ISO format e.g. "2026-01-15".' })),
-  before: Type.Optional(Type.String({ description: 'Creation date upper bound (inclusive), ISO format e.g. "2026-03-12".' })),
-  sortBy: Type.Optional(Type.String({ description: 'Sort string: "field" or "field:order". field = relevance|created|modified|name|refCount. order defaults to desc.' })),
+  rules: Type.Optional(searchRulesSchema),
   limit: Type.Optional(Type.Integer({ minimum: 1, maximum: MAX_PAGE_SIZE, default: DEFAULT_PAGE_SIZE, description: 'Max results per page (default 20, max 50).' })),
   offset: Type.Optional(Type.Integer({ minimum: 0, default: 0, description: 'Pagination offset.' })),
   count: Type.Optional(Type.Boolean({ description: 'If true, return only the total count — no items.' })),
@@ -132,7 +127,7 @@ function searchByBacklinks(
     for (const ref of refs) refIds.add(ref.ownerNodeId);
   }
 
-  let filtered = [...refIds]
+  const filtered = [...refIds]
     .map((id) => loroDoc.toNodexNode(id))
     .filter((n): n is NodexNode => n !== null)
     .filter((n) => requiredTagIds.every((tid) => n.tags.includes(tid)));
@@ -149,20 +144,20 @@ function searchByBacklinks(
 
 // ─── Main search path ───
 
-function searchByFilters(params: SearchToolParams, requiredTagIds: string[]): AgentToolResult<unknown> {
+function searchByFilters(rules: SearchRules, params: SearchToolParams, requiredTagIds: string[]): AgentToolResult<unknown> {
   const limit = Math.min(params.limit ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
   const offset = params.offset ?? 0;
-  const query = params.query?.trim() ?? '';
+  const query = rules.query?.trim() ?? '';
 
   // Date range
-  const fromTs = toTimestamp(params.after, false);
-  const toTs = toTimestamp(params.before, true);
+  const fromTs = toTimestamp(rules.after, false);
+  const toTs = toTimestamp(rules.before, true);
 
   // Field filters: resolve names → fieldDefIds
   const fieldFilters: Array<{ fieldDefId: string; value: string }> = [];
   const unresolvedFilters: string[] = [];
-  if (params.fields) {
-    for (const [name, value] of Object.entries(params.fields)) {
+  if (rules.fields) {
+    for (const [name, value] of Object.entries(rules.fields)) {
       const fieldDefId = findFieldDefIdInSchema(name);
       if (fieldDefId) {
         fieldFilters.push({ fieldDefId, value });
@@ -173,7 +168,8 @@ function searchByFilters(params: SearchToolParams, requiredTagIds: string[]): Ag
   }
 
   // Subtree scoping
-  const subtreeIds = params.parentId ? getSubtreeIds(params.parentId) : null;
+  const scopeId = rules.scopeId ?? rules.parentId;
+  const subtreeIds = scopeId ? getSubtreeIds(scopeId) : null;
 
   // Build candidate list
   let candidates = loroDoc.getAllNodeIds()
@@ -219,7 +215,7 @@ function searchByFilters(params: SearchToolParams, requiredTagIds: string[]): Ag
   }
 
   // Sorting (relevance = fuzzySort order, skip additional sort)
-  const parsedSort = parseSortBy(params.sortBy);
+  const parsedSort = parseSortBy(rules.sortBy);
   const sortField = parsedSort?.field ?? (query ? 'relevance' : 'modified');
   const sortOrder = parsedSort?.order ?? 'desc';
 
@@ -263,10 +259,12 @@ function countResult(total: number, unresolvedFilters: string[] = []): AgentTool
 // ─── Entry point ───
 
 async function executeSearchTool(params: SearchToolParams): Promise<AgentToolResult<unknown>> {
+  const rules: SearchRules = params.rules ?? {};
+
   // Resolve tag display names → IDs
   const resolvedTags: string[] = [];
   const unresolvedTags: string[] = [];
-  for (const name of params.searchTags ?? []) {
+  for (const name of rules.searchTags ?? []) {
     const id = findTagDefIdByName(name);
     if (id) {
       resolvedTags.push(id);
@@ -290,9 +288,9 @@ async function executeSearchTool(params: SearchToolParams): Promise<AgentToolRes
 
   const requiredTagIds = resolvedTags;
 
-  return params.linkedTo
-    ? searchByBacklinks(params.linkedTo, requiredTagIds, params)
-    : searchByFilters(params, requiredTagIds);
+  return rules.linkedTo
+    ? searchByBacklinks(rules.linkedTo, requiredTagIds, params)
+    : searchByFilters(rules, params, requiredTagIds);
 }
 
 export const searchTool: AgentTool<typeof searchToolParameters, unknown> = {
@@ -303,14 +301,17 @@ export const searchTool: AgentTool<typeof searchToolParameters, unknown> = {
     'field value filtering, backlink lookup, date range, subtree scoping, and',
     'sorting. Think of it as Grep for your knowledge graph.',
     '',
+    'All search conditions go inside the `rules` object (same schema as node_create type="search").',
+    'Execution params (limit, offset, count) stay at top level.',
+    '',
     'Quick patterns:',
-    '- Text search: node_search(query: "API design")',
-    '- Tag + field: node_search(searchTags: ["task"], fields: {"Status": "Todo"})',
-    '- Backlinks: node_search(linkedTo: "nodeId")  → all nodes referencing this node',
-    '- Subtree: node_search(parentId: "projectId", query: "auth")  → includes the parent node and its descendants',
-    '- Count only: node_search(searchTags: ["task"], count: true)',
-    '- Date range: node_search(after: "2026-03-01", before: "2026-03-31")',
-    '- Sorted: node_search(query: "auth", sortBy: "modified:desc")',
+    '- Text search: node_search({ rules: { query: "API design" } })',
+    '- Tag + field: node_search({ rules: { searchTags: ["task"], fields: {"Status": "Todo"} } })',
+    '- Backlinks: node_search({ rules: { linkedTo: "nodeId" } })  → all nodes referencing this node',
+    '- Subtree: node_search({ rules: { scopeId: "projectId", query: "auth" } })  → includes the scope node and its descendants',
+    '- Count only: node_search({ rules: { searchTags: ["task"] }, count: true })',
+    '- Date range: node_search({ rules: { after: "2026-03-01", before: "2026-03-31" } })',
+    '- Sorted: node_search({ rules: { query: "auth", sortBy: "modified:desc" } })',
     '',
     'Behavior boundaries:',
     '- searchTags are AND filters; if any tag name is unknown, the result is empty with guidance',

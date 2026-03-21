@@ -181,8 +181,7 @@ describe('node tools (Phase 1.5)', () => {
 
   it('searches by query and tag display name', async () => {
     const details = await executeSearch({
-      query: 'weekly sync',
-      searchTags: ['meeting'],
+      rules: { query: 'weekly sync', searchTags: ['meeting'] },
     }) as {
       total: number;
       items: Array<{ id: string; name: string }>;

@@ -13,27 +13,48 @@ import { useNodeStore } from '../../stores/node-store.js';
 import { formatResultText, pushAiOp } from './shared.js';
 
 const deleteToolParameters = Type.Object({
-  nodeId: Type.String({ description: 'ID of the node to delete or restore.' }),
+  nodeId: Type.Union([
+    Type.String(),
+    Type.Array(Type.String()),
+  ], { description: 'Node ID or array of node IDs to delete or restore. Use an array for batch operations.' }),
   restore: Type.Optional(Type.Boolean({ description: 'true = restore from Trash back to original parent. Omit or false = move to Trash.' })),
 });
 
 type DeleteToolParams = typeof deleteToolParameters.static;
 
+function resolveNodeIds(input: string | string[]): string[] {
+  return Array.isArray(input) ? input : [input];
+}
+
 async function executeDeleteTool(params: DeleteToolParams): Promise<AgentToolResult<unknown>> {
-  const node = loroDoc.toNodexNode(params.nodeId);
-  if (!node) throw new Error(`Node not found: ${params.nodeId}. Use node_search to find the correct ID.`);
+  const nodeIds = resolveNodeIds(params.nodeId);
+  if (nodeIds.length === 0) {
+    throw new Error('nodeId is required — provide at least one node ID.');
+  }
+
+  // Validate all nodes exist upfront
+  const nodes = nodeIds.map((id) => {
+    const node = loroDoc.toNodexNode(id);
+    if (!node) throw new Error(`Node not found: ${id}. Use node_search to find the correct ID.`);
+    return { id, name: node.name ?? '' };
+  });
 
   if (params.restore) {
-    // Restore from trash
     withCommitOrigin(AI_COMMIT_ORIGIN, () => {
-      useNodeStore.getState().restoreNode(params.nodeId);
+      const store = useNodeStore.getState();
+      for (const { id } of nodes) {
+        store.restoreNode(id);
+      }
     });
-    pushAiOp('node_delete', params.nodeId, `restore "${node.name ?? ''}"`);
-    const restoredParentId = loroDoc.getParentId(params.nodeId) ?? '';
+    const results = nodes.map(({ id, name }) => {
+      pushAiOp('node_delete', id, `restore "${name}"`);
+      return { id, parentId: loroDoc.getParentId(id) ?? '' };
+    });
 
     const output = {
       action: 'restored' as const,
-      parentId: restoredParentId,
+      count: results.length,
+      ...(results.length === 1 ? { parentId: results[0].parentId } : { items: results }),
     };
     return {
       content: [{ type: 'text', text: formatResultText(output) }],
@@ -43,14 +64,20 @@ async function executeDeleteTool(params: DeleteToolParams): Promise<AgentToolRes
 
   // Move to trash
   withCommitOrigin(AI_COMMIT_ORIGIN, () => {
-    useNodeStore.getState().trashNode(params.nodeId, { commit: false });
+    const store = useNodeStore.getState();
+    for (const { id } of nodes) {
+      store.trashNode(id, { commit: false });
+    }
     commitDoc();
   });
-  pushAiOp('node_delete', params.nodeId, `trash "${node.name ?? ''}"`);
+  for (const { id, name } of nodes) {
+    pushAiOp('node_delete', id, `trash "${name}"`);
+  }
 
   const output = {
     action: 'trashed' as const,
-    name: node.name ?? '',
+    count: nodes.length,
+    ...(nodes.length === 1 ? { name: nodes[0].name } : { names: nodes.map((n) => n.name) }),
   };
   return {
     content: [{ type: 'text', text: formatResultText(output) }],
@@ -62,12 +89,12 @@ export const deleteTool: AgentTool<typeof deleteToolParameters, unknown> = {
   name: 'node_delete',
   label: 'Delete Node',
   description: [
-    'Move a node to Trash, or restore from Trash.',
+    'Move nodes to Trash, or restore from Trash. Supports single ID or array for batch.',
     'Works on any node: content, field values, references.',
     'Deleting a field value node clears that field.',
     'Deleting a reference removes the link.',
     '',
-    'Use restore: true to recover a trashed node.',
+    'Use restore: true to recover trashed nodes.',
     'All write operations use isolated undo — undoable with the undo tool.',
   ].join('\n'),
   parameters: deleteToolParameters,

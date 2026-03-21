@@ -641,10 +641,9 @@ describe('chat ui', () => {
 
     await vi.waitFor(() => {
       expect(container.textContent).toContain('Thought');
-      expect(container.textContent).toContain('Reading page text');
-      // Auto-expanded during execution — shows "3 steps" title + individual steps
-      expect(container.textContent).toContain('3 steps');
-      expect(container.textContent).toContain('Navigated to');
+      // Collapsed — shows latest step summary, not expanded children
+      expect(container.textContent).toContain('step 3');
+      expect(container.textContent).not.toContain('Navigated to');
     });
   });
 

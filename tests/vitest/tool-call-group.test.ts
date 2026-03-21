@@ -47,7 +47,7 @@ function makeAssistantEntry(content: (ToolCall | { type: 'text'; text: string })
 // ---------------------------------------------------------------------------
 
 describe('ToolCallGroup', () => {
-  it('renders expanded with step count while executing', () => {
+  it('renders collapsed with latest step summary while executing', () => {
     const toolCalls = [
       makeToolCall('tc1', 'browser', { action: 'navigate', url: 'https://google.com' }),
       makeToolCall('tc2', 'browser', { action: 'click', elementDescription: 'Search' }),
@@ -63,10 +63,9 @@ describe('ToolCallGroup', () => {
       React.createElement(ToolCallGroup, { toolCalls, results }),
     );
 
-    // Auto-expanded during execution — title shows step count, children visible
-    expect(html).toContain('3 steps');
-    // Individual tool calls should be rendered (expanded)
-    expect(html).toContain('Navigated to');
+    // Collapsed — title shows latest step summary, children NOT visible
+    expect(html).toContain('step 3');
+    expect(html).not.toContain('Navigated to');
   });
 
   it('renders completed title when all have results', () => {
@@ -137,10 +136,10 @@ describe('ChatMessage tool call grouping', () => {
       React.createElement(ChatMessage, { entry }),
     );
 
-    // Should contain group indicator (auto-expanded during execution)
-    expect(html).toContain('3 steps');
-    // Individual steps should be visible (expanded)
-    expect(html).toContain('Navigating to');
+    // Should contain group indicator (collapsed — shows latest step summary)
+    expect(html).toContain('step 3');
+    // Individual steps should NOT be visible (collapsed)
+    expect(html).not.toContain('Navigating to');
   });
 
   it('does not group a single toolCall', () => {
@@ -171,8 +170,8 @@ describe('ChatMessage tool call grouping', () => {
 
     // Text block should break groups — two groups of 2
     expect(html).toContain('Found some info.');
-    // Both groups should show "2 steps" (auto-expanded during execution)
-    const stepMatches = html.match(/2 steps/g);
+    // Both groups collapsed — show "step 2" (latest step in each group)
+    const stepMatches = html.match(/step 2/g);
     expect(stepMatches).not.toBeNull();
     expect(stepMatches!.length).toBe(2);
   });

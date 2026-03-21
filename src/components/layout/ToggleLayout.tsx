@@ -99,8 +99,8 @@ function ToggleTopBar({
         </span>
       </button>
 
-      {/* User menu — sits at same height as active tab */}
-      <div className="flex h-9 items-center rounded-t-xl bg-background px-1">
+      {/* User menu — outside the card, in warm paper area */}
+      <div className="flex h-9 items-center px-1">
         <ToolbarUserMenu />
       </div>
     </div>

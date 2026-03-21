@@ -23,8 +23,7 @@ describe('node_search tool', () => {
     } as never);
 
     const result = await executeSearch({
-      searchTags: ['task'],
-      fields: { Status: 'In Progress' },
+      rules: { searchTags: ['task'], fields: { Status: 'In Progress' } },
     });
 
     expect(result.total).toBeGreaterThan(0);
@@ -38,7 +37,7 @@ describe('node_search tool', () => {
     } as never);
 
     const result = await executeSearch({
-      linkedTo: 'note_1',
+      rules: { linkedTo: 'note_1' },
     });
 
     expect(result.total).toBeGreaterThan(0);
@@ -47,7 +46,7 @@ describe('node_search tool', () => {
 
   it('supports count-only mode', async () => {
     const result = await executeSearch({
-      searchTags: ['task'],
+      rules: { searchTags: ['task'] },
       count: true,
     });
 
@@ -57,7 +56,7 @@ describe('node_search tool', () => {
 
   it('keeps count-only mode compact when tag names do not resolve', async () => {
     const result = await executeSearch({
-      searchTags: ['does-not-exist'],
+      rules: { searchTags: ['does-not-exist'] },
       count: true,
     });
 
@@ -71,8 +70,7 @@ describe('node_search tool', () => {
 
   it('sorts by sortBy string with explicit order', async () => {
     const result = await executeSearch({
-      searchTags: ['meeting'],
-      sortBy: 'name:asc',
+      rules: { searchTags: ['meeting'], sortBy: 'name:asc' },
     });
 
     const names: string[] = result.items.map((item: { name: string }) => item.name);
@@ -81,8 +79,7 @@ describe('node_search tool', () => {
 
   it('defaults sortBy order to desc', async () => {
     const result = await executeSearch({
-      query: 'note',
-      sortBy: 'created',
+      rules: { query: 'note', sortBy: 'created' },
     });
 
     if (result.items.length >= 2) {
@@ -95,8 +92,7 @@ describe('node_search tool', () => {
 
   it('limits search to a subtree via parentId', async () => {
     const result = await executeSearch({
-      parentId: 'proj_1',
-      query: 'Design',
+      rules: { scopeId: 'proj_1', query: 'Design' },
     });
 
     expect(result.total).toBeGreaterThan(0);
@@ -121,7 +117,7 @@ describe('node_search tool', () => {
     } as never);
 
     const result = await executeSearch({
-      searchTags: ['task'],
+      rules: { searchTags: ['task'] },
     });
 
     const taskItem = result.items.find((item: { id: string }) => item.id === 'task_1');
@@ -141,8 +137,7 @@ describe('node_search tool', () => {
     });
 
     const result = await executeSearch({
-      after: todayStr,
-      before: todayStr,
+      rules: { after: todayStr, before: todayStr },
     });
 
     expect(result.items.map((item: { id: string }) => item.id)).toContain(createdToday.id);

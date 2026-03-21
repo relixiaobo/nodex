@@ -4,6 +4,7 @@
  * Contains tag resolution, field resolution, and common helpers
  * used across create, read, edit, delete, and search tools.
  */
+import { Type } from '@mariozechner/pi-ai';
 import { nanoid } from 'nanoid';
 import { FIELD_TYPES, SYSTEM_NODE_IDS } from '../../types/index.js';
 import { fuzzySort } from '../fuzzy-search.js';
@@ -21,6 +22,22 @@ import type { ParsedTanaPasteField, ParsedTanaPasteValue } from './tana-paste-pa
 export const MAX_READ_DEPTH = 3;
 export const MAX_PAGE_SIZE = 50;
 export const DEFAULT_PAGE_SIZE = 20;
+
+// ─── Search rules schema (shared between node_search and node_create type="search") ───
+
+export const searchRulesSchema = Type.Object({
+  query: Type.Optional(Type.String({ description: 'Text filter on node name and description.' })),
+  searchTags: Type.Optional(Type.Array(Type.String(), { description: 'Tag display names. AND logic — results must have ALL tags. Unknown tags are skipped and reported.' })),
+  fields: Type.Optional(Type.Record(Type.String(), Type.String(), { description: 'Field value filters by display name, e.g. {"Status": "Done"}. Unknown fields are skipped and reported.' })),
+  linkedTo: Type.Optional(Type.String({ description: 'Node ID — find nodes that reference (link to) this node.' })),
+  scopeId: Type.Optional(Type.String({ description: 'Node ID — restrict results to this node and its descendants.' })),
+  parentId: Type.Optional(Type.String({ description: 'Deprecated alias for scopeId.' })),
+  after: Type.Optional(Type.String({ description: 'Creation date lower bound (inclusive). Format: YYYY-MM-DD, e.g. "2026-03-01".' })),
+  before: Type.Optional(Type.String({ description: 'Creation date upper bound (inclusive). Format: YYYY-MM-DD, e.g. "2026-03-31".' })),
+  sortBy: Type.Optional(Type.String({ description: 'Sort order. Format: "field" or "field:order". Fields: relevance, created, modified, name, refCount. Order: asc or desc (default desc). Example: "created:desc".' })),
+}, { description: 'Search conditions. Used by both node_search (one-time query) and node_create type="search" (persisted live query). Example: { searchTags: ["task"], fields: {"Status": "Todo"} }' });
+
+export type SearchRules = typeof searchRulesSchema.static;
 
 // ─── Tag helpers ───
 

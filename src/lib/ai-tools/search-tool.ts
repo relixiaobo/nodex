@@ -301,7 +301,7 @@ export const searchTool: AgentTool<typeof searchToolParameters, unknown> = {
   description: [
     'Search the knowledge graph. Supports text search (fuzzy, CJK), tag filtering,',
     'field value filtering, backlink lookup, date range, subtree scoping, and',
-    'flat sortBy strings. Think of it as Grep for your knowledge graph.',
+    'sorting. Think of it as Grep for your knowledge graph.',
     '',
     'Quick patterns:',
     '- Text search: node_search(query: "API design")',

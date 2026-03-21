@@ -1,9 +1,13 @@
 import 'fake-indexeddb/auto';
 import { deleteDB } from 'idb';
 import { getChatSession, resetChatPersistenceForTests } from '../../src/lib/ai-persistence.js';
-import { chatPanelSessionId, isChatPanel } from '../../src/types/index.js';
 import { useUIStore } from '../../src/stores/ui-store.js';
-import { focusOrOpenChat, openChatPanel, openChatWithPrompt } from '../../src/lib/chat-panel-actions.js';
+import {
+  ensureChatSession,
+  focusOrOpenChat,
+  openChatPanel,
+  openChatWithPrompt,
+} from '../../src/lib/chat-panel-actions.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
 const DB_NAME = 'soma-ai-chat';
@@ -17,60 +21,64 @@ describe('chat-panel-actions', () => {
     resetChatPersistenceForTests();
   });
 
-  it('openChatPanel creates a persisted session and opens a chat panel', async () => {
-    await openChatPanel();
+  it('ensureChatSession creates a persisted session without switching away from node view', async () => {
+    const sessionId = await ensureChatSession();
 
     const state = useUIStore.getState();
-    expect(state.panels).toHaveLength(2);
+    expect(state.activeView).toBe('node');
+    expect(state.currentNodeId).toBe('proj_1');
+    expect(state.currentChatSessionId).toBe(sessionId);
 
-    const chatPanel = state.panels[1];
-    expect(chatPanel).toBeDefined();
-    expect(isChatPanel(chatPanel!.nodeId)).toBe(true);
-    expect(state.activePanelId).toBe(chatPanel!.id);
-
-    const persisted = await getChatSession(chatPanelSessionId(chatPanel!.nodeId));
-    expect(persisted?.id).toBe(chatPanelSessionId(chatPanel!.nodeId));
+    const persisted = await getChatSession(sessionId);
+    expect(persisted?.id).toBe(sessionId);
   });
 
-  it('focusOrOpenChat focuses an existing chat panel instead of creating another one', async () => {
-    await openChatPanel();
-    const existingChatPanel = useUIStore.getState().panels[1]!;
+  it('openChatPanel creates a new persisted session and switches to chat view', async () => {
+    const sessionId = await openChatPanel();
 
-    useUIStore.getState().setActivePanel('main');
+    const state = useUIStore.getState();
+    expect(state.activeView).toBe('chat');
+    expect(state.currentChatSessionId).toBe(sessionId);
+    expect(state.currentNodeId).toBe('proj_1');
+
+    const persisted = await getChatSession(sessionId);
+    expect(persisted?.id).toBe(sessionId);
+  });
+
+  it('focusOrOpenChat focuses an existing session instead of creating another one', async () => {
+    const existingSessionId = await ensureChatSession();
+
+    useUIStore.getState().switchToNode('proj_1');
     await focusOrOpenChat();
 
     const state = useUIStore.getState();
-    expect(state.panels).toHaveLength(2);
-    expect(state.activePanelId).toBe(existingChatPanel.id);
+    expect(state.activeView).toBe('chat');
+    expect(state.currentChatSessionId).toBe(existingSessionId);
   });
 
-  it('openChatWithPrompt reuses an existing chat panel and queues the prompt', async () => {
-    await openChatPanel();
-    const existingChatPanel = useUIStore.getState().panels[1]!;
+  it('openChatWithPrompt reuses the existing chat session and queues the prompt', async () => {
+    const existingSessionId = await ensureChatSession();
 
-    useUIStore.getState().setActivePanel('main');
+    useUIStore.getState().switchToNode('proj_1');
     await openChatWithPrompt('Explain this page');
 
     const state = useUIStore.getState();
-    expect(state.panels).toHaveLength(2);
-    expect(state.activePanelId).toBe(existingChatPanel.id);
+    expect(state.activeView).toBe('chat');
+    expect(state.currentChatSessionId).toBe(existingSessionId);
     expect(state.pendingChatPrompt).toEqual({
-      panelId: existingChatPanel.id,
+      sessionId: existingSessionId,
       prompt: 'Explain this page',
     });
   });
 
-  it('openChatWithPrompt opens a new chat panel and targets that panel when none exists', async () => {
+  it('openChatWithPrompt creates a new chat session when none exists', async () => {
     await openChatWithPrompt('Start fresh');
 
     const state = useUIStore.getState();
-    const createdChatPanel = state.panels[1];
-
-    expect(createdChatPanel).toBeDefined();
-    expect(isChatPanel(createdChatPanel!.nodeId)).toBe(true);
-    expect(state.activePanelId).toBe(createdChatPanel!.id);
+    expect(state.activeView).toBe('chat');
+    expect(state.currentChatSessionId).toBeTruthy();
     expect(state.pendingChatPrompt).toEqual({
-      panelId: createdChatPanel!.id,
+      sessionId: state.currentChatSessionId!,
       prompt: 'Start fresh',
     });
   });

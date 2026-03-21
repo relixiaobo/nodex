@@ -1,50 +1,64 @@
 import { createSession } from './ai-chat-tree.js';
 import { saveChatSession } from './ai-persistence.js';
 import { useUIStore } from '../stores/ui-store.js';
-import { CHAT_PANEL_PREFIX, isChatPanel } from '../types/index.js';
 
-export async function openChatPanel(insertIndex?: number): Promise<string> {
+async function createChatSession(): Promise<string> {
   const session = createSession();
   try {
     await saveChatSession(session);
   } catch {
-    // Fail open: panel restoration can recreate the session if persistence is unavailable.
+    // Fail open: the in-memory session is still usable even if persistence fails.
   }
 
-  useUIStore.getState().openPanel(`${CHAT_PANEL_PREFIX}${session.id}`, insertIndex);
-  return useUIStore.getState().activePanelId;
+  return session.id;
+}
+
+export async function ensureChatSession(): Promise<string> {
+  const existingSessionId = useUIStore.getState().currentChatSessionId;
+  if (existingSessionId) {
+    return existingSessionId;
+  }
+
+  const sessionId = await createChatSession();
+  useUIStore.getState().setCurrentChatSessionId(sessionId);
+  return sessionId;
+}
+
+export async function openChatPanel(): Promise<string> {
+  const sessionId = await createChatSession();
+  const ui = useUIStore.getState();
+  ui.setCurrentChatSessionId(sessionId);
+  ui.switchToChat();
+  return sessionId;
 }
 
 export async function focusOrOpenChat(): Promise<void> {
-  const { panels, activePanelId, setActivePanel } = useUIStore.getState();
-  const activePanel = panels.find((panel) => panel.id === activePanelId);
-  if (activePanel && isChatPanel(activePanel.nodeId)) {
-    return;
-  }
-
-  const existingChatPanel = panels.find((panel) => isChatPanel(panel.nodeId));
-  if (existingChatPanel) {
-    setActivePanel(existingChatPanel.id);
+  const { currentChatSessionId, switchToChat } = useUIStore.getState();
+  if (currentChatSessionId) {
+    switchToChat();
     return;
   }
 
   await openChatPanel();
 }
 
-export async function openChatWithPrompt(prompt: string): Promise<void> {
-  const { panels, activePanelId, setActivePanel, setPendingChatPrompt } = useUIStore.getState();
-  const activeChatPanel = panels.find(
-    (panel) => panel.id === activePanelId && isChatPanel(panel.nodeId),
-  );
-  const targetPanel = activeChatPanel ?? panels.find((panel) => isChatPanel(panel.nodeId));
+export function switchToChatSession(sessionId: string): void {
+  const ui = useUIStore.getState();
+  ui.setCurrentChatSessionId(sessionId);
+  ui.switchToChat();
+}
 
-  let targetPanelId: string;
-  if (targetPanel) {
-    setActivePanel(targetPanel.id);
-    targetPanelId = targetPanel.id;
+export async function openChatWithPrompt(prompt: string): Promise<void> {
+  const ui = useUIStore.getState();
+  let sessionId = ui.currentChatSessionId;
+
+  if (!sessionId) {
+    sessionId = await createChatSession();
+    ui.setCurrentChatSessionId(sessionId);
+    ui.switchToChat();
   } else {
-    targetPanelId = await openChatPanel();
+    ui.switchToChat();
   }
 
-  setPendingChatPrompt({ panelId: targetPanelId, prompt });
+  ui.setPendingChatPrompt({ sessionId, prompt });
 }

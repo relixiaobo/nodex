@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useState, type RefObject } from 'react';
 import { ExternalLink } from '../../lib/icons.js';
 import * as loroDoc from '../../lib/loro-doc.js';
+import { buildExpandedNodeKey } from '../../lib/expanded-node-key.js';
 import { useUIStore } from '../../stores/ui-store.js';
 import { OutlinerItem } from '../outliner/OutlinerItem.js';
 import { useNode } from '../../hooks/use-node.js';
@@ -49,7 +50,7 @@ interface NodePopoverProps {
 }
 
 export function NodePopover({ nodeId, anchorRect, onClose }: NodePopoverProps) {
-  const navigateTo = useUIStore((s) => s.navigateTo);
+  const switchToNode = useUIStore((s) => s.switchToNode);
   const setExpanded = useUIStore((s) => s.setExpanded);
   const node = useNode(nodeId);
   const realParentId = loroDoc.getParentId(nodeId) ?? nodeId;
@@ -58,14 +59,14 @@ export function NodePopover({ nodeId, anchorRect, onClose }: NodePopoverProps) {
   // Auto-expand on mount so children are visible
   useEffect(() => {
     if (hasChildren) {
-      setExpanded(`${CHAT_OUTLINER_PANEL_ID}:${realParentId}:${nodeId}`, true, true);
+      setExpanded(buildExpandedNodeKey(realParentId, nodeId), true, true);
     }
   }, [nodeId, realParentId, hasChildren, setExpanded]);
 
   const handleOpenInPanel = useCallback(() => {
-    navigateTo(nodeId);
+    switchToNode(nodeId);
     onClose();
-  }, [navigateTo, nodeId, onClose]);
+  }, [nodeId, onClose, switchToNode]);
 
   return (
     <PopoverShell anchorRect={anchorRect} onClose={onClose}>
@@ -89,7 +90,7 @@ export function NodePopover({ nodeId, anchorRect, onClose }: NodePopoverProps) {
           className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-foreground-secondary transition-colors hover:bg-foreground/4 hover:text-foreground"
         >
           <ExternalLink size={12} />
-          Open in panel
+          Open in outliner
         </button>
       </div>
     </PopoverShell>

@@ -38,6 +38,7 @@ import {
 } from '../lib/webclip-messaging.js';
 import { applyWebClipToNode } from '../lib/webclip-service.js';
 import { ensureTodayNode } from '../lib/journal.js';
+import { buildExpandedNodeKey } from '../lib/expanded-node-key.js';
 import { t } from '../i18n/strings.js';
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -428,7 +429,7 @@ export function useEditorTriggers(config: EditorTriggerConfig): EditorTriggerSta
           const tempNodeId = startRefConversion(newRefId, parentId, insertPos);
           setPendingRefConversion({ tempNodeId, refNodeId, parentId });
           const gpId = loroDoc.getParentId(parentId);
-          if (gpId) setExpanded(`${panelId}:${gpId}:${parentId}`, true, true);
+          if (gpId) setExpanded(buildExpandedNodeKey(gpId, parentId), true, true);
           useUIStore.getState().setPendingInputChar(null);
           useUIStore.getState().setFocusClickCoords({
             nodeId: tempNodeId,

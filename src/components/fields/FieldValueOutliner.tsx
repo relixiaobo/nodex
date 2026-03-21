@@ -46,6 +46,7 @@ import { useDragSelect } from '../../hooks/use-drag-select.js';
 import { navigateToSiblingRow } from '../../lib/outliner-navigation.js';
 import { canCreateChildrenUnder, canEditFieldEntryValue, getNodeCapabilities } from '../../lib/node-capabilities.js';
 import { OptionsPicker } from './OptionsPicker.js';
+import { buildExpandedNodeKey } from '../../lib/expanded-node-key.js';
 
 interface FieldValueOutlinerProps {
   fieldEntryId: string;
@@ -509,7 +510,7 @@ export function FieldValueOutliner({ fieldEntryId, fieldDataType, attrDefId, con
         <TrailingInput
           parentId={fieldEntryId}
           depth={0}
-          parentExpandKey={`${panelId}:${loroDoc.getParentId(fieldEntryId) ?? ''}:${fieldEntryId}`}
+          parentExpandKey={buildExpandedNodeKey(loroDoc.getParentId(fieldEntryId) ?? '', fieldEntryId)}
           fieldDataType={fieldDataType}
           attrDefId={attrDefId}
           panelId={panelId}

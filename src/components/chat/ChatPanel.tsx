@@ -85,8 +85,8 @@ function mergeToolCallOnlyEntries(entries: ToolCallOnlyEntry[]): ChatMessageEntr
 export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
   const pendingChatPrompt = useUIStore((s) => s.pendingChatPrompt);
   const setPendingChatPrompt = useUIStore((s) => s.setPendingChatPrompt);
-  const activePanelId = useUIStore((s) => s.activePanelId);
-  const isActive = activePanelId === panelId;
+  const activeView = useUIStore((s) => s.activeView);
+  const isActive = activeView === 'chat';
   const {
     agent,
     messages,
@@ -197,7 +197,7 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
   }, [chatState, isStreaming, messages, steeringNote]);
 
   useEffect(() => {
-    if (!isActive || !pendingChatPrompt || pendingChatPrompt.panelId !== panelId) return;
+    if (!isActive || !pendingChatPrompt || pendingChatPrompt.sessionId !== sessionId) return;
     if (chatState !== 'ready' || chatBusy || !ready) return;
 
     setPendingChatPrompt(null);
@@ -205,9 +205,9 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
   }, [
     chatBusy,
     isActive,
-    panelId,
     pendingChatPrompt,
     ready,
+    sessionId,
     setPendingChatPrompt,
     chatState,
   ]);
@@ -264,7 +264,7 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
   }
 
   function handleOpenSettings() {
-    useUIStore.getState().openPanel(SYSTEM_NODE_IDS.SETTINGS);
+    useUIStore.getState().switchToNode(SYSTEM_NODE_IDS.SETTINGS);
   }
 
   async function handleModelChange(modelId: string, provider: string) {
@@ -354,7 +354,6 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
           sessionId={sessionId}
           onClose={(e) => {
             e.stopPropagation();
-            useUIStore.getState().closePanel(panelId);
           }}
         />
       )}
@@ -382,7 +381,7 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
           </div>
         ) : chatState === 'onboarding' ? (
           <div className="flex flex-1 overflow-hidden">
-            <ChatOnboarding panelId={panelId} />
+            <ChatOnboarding />
             {debugEnabled && debugOpen && (
               <div className="w-1/2 shrink-0 overflow-y-auto overflow-x-hidden border-l border-border px-3 py-3">
                 <ChatDebugPanel debug={debug} />

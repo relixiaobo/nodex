@@ -1,44 +1,34 @@
-/**
- * NavButtons (panel navigation) tests.
- *
- * Verifies that goBack / goForward correctly navigate via navHistory events,
- * matching the logic consumed by NavButtons.tsx.
- *
- * Seed data initializes panels to [{id:'main', nodeId: Today}] via replacePanel,
- * so all tests start with a single panel showing the current day node.
- */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ensureTodayNode } from '../../src/lib/journal.js';
 import { useUIStore } from '../../src/stores/ui-store.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
-/** Helper: get current active panel node ID */
 function currentNodeId(): string | null {
-  const s = useUIStore.getState();
-  return s.panels.find((p) => p.id === s.activePanelId)?.nodeId ?? null;
+  return useUIStore.getState().currentNodeId;
 }
 
 beforeEach(() => {
   resetAndSeed();
 });
 
-describe('NavButtons — panel navigation', () => {
-  it('seed initializes with a panel showing Today', () => {
+describe('node history wrappers', () => {
+  it('seed initializes the node view with Today', () => {
     const s = useUIStore.getState();
-    expect(s.panels.length).toBe(1);
-    expect(s.panels[0].nodeId).toBe(ensureTodayNode());
-    expect(s.activePanelId).toBe(s.panels[0].id);
+    expect(s.activeView).toBe('node');
+    expect(s.currentNodeId).toBe(ensureTodayNode());
+    expect(s.nodeHistory).toEqual([ensureTodayNode()]);
+    expect(s.nodeHistoryIndex).toBe(0);
   });
 
-  it('navigateTo updates active panel nodeId and pushes navHistory', () => {
+  it('navigateTo updates currentNodeId and pushes nodeHistory', () => {
     useUIStore.getState().navigateTo('proj_1');
     const s = useUIStore.getState();
     expect(currentNodeId()).toBe('proj_1');
-    expect(s.navHistory.length).toBe(1);
-    expect(s.navIndex).toBe(0);
+    expect(s.nodeHistory).toEqual([ensureTodayNode(), 'proj_1']);
+    expect(s.nodeHistoryIndex).toBe(1);
   });
 
-  it('goBack restores previous nodeId', () => {
+  it('goBack restores the previous node id', () => {
     useUIStore.getState().navigateTo('proj_1');
     useUIStore.getState().navigateTo('note_1');
     useUIStore.getState().goBack();
@@ -46,7 +36,7 @@ describe('NavButtons — panel navigation', () => {
     expect(currentNodeId()).toBe('proj_1');
   });
 
-  it('goForward restores forward nodeId', () => {
+  it('goForward restores the forward node id', () => {
     useUIStore.getState().navigateTo('proj_1');
     useUIStore.getState().navigateTo('note_1');
     useUIStore.getState().goBack();
@@ -55,33 +45,29 @@ describe('NavButtons — panel navigation', () => {
     expect(currentNodeId()).toBe('note_1');
   });
 
-  it('goBack is no-op at start of history', () => {
+  it('goBack is a no-op at the start of history', () => {
     const todayId = ensureTodayNode();
-    // No navHistory events yet, goBack should be no-op
     useUIStore.getState().goBack();
-
     expect(currentNodeId()).toBe(todayId);
   });
 
-  it('goForward is no-op at end of history', () => {
+  it('goForward is a no-op at the end of history', () => {
     useUIStore.getState().navigateTo('proj_1');
-    // Already at end, goForward should be no-op
     useUIStore.getState().goForward();
-
     expect(currentNodeId()).toBe('proj_1');
   });
 
   it('navigateTo after goBack truncates forward history', () => {
+    const todayId = ensureTodayNode();
     useUIStore.getState().navigateTo('proj_1');
     useUIStore.getState().navigateTo('note_1');
     useUIStore.getState().navigateTo('note_2');
-    useUIStore.getState().goBack(); // → note_1
-    useUIStore.getState().navigateTo('person_1'); // truncates note_2
+    useUIStore.getState().goBack();
+    useUIStore.getState().navigateTo('person_1');
 
     expect(currentNodeId()).toBe('person_1');
-    // navHistory should have: navigate(today→proj_1), navigate(proj_1→note_1), navigate(note_1→person_1)
     const s = useUIStore.getState();
-    expect(s.navHistory.length).toBe(3);
-    expect(s.navIndex).toBe(2);
+    expect(s.nodeHistory).toEqual([todayId, 'proj_1', 'note_1', 'person_1']);
+    expect(s.nodeHistoryIndex).toBe(3);
   });
 });

@@ -4,9 +4,10 @@ import { createRoot, type Root } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 
-const { mockGetCurrentUser, mockGetStartupPagePreference } = vi.hoisted(() => ({
+const { mockGetCurrentUser, mockGetStartupPagePreference, mockEnsureChatSession } = vi.hoisted(() => ({
   mockGetCurrentUser: vi.fn(),
   mockGetStartupPagePreference: vi.fn(),
+  mockEnsureChatSession: vi.fn<() => Promise<string>>(),
 }));
 
 vi.mock('../../src/lib/auth.js', async () => {
@@ -26,12 +27,12 @@ vi.mock('../../src/lib/startup-page-preference.js', async () => {
   };
 });
 
-vi.mock('../../src/hooks/use-nav-undo-keyboard', () => ({
-  useNavUndoKeyboard: vi.fn(),
+vi.mock('../../src/lib/chat-panel-actions.js', () => ({
+  ensureChatSession: mockEnsureChatSession,
 }));
 
-vi.mock('../../src/hooks/use-panel-keyboard.js', () => ({
-  usePanelKeyboard: vi.fn(),
+vi.mock('../../src/hooks/use-nav-undo-keyboard', () => ({
+  useNavUndoKeyboard: vi.fn(),
 }));
 
 vi.mock('../../src/hooks/use-chat-shortcut.js', () => ({
@@ -49,8 +50,8 @@ vi.mock('../../src/hooks/use-global-selection-dismiss.js', () => ({
   }),
 }));
 
-vi.mock('../../src/components/layout/DeskLayout.js', () => ({
-  DeskLayout: () => React.createElement('div', { 'data-testid': 'desk-layout' }),
+vi.mock('../../src/components/layout/ToggleLayout.js', () => ({
+  ToggleLayout: () => React.createElement('div', { 'data-testid': 'toggle-layout' }),
 }));
 
 vi.mock('../../src/components/search/CommandPalette', () => ({
@@ -63,6 +64,7 @@ vi.mock('../../src/components/tags/BatchTagSelector', () => ({
 
 vi.mock('../../src/components/ui/Tooltip', () => ({
   TooltipProvider: ({ children }: { children: React.ReactNode }) => React.createElement(React.Fragment, null, children),
+  Tooltip: ({ children }: { children: React.ReactNode }) => React.createElement(React.Fragment, null, children),
 }));
 
 import { App } from '../../src/entrypoints/sidepanel/App.js';
@@ -83,7 +85,13 @@ describe('App bootstrap', () => {
     await useUIStore.persist.rehydrate();
     mockGetCurrentUser.mockReset();
     mockGetStartupPagePreference.mockReset();
+    mockEnsureChatSession.mockReset();
     mockGetStartupPagePreference.mockReturnValue(STARTUP_PAGE.CHAT);
+    mockEnsureChatSession.mockImplementation(async () => {
+      useUIStore.getState().setCurrentChatSessionId('session_bootstrap');
+      return 'session_bootstrap';
+    });
+
     originalChrome = globalThis.chrome;
     vi.stubGlobal('chrome', {
       runtime: {
@@ -125,7 +133,7 @@ describe('App bootstrap', () => {
     });
   });
 
-  it('opens Today on bootstrap when startup preference is Today', async () => {
+  it('opens Today on bootstrap when startup preference is Today while keeping node view active', async () => {
     mockGetCurrentUser.mockResolvedValue({
       id: 'user_app_bootstrap',
       email: 'app@example.com',
@@ -138,8 +146,15 @@ describe('App bootstrap', () => {
     });
 
     await vi.waitFor(() => {
-      expect(useUIStore.getState().panels[0]?.nodeId).toBe(ensureTodayNode());
-      expect(container.querySelector('[data-testid="desk-layout"]')).not.toBeNull();
+      const state = useUIStore.getState();
+      expect(state.activeView).toBe('node');
+      expect(state.currentNodeId).toBe(ensureTodayNode());
+      expect(container.querySelector('[data-testid="toggle-layout"]')).not.toBeNull();
     });
+
+    await vi.waitFor(() => {
+      expect(useUIStore.getState().currentChatSessionId).toBe('session_bootstrap');
+    });
+    expect(useUIStore.getState().activeView).toBe('node');
   });
 });

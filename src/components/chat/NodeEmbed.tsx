@@ -5,6 +5,8 @@
  * auto-expands it so children are visible. Supports editing and expand/collapse.
  */
 import { useEffect } from 'react';
+import { ExternalLink } from '../../lib/icons.js';
+import { buildExpandedNodeKey } from '../../lib/expanded-node-key.js';
 import { useNode } from '../../hooks/use-node.js';
 import { useUIStore } from '../../stores/ui-store.js';
 import * as loroDoc from '../../lib/loro-doc.js';
@@ -18,13 +20,14 @@ interface NodeEmbedProps {
 export function NodeEmbed({ nodeId }: NodeEmbedProps) {
   const node = useNode(nodeId);
   const setExpanded = useUIStore((s) => s.setExpanded);
+  const switchToNode = useUIStore((s) => s.switchToNode);
   const realParentId = loroDoc.getParentId(nodeId) ?? nodeId;
   const hasChildren = (node?.children?.length ?? 0) > 0;
 
   // Auto-expand on mount so children are visible
   useEffect(() => {
     if (hasChildren) {
-      setExpanded(`${CHAT_OUTLINER_PANEL_ID}:${realParentId}:${nodeId}`, true, true);
+      setExpanded(buildExpandedNodeKey(realParentId, nodeId), true, true);
     }
   }, [nodeId, realParentId, hasChildren, setExpanded]);
 
@@ -46,6 +49,16 @@ export function NodeEmbed({ nodeId }: NodeEmbedProps) {
         rootNodeId={realParentId}
         panelId={CHAT_OUTLINER_PANEL_ID}
       />
+      <div className="flex items-center justify-end border-t border-border px-2 py-1">
+        <button
+          type="button"
+          onClick={() => switchToNode(nodeId)}
+          className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-foreground-secondary transition-colors hover:bg-foreground/4 hover:text-foreground"
+        >
+          <ExternalLink size={12} />
+          Open in outliner
+        </button>
+      </div>
     </div>
   );
 }

@@ -10,8 +10,9 @@ interface UseChatDebugSnapshotResult {
 }
 
 export function useChatDebugSnapshot(debug: AgentDebugState): UseChatDebugSnapshotResult {
-  const activePanelId = useUIStore((state) => state.activePanelId);
-  const panels = useUIStore((state) => state.panels);
+  const activeView = useUIStore((state) => state.activeView);
+  const currentNodeId = useUIStore((state) => state.currentNodeId);
+  const currentChatSessionId = useUIStore((state) => state.currentChatSessionId);
   const [tabRefreshVersion, setTabRefreshVersion] = useState(0);
   const [snapshot, setSnapshot] = useState<AgentDebugSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -54,7 +55,7 @@ export function useChatDebugSnapshot(debug: AgentDebugState): UseChatDebugSnapsh
     return () => {
       cancelled = true;
     };
-  }, [debug.revision, panels, activePanelId, tabRefreshVersion]);
+  }, [debug.revision, activeView, currentNodeId, currentChatSessionId, tabRefreshVersion]);
 
   return {
     snapshot,

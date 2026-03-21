@@ -1,6 +1,6 @@
-import { useRef, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { useNode } from '../../hooks/use-node.js';
-import { NodePopover, useNodePopover } from './NodePopover.js';
+import { useUIStore } from '../../stores/ui-store.js';
 
 interface NodeReferenceProps {
   nodeId: string;
@@ -9,8 +9,7 @@ interface NodeReferenceProps {
 
 export function NodeReference({ nodeId, children }: NodeReferenceProps) {
   const node = useNode(nodeId);
-  const triggerRef = useRef<HTMLSpanElement>(null);
-  const { anchorRect, open, close } = useNodePopover(node, triggerRef);
+  const switchToNode = useUIStore((s) => s.switchToNode);
 
   if (!node) {
     return (
@@ -20,22 +19,25 @@ export function NodeReference({ nodeId, children }: NodeReferenceProps) {
     );
   }
 
+  const handleOpen = () => {
+    switchToNode(nodeId);
+  };
+
   return (
-    <>
-      <span
-        ref={triggerRef}
-        role="button"
-        tabIndex={0}
-        onClick={open}
-        onKeyDown={(e) => { if (e.key === 'Enter') open(); }}
-        className="cursor-pointer text-primary underline decoration-primary/30 underline-offset-[3px] transition-colors hover:text-primary/80"
-        title={node.name ?? nodeId}
-      >
-        {children}
-      </span>
-      {anchorRect && (
-        <NodePopover nodeId={nodeId} anchorRect={anchorRect} onClose={close} />
-      )}
-    </>
+    <span
+      role="button"
+      tabIndex={0}
+      onClick={handleOpen}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          handleOpen();
+        }
+      }}
+      className="cursor-pointer text-primary underline decoration-primary/30 underline-offset-[3px] transition-colors hover:text-primary/80"
+      title={node.name ?? nodeId}
+    >
+      {children}
+    </span>
   );
 }

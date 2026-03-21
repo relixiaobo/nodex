@@ -3,12 +3,11 @@ import { useWorkspaceStore } from '../../stores/workspace-store';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import { useNavUndoKeyboard } from '../../hooks/use-nav-undo-keyboard';
-import { usePanelKeyboard } from '../../hooks/use-panel-keyboard.js';
 import { useChatShortcut } from '../../hooks/use-chat-shortcut.js';
 import { useTodayShortcut } from '../../hooks/use-today-shortcut';
 import { useGlobalSelectionDismiss } from '../../hooks/use-global-selection-dismiss.js';
 import { LoginScreen } from '../../components/auth/LoginScreen.js';
-import { DeskLayout } from '../../components/layout/DeskLayout.js';
+import { ToggleLayout } from '../../components/layout/ToggleLayout.js';
 import { CommandPalette } from '../../components/search/CommandPalette';
 import { BatchTagSelector } from '../../components/tags/BatchTagSelector';
 import { initLoroDoc } from '../../lib/loro-doc.js';
@@ -51,7 +50,7 @@ import { ensureSystemNodes } from '../../lib/bootstrap-system-nodes.js';
 import { Toaster, toast } from 'sonner';
 import { TooltipProvider } from '../../components/ui/Tooltip';
 import { isAppPanel, isChatPanel } from '../../types/index.js';
-import { openChatPanel } from '../../lib/chat-panel-actions.js';
+import { ensureChatSession } from '../../lib/chat-panel-actions.js';
 
 // ─── Error Boundary ───
 // Prevents white screen — catches render errors and shows a recovery UI.
@@ -108,7 +107,6 @@ function useBootstrap(skip: boolean): BootstrapResult {
  const [ready, setReady] = useState(skip);
  const [requireLogin, setRequireLogin] = useState(false);
  const isAuthenticated = useWorkspaceStore((s) => s.isAuthenticated);
- const replacePanel = useUIStore((s) => s.replacePanel);
 
  const authInitCalled = useRef(false);
  const workspaceBootstrapInFlight = useRef(false);
@@ -140,42 +138,32 @@ function useBootstrap(skip: boolean): BootstrapResult {
     });
    }
 
-   // Default panel logic:
-   // - Empty panels → open Chat (chat-first experience)
-   // - Invalid/stale node panel → reset to Today
-   // - First visit of the day on a node panel → reset to Today
-   // Preserve restored app/chat panels as-is so special panels survive restart.
-   // Use replacePanel (not navigateTo) to avoid creating a Loro undo entry whose
-   // captured UI snapshot is the empty initial state — that would cause repeated
-   // Cmd+Z to restore a blank panel stack.
+   // Toggle-layout bootstrap:
+   // - New users default to Chat unless startup preference explicitly prefers Today
+   // - Returning users restore the last active view
+   // - First node visit of a new day resets the node view to Today
+   // - Hidden Chat view still gets a session so switching preserves state immediately
    const uiState = useUIStore.getState();
-   const activePanel = uiState.panels.find((p) => p.id === uiState.activePanelId);
-   const currentPanelNodeId = activePanel?.nodeId ?? null;
-   const todayStr = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-   const lastVisitDate = uiState.lastVisitDate;
-   const isFirstVisitOfDay = lastVisitDate !== todayStr;
-   useUIStore.getState().setLastVisitDate(todayStr);
-   const hasInvalidActiveNode = !!currentPanelNodeId
-    && !isAppPanel(currentPanelNodeId)
-    && !isChatPanel(currentPanelNodeId)
-    && !loroDoc.hasNode(currentPanelNodeId);
+   const today = new Date();
+   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+   const isFirstNodeVisitOfDay = uiState.lastVisitDate !== todayStr;
+   const currentNodeId = uiState.currentNodeId;
+   const hasInvalidCurrentNode = !!currentNodeId
+    && !isAppPanel(currentNodeId)
+    && !loroDoc.hasNode(currentNodeId);
 
-   if (uiState.panels.length === 0) {
-    if (getStartupPagePreference() === STARTUP_PAGE.TODAY) {
-     replacePanel(ensureTodayNode());
+   if (!uiState.currentChatSessionId) {
+    void ensureChatSession();
+   }
+
+   if (uiState.activeView === 'node') {
+    if (hasInvalidCurrentNode || !currentNodeId || isFirstNodeVisitOfDay) {
+     useUIStore.getState().switchToNode(ensureTodayNode());
     } else {
-     void openChatPanel();
+     useUIStore.getState().setLastVisitDate(todayStr);
     }
-   } else if (
-    hasInvalidActiveNode
-    || (
-      isFirstVisitOfDay
-      && !!currentPanelNodeId
-      && !isAppPanel(currentPanelNodeId)
-      && !isChatPanel(currentPanelNodeId)
-    )
-   ) {
-    replacePanel(ensureTodayNode());
+   } else if (getStartupPagePreference() === STARTUP_PAGE.TODAY && !currentNodeId && !uiState.currentChatSessionId) {
+    useUIStore.getState().switchToNode(ensureTodayNode());
    }
 
    // ── Drain pending highlight queue ──
@@ -478,11 +466,9 @@ export function App({ skipBootstrap = false }: AppProps) {
   }
  }, []);
 
- // Global Cmd+Z / Cmd+Shift+Z for navigation undo/redo
+ // Global Cmd+Z / Cmd+Shift+Z for node history navigation
  useNavUndoKeyboard();
- // Global multi-panel keyboard shortcuts (Cmd+\, Cmd+Shift+W, Cmd+Option+←/→)
- usePanelKeyboard();
- // Global Cmd+L / Cmd+Shift+L for chat drawer
+ // Global Cmd+L / Cmd+Shift+L for chat view
  useChatShortcut();
  // Global Cmd+Shift+D for go to today
  useTodayShortcut();
@@ -507,7 +493,7 @@ export function App({ skipBootstrap = false }: AppProps) {
      onPointerDownCapture={selectionDismissHandlers.onPointerDownCapture}
      onFocusCapture={selectionDismissHandlers.onFocusCapture}
     >
-     <DeskLayout />
+     <ToggleLayout />
      <CommandPalette />
      <BatchTagSelector />
      <Toaster

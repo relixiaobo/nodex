@@ -12,7 +12,6 @@ import {
   matchDateShortcuts,
 } from '../../src/components/references/ReferenceSelector.js';
 import { SYSTEM_NODE_IDS } from '../../src/types/index.js';
-import type { Panel, NavigationEvent } from '../../src/types/index.js';
 
 function createNamedNode(id: string, name: string, updatedAt: number, type?: string) {
   createNode(id, null);
@@ -35,16 +34,15 @@ describe('collectRecentReferenceNodes', () => {
 
     const recent = collectRecentReferenceNodes({
       currentNodeId: 'current',
-      navHistory: [],
-      navIndex: -1,
-      panels: [{ id: 'main', nodeId: SYSTEM_NODE_IDS.LIBRARY }] as Panel[],
+      nodeHistory: [],
+      nodeHistoryIndex: -1,
       limit: 5,
     });
 
     expect(recent.map((n) => n.id)).toEqual(['n_new', 'n_old']);
   });
 
-  it('prefers panels + navigation history order before fallback candidates', () => {
+  it('prefers node history order before fallback candidates', () => {
     createNamedNode(SYSTEM_NODE_IDS.LIBRARY, 'Library', 1000);
     createNamedNode('current', 'Current', 900);
     createNamedNode('h_1', 'History One', 1200);
@@ -52,25 +50,18 @@ describe('collectRecentReferenceNodes', () => {
     createNamedNode('n_1', 'Newest', 2000);
     commitDoc('__seed__');
 
-    // Simulate: panels show h_2 (current panel) and navHistory has navigate events
-    const navHistory: NavigationEvent[] = [
-      { action: 'navigate', panelId: 'main', fromNodeId: SYSTEM_NODE_IDS.LIBRARY, toNodeId: 'h_1' },
-      { action: 'navigate', panelId: 'main', fromNodeId: 'h_1', toNodeId: 'h_2' },
-    ];
-
     const recent = collectRecentReferenceNodes({
       currentNodeId: 'current',
-      navHistory,
-      navIndex: 1,
-      panels: [{ id: 'main', nodeId: 'h_2' }] as Panel[],
+      nodeHistory: ['h_1', 'h_2'],
+      nodeHistoryIndex: 1,
       limit: 3,
     });
 
-    // h_2 from panels first, then h_1 from navHistory, then n_1 from fallback
+    // h_2 from current history position first, then h_1, then n_1 from fallback.
     expect(recent.map((n) => n.id)).toEqual(['h_2', 'h_1', 'n_1']);
   });
 
-  it('deduplicates panels and fallback nodes', () => {
+  it('deduplicates node history and fallback nodes', () => {
     createNamedNode(SYSTEM_NODE_IDS.LIBRARY, 'Library', 1000);
     createNamedNode('current', 'Current', 900);
     createNamedNode('dup_1', 'Duplicated', 2200);
@@ -79,9 +70,8 @@ describe('collectRecentReferenceNodes', () => {
 
     const recent = collectRecentReferenceNodes({
       currentNodeId: 'current',
-      navHistory: [],
-      navIndex: -1,
-      panels: [{ id: 'main', nodeId: 'dup_1' }] as Panel[],
+      nodeHistory: ['dup_1'],
+      nodeHistoryIndex: 0,
       limit: 3,
     });
 

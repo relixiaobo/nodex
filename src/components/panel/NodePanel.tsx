@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Trash2, RotateCcw } from '../../lib/icons.js';
 import { useNode } from '../../hooks/use-node';
 import { useNodeStore } from '../../stores/node-store';
@@ -70,28 +70,7 @@ export function NodePanel({ nodeId, panelId }: NodePanelProps) {
     return isTagDef ? resolveTagColor(nodeId) : null;
   });
 
-  const setPanelTitleVisible = useUIStore((s) => s.setPanelTitleVisible);
-  const titleElRef = useRef<HTMLElement | null>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  const handleTitleRef = useCallback((el: HTMLElement | null) => {
-    titleElRef.current = el;
-  }, []);
-
-  useEffect(() => {
-    const el = titleElRef.current;
-    const root = scrollRef.current;
-    if (!el || !root) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => setPanelTitleVisible(panelId, entry.isIntersecting),
-      { root, threshold: 0 },
-    );
-    observer.observe(el);
-    return () => {
-      observer.disconnect();
-      setPanelTitleVisible(panelId, true);
-    };
-  }, [nodeId, panelId, setPanelTitleVisible]);
+  const handleTitleRef = useCallback((_el: HTMLElement | null) => {}, []);
 
   const [confirmHardDelete, setConfirmHardDelete] = useState(false);
   const [confirmEmptyTrash, setConfirmEmptyTrash] = useState(false);
@@ -131,7 +110,7 @@ export function NodePanel({ nodeId, panelId }: NodePanelProps) {
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      <div ref={scrollRef} className="flex-1 overflow-y-auto scroll-pb-[40vh]">
+      <div className="flex-1 overflow-y-auto scroll-pb-[40vh]">
         {isTagDef && tagDefColor && (
           <div
             className="h-28 -mb-28 pointer-events-none"

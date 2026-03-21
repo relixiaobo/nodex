@@ -41,6 +41,7 @@ import { pmSchema } from './pm-schema.js';
 import { marksToDoc } from '../../lib/pm-doc-utils.js';
 import { parseMultiLinePaste } from '../../lib/paste-parser.js';
 import { logPasteDebug, previewMultiline, summarizePasteNodes } from '../../lib/paste-debug.js';
+import { buildExpandedNodeKey } from '../../lib/expanded-node-key.js';
 
 const KEY_TRAILING_ENTER = getPrimaryShortcutKey('trailing.enter', 'Enter');
 const KEY_TRAILING_INDENT = getPrimaryShortcutKey('trailing.indent_depth', 'Tab');
@@ -54,7 +55,7 @@ interface TrailingInputProps {
     parentId: string;
     depth: number;
     autoFocus?: boolean;
-    /** Compound expand key for the parent node (grandparentId:parentId) */
+    /** Expand key for the parent node ("parentId:nodeId"). */
     parentExpandKey: string;
     /** Panel ID for scoped expand state (defaults to 'main') */
     panelId?: string;
@@ -267,7 +268,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, pan
 
                     const lastSiblingId = siblings[siblings.length - 1];
                     // Expand the last sibling (compound key: effectiveParentId is its parent context)
-                    const siblingEK = `${ref.panelId}:${ref.effectiveParentId}:${lastSiblingId}`;
+                        const siblingEK = buildExpandedNodeKey(ref.effectiveParentId, lastSiblingId);
                     ref.setExpanded(siblingEK, true, true);
                     // Track: new effectiveParentId is lastSiblingId, its expand key is siblingEK
                     ref.setEffectiveParentEK(siblingEK);
@@ -289,7 +290,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, pan
 
                     // Compute expand key for grandparent (best-effort via parent chain)
                     const ggpId = loroDoc.getParentId(grandparentId) ?? '';
-                    ref.setEffectiveParentEK(`${ref.panelId}:${ggpId}:${grandparentId}`);
+                    ref.setEffectiveParentEK(buildExpandedNodeKey(ggpId, grandparentId));
                     ref.setEffectiveParentId(grandparentId);
                     ref.setEffectiveDepth(ref.effectiveDepth - 1);
                     return true;

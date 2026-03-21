@@ -60,42 +60,38 @@ function ToggleTopBar({
   );
   const nodeTitle = useNodeTitle(resolvedNodeId);
 
-  const activeTabClass = 'flex h-8 min-w-0 items-center gap-1.5 rounded-t-lg bg-background px-3 text-sm text-foreground shadow-[0_-1px_2px_rgba(0,0,0,0.04)]';
-  const inactiveTabClass = 'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-foreground-tertiary transition-colors hover:text-foreground';
+  const tabClass = (active: boolean) =>
+    `flex h-8 min-w-0 flex-1 items-center gap-1.5 rounded-t-lg px-2.5 text-[13px] transition-colors ${
+      active
+        ? 'bg-background text-foreground'
+        : 'text-foreground-tertiary hover:text-foreground'
+    }`;
 
   return (
-    <div className="flex shrink-0 items-end gap-0.5 px-1.5 pb-0">
+    <div className="flex shrink-0 items-end px-1.5">
       <button
         type="button"
-        disabled={activeView === 'chat'}
         onClick={() => switchToChat()}
-        className={activeView === 'chat' ? activeTabClass : inactiveTabClass}
+        className={tabClass(activeView === 'chat')}
       >
-        <MessageSquare size={16} strokeWidth={1.7} className="shrink-0" />
-        {activeView === 'chat' && (
-          <span className="min-w-0 truncate text-[13px]">
-            {chatTitle?.trim() || 'Chat'}
-          </span>
-        )}
+        <MessageSquare size={15} strokeWidth={1.7} className="shrink-0" />
+        <span className="min-w-0 truncate">
+          {chatTitle?.trim() || 'Chat'}
+        </span>
       </button>
 
       <button
         type="button"
-        disabled={activeView === 'node'}
         onClick={() => switchToNode()}
-        className={activeView === 'node' ? activeTabClass : inactiveTabClass}
+        className={tabClass(activeView === 'node')}
       >
-        <ListTree size={16} strokeWidth={1.7} className="shrink-0" />
-        {activeView === 'node' && (
-          <span className="min-w-0 truncate text-[13px]">
-            {nodeTitle}
-          </span>
-        )}
+        <ListTree size={15} strokeWidth={1.7} className="shrink-0" />
+        <span className="min-w-0 truncate">
+          {nodeTitle}
+        </span>
       </button>
 
-      <div className="flex-1" />
-
-      <div className="flex items-center pb-1">
+      <div className="flex h-8 items-center">
         <ToolbarUserMenu />
       </div>
     </div>
@@ -124,7 +120,7 @@ export function ToggleLayout() {
         resolvedNodeId={renderableNodeId}
       />
 
-      <div className="flex flex-1 flex-col overflow-hidden rounded-b-xl rounded-tr-xl bg-background shadow-card">
+      <div className="flex flex-1 flex-col overflow-hidden rounded-b-xl bg-background shadow-card">
         <div className="relative flex-1 overflow-hidden">
         <div className={activeView === 'chat' ? 'flex h-full flex-col' : hiddenViewClass} aria-hidden={activeView !== 'chat'}>
           {currentChatSessionId ? (

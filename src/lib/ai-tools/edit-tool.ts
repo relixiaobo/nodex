@@ -146,6 +146,15 @@ function executeMergeNoCommit(targetId: string, sourceId: string): MergeResult {
   if (targetId === sourceId) {
     throw new Error('Cannot merge a node into itself.');
   }
+  // Reject ancestor/descendant merges: if target is inside source's subtree,
+  // trashing source would drag the target into Trash too.
+  let cursor = loroDoc.getParentId(targetId);
+  while (cursor) {
+    if (cursor === sourceId) {
+      throw new Error(`Cannot merge: target ${targetId} is a descendant of source ${sourceId}. Move the target out first, or merge in the other direction.`);
+    }
+    cursor = loroDoc.getParentId(cursor);
+  }
 
   const store = useNodeStore.getState();
 
@@ -195,6 +204,14 @@ function executeMergeNoCommit(targetId: string, sourceId: string): MergeResult {
 
     const existingTargetFe = targetFieldMap.get(fe.fieldDefId);
     if (existingTargetFe) {
+      // Check cardinality: if single-value and target already has values, skip
+      const targetFeValues = loroDoc.getChildren(existingTargetFe);
+      const fieldDef = loroDoc.toNodexNode(fe.fieldDefId);
+      const isSingleValue = !fieldDef?.cardinality || fieldDef.cardinality === 'single';
+      if (isSingleValue && targetFeValues.length > 0) {
+        // Single-value field already has a value in target — skip to avoid invalid state
+        continue;
+      }
       // Move source field values into existing target field entry
       const sourceValues = loroDoc.getChildren(feId);
       for (const valueId of sourceValues) {
@@ -206,12 +223,12 @@ function executeMergeNoCommit(targetId: string, sourceId: string): MergeResult {
     }
   }
 
-  // 5. Redirect references: scan ALL nodes, find reference nodes pointing to source
+  // 5. Redirect all targetId references: reference nodes AND field value nodes
   let referencesRedirected = 0;
   const allNodeIds = loroDoc.getAllNodeIds();
   for (const id of allNodeIds) {
     const node = loroDoc.toNodexNode(id);
-    if (node?.type === 'reference' && node.targetId === sourceId) {
+    if (node?.targetId === sourceId) {
       loroDoc.setNodeData(id, 'targetId', targetId);
       referencesRedirected++;
     }

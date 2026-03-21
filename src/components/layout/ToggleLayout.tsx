@@ -41,9 +41,11 @@ function useNodeTitle(nodeId: string | null): string {
 
 // ── Tab button ──
 
-const ACTIVE_TAB = 'tab-connector-left tab-connector-right relative z-10 flex h-9 min-w-0 flex-1 items-center gap-1.5 rounded-t-xl bg-background px-3 text-[13px] text-foreground';
-const INACTIVE_TAB = 'group/tab flex h-9 min-w-0 flex-1 items-stretch px-1 pb-1 outline-none';
-const INACTIVE_INNER = 'flex min-w-0 flex-1 items-center gap-1.5 rounded-lg px-2 text-[13px] text-foreground-tertiary transition-colors group-hover/tab:bg-foreground/[0.05] group-hover/tab:text-foreground';
+const TAB_BUTTON = 'group/tab flex h-9 min-w-0 flex-1 items-stretch px-1 pb-1 outline-none';
+const TAB_BUTTON_ACTIVE = `${TAB_BUTTON} tab-connector-left tab-connector-right relative z-10 rounded-t-xl bg-background !p-0`;
+const TAB_INNER = 'flex min-w-0 flex-1 items-center gap-1.5 rounded-lg px-2 text-[13px] transition-colors';
+const TAB_INNER_ACTIVE = `${TAB_INNER} text-foreground`;
+const TAB_INNER_INACTIVE = `${TAB_INNER} text-foreground-tertiary group-hover/tab:bg-foreground/[0.05] group-hover/tab:text-foreground`;
 
 function TabButton({
   active,
@@ -56,16 +58,12 @@ function TabButton({
   title: string;
   onClick: () => void;
 }) {
-  const content = (
-    <>
-      <Icon size={15} strokeWidth={1.7} className="shrink-0" />
-      <span className="min-w-0 truncate">{title}</span>
-    </>
-  );
-
   return (
-    <button type="button" onClick={onClick} className={active ? ACTIVE_TAB : INACTIVE_TAB}>
-      {active ? content : <span className={INACTIVE_INNER}>{content}</span>}
+    <button type="button" onClick={onClick} className={active ? TAB_BUTTON_ACTIVE : TAB_BUTTON}>
+      <span className={active ? TAB_INNER_ACTIVE : TAB_INNER_INACTIVE}>
+        <Icon size={15} strokeWidth={1.7} className="shrink-0" />
+        <span className="min-w-0 truncate">{title}</span>
+      </span>
     </button>
   );
 }

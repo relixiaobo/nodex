@@ -61,14 +61,14 @@ function ToggleTopBar({
   const nodeTitle = useNodeTitle(resolvedNodeId);
 
   const tabClass = (active: boolean) =>
-    `flex h-8 min-w-0 flex-1 items-center gap-1.5 rounded-t-lg px-2.5 text-[13px] transition-colors ${
+    `flex h-9 min-w-0 flex-1 items-center gap-1.5 px-3 text-[13px] transition-colors ${
       active
-        ? 'bg-background text-foreground'
-        : 'text-foreground-tertiary hover:text-foreground'
+        ? 'text-foreground border-b border-transparent'
+        : 'text-foreground-tertiary border-b border-border/40 hover:text-foreground'
     }`;
 
   return (
-    <div className="flex shrink-0 items-end px-1.5">
+    <div className="flex shrink-0 items-stretch">
       <button
         type="button"
         onClick={() => switchToChat()}
@@ -91,7 +91,7 @@ function ToggleTopBar({
         </span>
       </button>
 
-      <div className="flex h-8 items-center">
+      <div className="flex items-center border-b border-border/40 px-1">
         <ToolbarUserMenu />
       </div>
     </div>
@@ -114,13 +114,12 @@ export function ToggleLayout() {
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden p-1.5">
-      <ToggleTopBar
-        activeView={activeView}
-        currentChatSessionId={currentChatSessionId}
-        resolvedNodeId={renderableNodeId}
-      />
-
-      <div className="flex flex-1 flex-col overflow-hidden rounded-b-xl bg-background shadow-card">
+      <div className="flex flex-1 flex-col overflow-hidden rounded-xl bg-background shadow-card">
+        <ToggleTopBar
+          activeView={activeView}
+          currentChatSessionId={currentChatSessionId}
+          resolvedNodeId={renderableNodeId}
+        />
         <div className="relative flex-1 overflow-hidden">
         <div className={activeView === 'chat' ? 'flex h-full flex-col' : hiddenViewClass} aria-hidden={activeView !== 'chat'}>
           {currentChatSessionId ? (

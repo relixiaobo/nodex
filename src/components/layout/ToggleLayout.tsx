@@ -65,7 +65,7 @@ function TabButton({
     <button type="button" onClick={onClick} className={active ? `${TAB_BUTTON_ACTIVE_BASE} ${connectorClass}` : TAB_BUTTON_INACTIVE}>
       {/* Hover bg indicator — inset from button edges, only for inactive */}
       {!active && (
-        <span className="pointer-events-none absolute inset-1 rounded-lg transition-colors group-hover/tab:bg-foreground/[0.05]" />
+        <span className="pointer-events-none absolute inset-x-1.5 bottom-1.5 top-0 rounded-lg transition-colors group-hover/tab:bg-foreground/[0.05]" />
       )}
       <Icon size={15} strokeWidth={1.7} className="relative shrink-0" />
       <span className="relative min-w-0 truncate">{title}</span>

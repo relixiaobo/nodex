@@ -16,6 +16,7 @@ import {
   formatResultText,
   parseSortBy,
   pushAiOp,
+  sanitizeDirectNodeDataPatch,
 } from './shared.js';
 import { parseTanaPaste } from './tana-paste-parser.js';
 import { createParsedNodeNoCommit } from './tana-paste-apply.js';
@@ -23,10 +24,12 @@ import { createParsedNodeNoCommit } from './tana-paste-apply.js';
 const CREATED_AT_FIELD_SENTINEL = '__createdAt__';
 
 const searchRulesSchema = Type.Object({
+  query: Type.Optional(Type.String({ description: 'Persisted text filter over node name and description.' })),
   searchTags: Type.Optional(Type.Array(Type.String(), { description: 'Tag display names that all results must have.' })),
   fields: Type.Optional(Type.Record(Type.String(), Type.String(), { description: 'Field filters by display name, e.g. {"Status": "Done"}.' })),
   linkedTo: Type.Optional(Type.String({ description: 'Return nodes that reference this node ID.' })),
-  parentId: Type.Optional(Type.String({ description: 'Restrict results to descendants of this node.' })),
+  scopeId: Type.Optional(Type.String({ description: 'Restrict results to this node and its descendants.' })),
+  parentId: Type.Optional(Type.String({ description: 'Deprecated alias for scopeId. Restrict results to this node and its descendants.' })),
   after: Type.Optional(Type.String({ description: 'Creation date lower bound (inclusive), ISO format.' })),
   before: Type.Optional(Type.String({ description: 'Creation date upper bound (inclusive), ISO format.' })),
   sortBy: Type.Optional(Type.String({ description: 'Default sort for the created search node, e.g. "created:desc".' })),
@@ -37,6 +40,8 @@ const createToolParameters = Type.Object({
   text: Type.Optional(Type.String({ description: 'Tana Paste content. The first line creates the root node. Later top-level lines may only add root tags, checkbox state, or fields. Child nodes must use 2-space indentation.' })),
   name: Type.Optional(Type.String({ description: 'Search node name. Required when type="search".' })),
   rules: Type.Optional(searchRulesSchema),
+  data: Type.Optional(Type.Record(Type.String(), Type.Unknown(), { description: 'Optional non-content node properties such as description, color, codeLanguage, showCheckbox, or type for content nodes.' })),
+  duplicateId: Type.Optional(Type.String({ description: 'Duplicate an existing node (deep copy). When provided, duplicate mode ignores text, type, and rules.' })),
   parentId: Type.Optional(Type.String({ description: 'Parent node ID. Defaults to today\'s journal node.' })),
   afterId: Type.Optional(Type.String({ description: 'Insert after this sibling node. If parentId is also provided, it must match the sibling parent.' })),
 });
@@ -53,6 +58,18 @@ interface SearchRuleBuildSummary {
   appliedRuleCount: number;
   unresolvedTags: string[];
   unresolvedFields: string[];
+  rulesApplied: Record<string, unknown>;
+}
+
+function applyCreateDataNoCommit(
+  nodeId: string,
+  data: Record<string, unknown> | undefined,
+  options: { allowType: boolean },
+): void {
+  const { safeData } = sanitizeDirectNodeDataPatch(data, { allowType: options.allowType });
+  if (Object.keys(safeData).length > 0) {
+    loroDoc.setNodeDataBatch(nodeId, safeData);
+  }
 }
 
 function resolveCreateLocation(parentId: string | undefined, afterId: string | undefined): Location {
@@ -85,6 +102,7 @@ function createContentNode(params: CreateToolParams): AgentToolResult<unknown> {
 
   const result = withCommitOrigin(AI_COMMIT_ORIGIN, () => {
     const created = createParsedNodeNoCommit(location.parentId, location.index, parsed, 0);
+    applyCreateDataNoCommit(created.nodeId, params.data, { allowType: !created.isReference });
     commitDoc();
     return created;
   });
@@ -145,8 +163,18 @@ function buildSearchRuleTreeNoCommit(searchNodeId: string, rules: CreateSearchRu
     appliedRuleCount: 0,
     unresolvedTags: [],
     unresolvedFields: [],
+    rulesApplied: {},
   };
   const rootGroupId = createQueryConditionNode(searchNodeId, { queryLogic: 'AND' });
+
+  if (rules.query?.trim()) {
+    const conditionId = createQueryConditionNode(rootGroupId, {
+      queryOp: 'STRING_MATCH',
+    });
+    createQueryValueNode(conditionId, { text: rules.query.trim() });
+    summary.appliedRuleCount += 1;
+    summary.rulesApplied.query = rules.query.trim();
+  }
 
   for (const tagName of rules.searchTags ?? []) {
     const tagDefId = findTagDefIdByName(tagName);
@@ -159,6 +187,10 @@ function buildSearchRuleTreeNoCommit(searchNodeId: string, rules: CreateSearchRu
       queryTagDefId: tagDefId,
     });
     summary.appliedRuleCount += 1;
+    const resolvedName = loroDoc.toNodexNode(tagDefId)?.name ?? tagName;
+    const tags = Array.isArray(summary.rulesApplied.searchTags) ? summary.rulesApplied.searchTags as string[] : [];
+    tags.push(resolvedName);
+    summary.rulesApplied.searchTags = tags;
   }
 
   for (const [fieldName, fieldValue] of Object.entries(rules.fields ?? {})) {
@@ -173,6 +205,9 @@ function buildSearchRuleTreeNoCommit(searchNodeId: string, rules: CreateSearchRu
     });
     createQueryValueNode(conditionId, { text: fieldValue });
     summary.appliedRuleCount += 1;
+    const fields = (summary.rulesApplied.fields as Record<string, string> | undefined) ?? {};
+    fields[fieldName] = fieldValue;
+    summary.rulesApplied.fields = fields;
   }
 
   if (rules.linkedTo) {
@@ -181,14 +216,17 @@ function buildSearchRuleTreeNoCommit(searchNodeId: string, rules: CreateSearchRu
     });
     createQueryValueNode(conditionId, { targetId: rules.linkedTo });
     summary.appliedRuleCount += 1;
+    summary.rulesApplied.linkedTo = rules.linkedTo;
   }
 
-  if (rules.parentId) {
+  const scopeId = rules.scopeId ?? rules.parentId;
+  if (scopeId) {
     const conditionId = createQueryConditionNode(rootGroupId, {
       queryOp: 'PARENTS_DESCENDANTS',
     });
-    createQueryValueNode(conditionId, { targetId: rules.parentId });
+    createQueryValueNode(conditionId, { targetId: scopeId });
     summary.appliedRuleCount += 1;
+    summary.rulesApplied.scopeId = scopeId;
   }
 
   if (rules.after) {
@@ -198,6 +236,7 @@ function buildSearchRuleTreeNoCommit(searchNodeId: string, rules: CreateSearchRu
     });
     createQueryValueNode(conditionId, { text: rules.after });
     summary.appliedRuleCount += 1;
+    summary.rulesApplied.after = rules.after;
   }
 
   if (rules.before) {
@@ -207,12 +246,13 @@ function buildSearchRuleTreeNoCommit(searchNodeId: string, rules: CreateSearchRu
     });
     createQueryValueNode(conditionId, { text: rules.before });
     summary.appliedRuleCount += 1;
+    summary.rulesApplied.before = rules.before;
   }
 
   return summary;
 }
 
-function addSearchSortNoCommit(searchNodeId: string, sortBy: string | undefined): { stored: boolean; ignoredSortBy?: string } {
+function addSearchSortNoCommit(searchNodeId: string, sortBy: string | undefined): { stored: boolean; ignoredSortBy?: string; appliedSortBy?: string } {
   const parsedSort = parseSortBy(sortBy);
   if (!parsedSort) {
     return { stored: false };
@@ -242,7 +282,7 @@ function addSearchSortNoCommit(searchNodeId: string, sortBy: string | undefined)
     sortField: mappedField,
     sortDirection: parsedSort.order,
   });
-  return { stored: true };
+  return { stored: true, appliedSortBy: `${parsedSort.field}:${parsedSort.order}` };
 }
 
 function createSearchNode(params: CreateToolParams): AgentToolResult<unknown> {
@@ -266,6 +306,7 @@ function createSearchNode(params: CreateToolParams): AgentToolResult<unknown> {
 
     const buildSummary = buildSearchRuleTreeNoCommit(created.id, params.rules!);
     const sortSummary = addSearchSortNoCommit(created.id, params.rules?.sortBy);
+    applyCreateDataNoCommit(created.id, params.data, { allowType: false });
     commitDoc();
     useNodeStore.getState().refreshSearchResults(created.id);
 
@@ -275,6 +316,9 @@ function createSearchNode(params: CreateToolParams): AgentToolResult<unknown> {
       appliedRuleCount: buildSummary.appliedRuleCount,
       unresolvedTags: buildSummary.unresolvedTags,
       unresolvedFields: buildSummary.unresolvedFields,
+      rulesApplied: sortSummary.appliedSortBy
+        ? { ...buildSummary.rulesApplied, sortBy: sortSummary.appliedSortBy }
+        : buildSummary.rulesApplied,
       ignoredSortBy: sortSummary.ignoredSortBy,
     };
   });
@@ -284,8 +328,11 @@ function createSearchNode(params: CreateToolParams): AgentToolResult<unknown> {
   const output: Record<string, unknown> = {
     id: result.nodeId,
     status: 'created',
+    type: 'search',
+    name: params.name.trim(),
     parentId: result.parentId,
     appliedRuleCount: result.appliedRuleCount,
+    rulesApplied: result.rulesApplied,
   };
   if (result.unresolvedTags.length > 0) {
     output.unresolvedTags = result.unresolvedTags;
@@ -310,6 +357,24 @@ function createSearchNode(params: CreateToolParams): AgentToolResult<unknown> {
 }
 
 async function executeCreateTool(params: CreateToolParams): Promise<AgentToolResult<unknown>> {
+  if (params.duplicateId) {
+    const duplicated = withCommitOrigin(AI_COMMIT_ORIGIN, () => useNodeStore.getState().duplicateNode(params.duplicateId!));
+    if (!duplicated) {
+      throw new Error(`Node not found: ${params.duplicateId}. Cannot duplicate a node that does not exist.`);
+    }
+    pushAiOp('node_create', duplicated.id, duplicated.name ?? '');
+    const output = {
+      id: duplicated.id,
+      name: duplicated.name ?? '',
+      parentId: loroDoc.getParentId(duplicated.id) ?? '',
+      duplicatedFrom: params.duplicateId,
+    };
+    return {
+      content: [{ type: 'text', text: formatResultText(output) }],
+      details: output,
+    };
+  }
+
   if (params.type === 'search') {
     return createSearchNode(params);
   }
@@ -332,15 +397,19 @@ export const createTool: AgentTool<typeof createToolParameters, unknown> = {
     '- field:: value sets a single-value field.',
     '- field:: followed by indented value lines creates a multi-value field.',
     '- Lines starting with "- " are accepted; the bullet prefix is stripped before parsing.',
+    '- Use data for non-content properties such as description, color, codeLanguage, showCheckbox, or content node type.',
     '',
     'Search nodes: pass type: "search" with a name and structured rules.',
+    '- query = persisted text filter over node name and description',
     '- searchTags = all tags must resolve to existing tags, or they are skipped and reported',
     '- fields = field filters by display name; unknown fields are skipped and reported',
     '- linkedTo = backlink target node ID',
-    '- parentId = descendants of this node',
+    '- scopeId = descendants of this node (preferred; rules.parentId is a deprecated alias)',
     '- after / before = creation date bounds in YYYY-MM-DD form',
     '- sortBy = created|modified|name|refCount[:asc|desc]; relevance is runtime-only and is not persisted',
     'Use rules only for persistable query conditions. node_search stays read-only.',
+    '',
+    'Duplicate mode: pass duplicateId to deep-copy an existing node as its next sibling.',
     '',
     'All write operations use isolated undo — undoable with the undo tool.',
   ].join('\n'),

@@ -282,6 +282,18 @@ describe('search-engine', () => {
       // task_1 is not done, so NOT(DONE) should be true
       expect(evaluateCondition(candidate, notGroup)).toBe(true);
     });
+
+    it('evaluates STRING_MATCH against node name and description text', () => {
+      const condId = loroDoc.createNode(undefined, SYSTEM_NODE_IDS.SEARCHES);
+      loroDoc.setNodeDataBatch(condId, { type: 'queryCondition', queryOp: 'STRING_MATCH' });
+      const valueId = loroDoc.createNode(undefined, condId);
+      loroDoc.setNodeDataBatch(valueId, { name: 'standup' });
+      loroDoc.commitDoc('__seed__');
+
+      const condition = loroDoc.toNodexNode(condId)!;
+      const candidate = loroDoc.toNodexNode('note_1')!;
+      expect(evaluateCondition(candidate, condition)).toBe(true);
+    });
   });
 
   describe('node-store createSearchNode', () => {

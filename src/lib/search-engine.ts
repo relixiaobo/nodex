@@ -143,6 +143,13 @@ function evaluateOp(
       return refIds.has(candidate.id);
     }
 
+    case 'STRING_MATCH': {
+      const needle = normalizeComparableValue(getConditionValueNodes(condition)[0]?.name ?? '');
+      if (!needle) return false;
+      const haystack = normalizeComparableValue(`${candidate.name ?? ''}\n${candidate.description ?? ''}`);
+      return haystack.includes(needle);
+    }
+
     case 'PARENTS_DESCENDANTS': {
       const scopeParentId = getConditionTargetIds(condition)[0];
       if (!scopeParentId) return false;

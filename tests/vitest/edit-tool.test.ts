@@ -92,6 +92,20 @@ describe('node_edit tool', () => {
     expect(siblings.indexOf('task_1')).toBe(siblings.indexOf('task_2') + 1);
   });
 
+  it('applies optional data properties and reports data as updated', async () => {
+    const result = await executeEdit({
+      nodeId: 'task_1',
+      data: {
+        description: 'updated description',
+        color: 'red',
+      },
+    });
+
+    expect(result.updated).toContain('data');
+    expect(loroDoc.toNodexNode('task_1')?.description).toBe('updated description');
+    expect(loroDoc.toNodexNode('task_1')?.color).toBe('red');
+  });
+
   it('combines rename, tag, field, and move in one call', async () => {
     const result = await executeEdit({
       nodeId: 'task_1',
@@ -127,5 +141,12 @@ describe('node_edit tool', () => {
     expect(result.status).toBe('unchanged');
     expect(result.updated).toEqual([]);
     expect(result.hint).toBeTruthy();
+  });
+
+  it('rejects text-based search node edits and asks the caller to recreate the node', async () => {
+    await expect(editTool.execute('tool_edit', {
+      nodeId: 'search_task',
+      text: 'New search text',
+    } as never)).rejects.toThrow('Editing search node rules via node_edit is not supported yet');
   });
 });

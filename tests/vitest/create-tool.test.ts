@@ -107,6 +107,34 @@ describe('node_create tool', () => {
       expect(newFieldDef).toBeTruthy();
     });
 
+    it('applies optional data properties when creating a content node', async () => {
+      const result = await executeCreate({
+        parentId: 'proj_1',
+        text: 'Code sample',
+        data: {
+          type: 'codeBlock',
+          codeLanguage: 'ts',
+          description: 'example snippet',
+        },
+      });
+
+      const node = loroDoc.toNodexNode(result.id);
+      expect(node?.type).toBe('codeBlock');
+      expect(node?.codeLanguage).toBe('ts');
+      expect(node?.description).toBe('example snippet');
+    });
+
+    it('duplicates an existing node when duplicateId is provided', async () => {
+      const result = await executeCreate({
+        duplicateId: 'task_1',
+      });
+
+      expect(result.duplicatedFrom).toBe('task_1');
+      expect(result.name).toBe(loroDoc.toNodexNode('task_1')?.name);
+      expect(result.id).not.toBe('task_1');
+      expect(loroDoc.getParentId(result.id)).toBe(loroDoc.getParentId('task_1'));
+    });
+
     it('errors when no text is provided for content creation', async () => {
       await expect(createTool.execute('tool_create', {} as never)).rejects.toThrow('text is required');
     });
@@ -143,9 +171,10 @@ describe('node_create tool', () => {
         type: 'search',
         name: 'Done tasks this month',
         rules: {
+          query: 'task',
           searchTags: ['task'],
           fields: { Status: 'Done' },
-          parentId: 'proj_1',
+          scopeId: 'proj_1',
           after: '2026-03-01',
           before: '2026-03-31',
           sortBy: 'created:desc',
@@ -163,12 +192,24 @@ describe('node_create tool', () => {
         .map((id) => loroDoc.toNodexNode(id))
         .filter(Boolean);
       expect(leafNodes.map((leaf) => leaf?.queryOp)).toEqual(expect.arrayContaining([
+        'STRING_MATCH',
         'HAS_TAG',
         'FIELD_IS',
         'PARENTS_DESCENDANTS',
         'GT',
         'LT',
       ]));
+      expect(result.type).toBe('search');
+      expect(result.name).toBe('Done tasks this month');
+      expect(result.rulesApplied).toMatchObject({
+        query: 'task',
+        searchTags: ['Task'],
+        fields: { Status: 'Done' },
+        scopeId: 'proj_1',
+        after: '2026-03-01',
+        before: '2026-03-31',
+        sortBy: 'created:desc',
+      });
 
       const viewDef = loroDoc.getChildren(result.id)
         .map((id) => loroDoc.toNodexNode(id))
@@ -198,6 +239,24 @@ describe('node_create tool', () => {
       expect(result.boundary).toBeTruthy();
       expect(result.nextStep).toBeTruthy();
       expect(result.fallback).toBeTruthy();
+    });
+
+    it('does not let data override the search node type', async () => {
+      const result = await executeCreate({
+        type: 'search',
+        name: 'Locked search type',
+        rules: {
+          searchTags: ['task'],
+        },
+        data: {
+          type: 'codeBlock',
+          description: 'search metadata stays allowed',
+        },
+      });
+
+      const searchNode = loroDoc.toNodexNode(result.id);
+      expect(searchNode?.type).toBe('search');
+      expect(searchNode?.description).toBe('search metadata stays allowed');
     });
 
     it('errors when required search params are missing', async () => {

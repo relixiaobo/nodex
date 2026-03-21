@@ -11,6 +11,7 @@ import {
   formatResultText,
   getTagDisplayNames,
   pushAiOp,
+  sanitizeDirectNodeDataPatch,
   toCheckedValue,
 } from './shared.js';
 import { parseTanaPaste } from './tana-paste-parser.js';
@@ -20,6 +21,7 @@ const editToolParameters = Type.Object({
   nodeId: Type.String({ description: 'ID of the node to edit.' }),
   text: Type.Optional(Type.String({ description: 'Tana Paste patch. A plain first line renames the node. Tag-only, checkbox-only, and field-only first lines do not rename. Indented lines append child nodes.' })),
   removeTags: Type.Optional(Type.Array(Type.String(), { description: 'Tag display names to remove from the node.' })),
+  data: Type.Optional(Type.Record(Type.String(), Type.Unknown(), { description: 'Optional non-content node properties such as description, color, codeLanguage, or showCheckbox.' })),
   parentId: Type.Optional(Type.String({ description: 'Move to this parent. If afterId is also provided, it must match the sibling parent.' })),
   afterId: Type.Optional(Type.String({ description: 'Move after this sibling node.' })),
 });
@@ -100,8 +102,15 @@ async function executeEditTool(params: EditToolParams): Promise<AgentToolResult<
   if (!node) {
     throw new Error(`Node not found: ${params.nodeId}. Use node_search to find the correct ID.`);
   }
+  if (node.type === 'search' && params.text?.trim()) {
+    throw new Error('Editing search node rules via node_edit is not supported yet. Recreate the search node with node_create(type: "search").');
+  }
 
   const before = snapshotNodeState(params.nodeId);
+  const { safeData } = sanitizeDirectNodeDataPatch(params.data, { allowType: false });
+  const beforeDataJson = JSON.stringify(
+    Object.fromEntries(Object.keys(safeData).sort().map((key) => [key, (node as unknown as Record<string, unknown>)[key] ?? null])),
+  );
   let createdFields: string[] = [];
   let unresolvedFields: string[] = [];
   let shouldCommit = false;
@@ -134,6 +143,11 @@ async function executeEditTool(params: EditToolParams): Promise<AgentToolResult<
       }
     }
 
+    if (Object.keys(safeData).length > 0) {
+      shouldCommit = true;
+      loroDoc.setNodeDataBatch(params.nodeId, safeData);
+    }
+
     const moveTarget = resolveMoveTarget(params.parentId, params.afterId);
     if (moveTarget) {
       shouldCommit = true;
@@ -146,6 +160,10 @@ async function executeEditTool(params: EditToolParams): Promise<AgentToolResult<
   });
 
   const after = snapshotNodeState(params.nodeId);
+  const freshNode = loroDoc.toNodexNode(params.nodeId);
+  const afterDataJson = JSON.stringify(
+    Object.fromEntries(Object.keys(safeData).sort().map((key) => [key, (freshNode as unknown as Record<string, unknown> | null)?.[key] ?? null])),
+  );
   const updated = new Set<string>();
   if (before.name !== after.name || before.inlineRefsJson !== after.inlineRefsJson) {
     updated.add('name');
@@ -162,8 +180,10 @@ async function executeEditTool(params: EditToolParams): Promise<AgentToolResult<
   if (before.parentId !== after.parentId || before.index !== after.index) {
     updated.add('position');
   }
+  if (beforeDataJson !== afterDataJson) {
+    updated.add('data');
+  }
 
-  const freshNode = loroDoc.toNodexNode(params.nodeId);
   const freshName = freshNode?.name ?? '';
   if (updated.size > 0) {
     pushAiOp('node_edit', params.nodeId, freshName);
@@ -216,6 +236,9 @@ export const editTool: AgentTool<typeof editToolParameters, unknown> = {
     '- field:: with no inline value and no indented values clears that field.',
     '- Indented lines append new child nodes; they do not replace existing children.',
     '- Child indentation uses 2 spaces per level.',
+    '',
+    'Use data for non-content properties such as description, color, codeLanguage, or showCheckbox.',
+    'Search node rule editing is not supported yet; recreate the search node if the rules need to change.',
     '',
     'removeTags handles deletions that Tana Paste cannot express.',
     'All write operations use isolated undo — undoable with the undo tool.',

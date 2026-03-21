@@ -72,7 +72,7 @@ export function createParsedNodeNoCommit(
   depth: number,
 ): TanaPasteApplySummary {
   if (depth > MAX_TANA_PASTE_CHILD_DEPTH) {
-    throw new Error(`Tana Paste depth exceeds the maximum supported depth of ${MAX_TANA_PASTE_CHILD_DEPTH}.`);
+    throw new Error(`Nesting depth exceeds the maximum of ${MAX_TANA_PASTE_CHILD_DEPTH} levels.`);
   }
 
   const summary: TanaPasteApplySummary = {

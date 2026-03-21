@@ -214,7 +214,7 @@ function pushFieldContext(
 export function parseTanaPaste(text: string): ParsedTanaPasteNode {
   const normalized = text.replace(/\r\n?/g, '\n').trim();
   if (!normalized) {
-    throw new Error('Empty Tana Paste text.');
+    throw new Error('text is empty. Provide at least one line of content.');
   }
 
   const lines = normalized

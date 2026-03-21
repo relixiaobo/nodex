@@ -1,5 +1,5 @@
 /**
- * node_edit — Modify an existing node using Tana Paste patch semantics.
+ * node_edit — Modify an existing node.
  */
 import type { AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core';
 import { Type } from '@mariozechner/pi-ai';
@@ -19,7 +19,7 @@ import { applyParsedNodeMutationsNoCommit, setParsedNodeNameNoCommit } from './t
 
 const editToolParameters = Type.Object({
   nodeId: Type.String({ description: 'ID of the node to edit.' }),
-  text: Type.Optional(Type.String({ description: 'Tana Paste patch. A plain first line renames the node. Tag-only, checkbox-only, and field-only first lines do not rename. Indented lines append child nodes.' })),
+  text: Type.Optional(Type.String({ description: 'Structured text patch. Same format as node_create text. First line renames; #tag adds tag; field:: value sets field; field:: clears field; [X]/[ ] sets checkbox; indented lines add children.' })),
   removeTags: Type.Optional(Type.Array(Type.String(), { description: 'Tag display names to remove from the node.' })),
   data: Type.Optional(Type.Record(Type.String(), Type.Unknown(), { description: 'Optional non-content node properties such as description, color, codeLanguage, or showCheckbox.' })),
   parentId: Type.Optional(Type.String({ description: 'Move to this parent. If afterId is also provided, it must match the sibling parent.' })),
@@ -226,22 +226,29 @@ export const editTool: AgentTool<typeof editToolParameters, unknown> = {
   name: 'node_edit',
   label: 'Edit Node',
   description: [
-    'Modify an existing node using Tana Paste patch semantics.',
-    'Text rules:',
-    '- A plain first line renames the node.',
-    '- A first line that is only #tag, [X] / [ ], or field:: ... does not rename; it only applies that mutation.',
-    '- An exact first line of [[Name^nodeId]] renames the node to a single reference chip.',
-    '- Top-level lines after the first line may only add root metadata: #tags, [X] / [ ], or field:: lines.',
-    '- field:: value sets a field.',
-    '- field:: with no inline value and no indented values clears that field.',
-    '- Indented lines append new child nodes; they do not replace existing children.',
-    '- Child indentation uses 2 spaces per level.',
+    'Modify an existing node. Only provided parameters are applied.',
     '',
-    'Use data for non-content properties such as description, color, codeLanguage, or showCheckbox.',
-    'Search node rule editing is not supported yet; recreate the search node if the rules need to change.',
+    'The text parameter uses the same format as node_create. Semantics are incremental (add/set), not replace:',
+    '- Plain first line = rename the node.',
+    '- First line that is only #tag, [X]/[ ], or field:: = does NOT rename, only applies that change.',
+    '- #tag = add tag.',
+    '- field:: value = set field value.',
+    '- field:: (empty, no indented values) = clear field.',
+    '- [X] = check, [ ] = uncheck.',
+    '- Indented lines = append new children (does NOT replace existing children).',
     '',
-    'removeTags handles deletions that Tana Paste cannot express.',
-    'All write operations use isolated undo — undoable with the undo tool.',
+    'Examples:',
+    '- Rename: text: "New name"',
+    '- Add tag + set field: text: "#task\\nStatus:: Done\\n[X]"',
+    '- Clear field: text: "Priority::"',
+    '- Add children: text: "\\n  New child 1\\n  New child 2"',
+    '',
+    'removeTags: tag names to remove (text cannot express deletion).',
+    'parentId + afterId: move the node.',
+    'data: set non-content properties (description, color, codeLanguage, showCheckbox).',
+    'Search nodes: rule editing not supported yet; delete and recreate.',
+    '',
+    'All write operations are undoable with the undo tool.',
   ].join('\n'),
   parameters: editToolParameters,
   execute: async (_toolCallId, params) => executeEditTool(params),

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import type { ToolCall, ToolResultMessage } from '@mariozechner/pi-ai';
 import { ChevronDown, ListChecks, Loader2 } from '../../lib/icons.js';
 import { ToolCallBlock, getStatus, summarizeToolCall } from './ToolCallBlock.js';
@@ -19,26 +19,9 @@ export function ToolCallGroup({ toolCalls, results }: ToolCallGroupProps) {
     else if (s === 'error') failed++;
   }
 
-  // Auto-expand while executing, auto-collapse when done.
-  // User manual toggle overrides auto behavior.
-  const [userToggled, setUserToggled] = useState(false);
-  const [expanded, setExpanded] = useState(isExecuting);
-  const wasExecuting = useRef(isExecuting);
-
-  useEffect(() => {
-    if (wasExecuting.current && !isExecuting && !userToggled) {
-      // Just finished executing → auto-collapse
-      setExpanded(false);
-    }
-    if (!wasExecuting.current && isExecuting && !userToggled) {
-      // Just started executing → auto-expand
-      setExpanded(true);
-    }
-    wasExecuting.current = isExecuting;
-  }, [isExecuting, userToggled]);
+  const [expanded, setExpanded] = useState(false);
 
   function handleToggle() {
-    setUserToggled(true);
     setExpanded((v) => !v);
   }
 

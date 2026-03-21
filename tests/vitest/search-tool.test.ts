@@ -55,6 +55,20 @@ describe('node_search tool', () => {
     expect(result.items).toBeUndefined();
   });
 
+  it('keeps count-only mode compact when tag names do not resolve', async () => {
+    const result = await executeSearch({
+      searchTags: ['does-not-exist'],
+      count: true,
+    });
+
+    expect(result.total).toBe(0);
+    expect(result.items).toBeUndefined();
+    expect(result.unresolvedTags).toEqual(['does-not-exist']);
+    expect(result.boundary).toBeTruthy();
+    expect(result.nextStep).toBeTruthy();
+    expect(result.fallback).toBeTruthy();
+  });
+
   it('sorts by sortBy string with explicit order', async () => {
     const result = await executeSearch({
       searchTags: ['meeting'],

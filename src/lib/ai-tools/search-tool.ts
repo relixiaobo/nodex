@@ -31,13 +31,13 @@ import {
 
 const searchToolParameters = Type.Object({
   query: Type.Optional(Type.String({ description: 'Fuzzy text search across node names and descriptions. CJK-aware.' })),
-  searchTags: Type.Optional(Type.Array(Type.String(), { description: 'Filter to nodes with ALL these tags (AND logic). Use display names, e.g. ["task", "source"].' })),
-  fields: Type.Optional(Type.Record(Type.String(), Type.String(), { description: 'Filter by field values, e.g. {"Status": "Todo"}. Field names must match existing tag field definitions.' })),
+  searchTags: Type.Optional(Type.Array(Type.String(), { description: 'Filter to nodes with ALL these tags (AND logic). Use display names. Every tag must resolve to an existing tag name.' })),
+  fields: Type.Optional(Type.Record(Type.String(), Type.String(), { description: 'Filter by exact field display values, e.g. {"Status": "Todo"}. Unknown field names are ignored with guidance.' })),
   linkedTo: Type.Optional(Type.String({ description: 'Find all nodes that reference this node ID (backlinks).' })),
-  parentId: Type.Optional(Type.String({ description: 'Restrict search to descendants of this node.' })),
+  parentId: Type.Optional(Type.String({ description: 'Restrict search to this node and its descendants.' })),
   after: Type.Optional(Type.String({ description: 'Creation date lower bound (inclusive), ISO format e.g. "2026-01-15".' })),
   before: Type.Optional(Type.String({ description: 'Creation date upper bound (inclusive), ISO format e.g. "2026-03-12".' })),
-  sortBy: Type.Optional(Type.String({ description: 'Sort string: "field" or "field:order". field = relevance|created|modified|name|refCount.' })),
+  sortBy: Type.Optional(Type.String({ description: 'Sort string: "field" or "field:order". field = relevance|created|modified|name|refCount. order defaults to desc.' })),
   limit: Type.Optional(Type.Integer({ minimum: 1, maximum: MAX_PAGE_SIZE, default: DEFAULT_PAGE_SIZE, description: 'Max results per page (default 20, max 50).' })),
   offset: Type.Optional(Type.Integer({ minimum: 0, default: 0, description: 'Pagination offset.' })),
   count: Type.Optional(Type.Boolean({ description: 'If true, return only the total count — no items.' })),
@@ -240,6 +240,9 @@ function searchByFilters(params: SearchToolParams, requiredTagIds: string[]): Ag
   const result: Record<string, unknown> = { total: ranked.length, offset, limit, items };
   if (unresolvedFilters.length > 0) {
     result.unresolvedFilters = unresolvedFilters;
+    result.boundary = 'Unknown field filters were ignored; only existing field names affect the search.';
+    result.nextStep = 'Retry with existing field display names, or remove the unresolved filters and search again.';
+    result.fallback = 'If you are unsure about the field names, inspect the schema or run a broader search without those filters.';
     result.hint = 'Some field filters could not be resolved — those filters were ignored. Check field names match existing tag field definitions.';
   }
   return { content: [{ type: 'text', text: formatResultText(result) }], details: result };
@@ -249,6 +252,9 @@ function countResult(total: number, unresolvedFilters: string[] = []): AgentTool
   const result: Record<string, unknown> = { total };
   if (unresolvedFilters.length > 0) {
     result.unresolvedFilters = unresolvedFilters;
+    result.boundary = 'Unknown field filters were ignored; only existing field names affect the search.';
+    result.nextStep = 'Retry with existing field display names, or remove the unresolved filters and search again.';
+    result.fallback = 'If you are unsure about the field names, inspect the schema or run a broader search without those filters.';
     result.hint = 'Some field filters could not be resolved — those filters were ignored. Check field names match existing tag field definitions.';
   }
   return { content: [{ type: 'text', text: formatResultText(result) }], details: result };
@@ -271,14 +277,14 @@ async function executeSearchTool(params: SearchToolParams): Promise<AgentToolRes
 
   // If any tag name didn't resolve, return empty with hint
   if (unresolvedTags.length > 0) {
-    const result: Record<string, unknown> = {
-      total: 0,
-      offset: params.offset ?? 0,
-      limit: params.limit ?? DEFAULT_PAGE_SIZE,
-      items: [],
-      unresolvedTags,
-      hint: `Tags not found: ${unresolvedTags.join(', ')}. No results because all searchTags must match (AND logic).`,
-    };
+    const result: Record<string, unknown> = { total: 0, unresolvedTags };
+    if (!params.count) {
+      result.items = [];
+    }
+    result.boundary = 'All searchTags use AND logic and must resolve to existing tag names.';
+    result.nextStep = 'Retry with existing tag display names, or drop searchTags and use text search to discover the right tags first.';
+    result.fallback = 'If you do not know the exact tag names, inspect the schema or run a broader search without tag filters.';
+    result.hint = `Tags not found: ${unresolvedTags.join(', ')}. No results because all searchTags must match (AND logic).`;
     return { content: [{ type: 'text', text: formatResultText(result) }], details: result };
   }
 
@@ -301,10 +307,15 @@ export const searchTool: AgentTool<typeof searchToolParameters, unknown> = {
     '- Text search: node_search(query: "API design")',
     '- Tag + field: node_search(searchTags: ["task"], fields: {"Status": "Todo"})',
     '- Backlinks: node_search(linkedTo: "nodeId")  → all nodes referencing this node',
-    '- Subtree: node_search(parentId: "projectId", query: "auth")',
+    '- Subtree: node_search(parentId: "projectId", query: "auth")  → includes the parent node and its descendants',
     '- Count only: node_search(searchTags: ["task"], count: true)',
     '- Date range: node_search(after: "2026-03-01", before: "2026-03-31")',
     '- Sorted: node_search(query: "auth", sortBy: "modified:desc")',
+    '',
+    'Behavior boundaries:',
+    '- searchTags are AND filters; if any tag name is unknown, the result is empty with guidance',
+    '- Unknown field names are ignored and reported',
+    '- count: true returns only the total count plus any guidance fields',
   ].join('\n'),
   parameters: searchToolParameters,
   execute: async (_toolCallId, params) => executeSearchTool(params),

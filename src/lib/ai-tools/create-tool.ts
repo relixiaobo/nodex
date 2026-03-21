@@ -34,7 +34,7 @@ const searchRulesSchema = Type.Object({
 
 const createToolParameters = Type.Object({
   type: Type.Optional(Type.Literal('search', { description: 'Set to "search" to create a search node. Omit for normal content nodes.' })),
-  text: Type.Optional(Type.String({ description: 'Tana Paste content. First line = node name, later lines = children or fields.' })),
+  text: Type.Optional(Type.String({ description: 'Tana Paste content. The first line creates the root node. Later top-level lines may only add root tags, checkbox state, or fields. Child nodes must use 2-space indentation.' })),
   name: Type.Optional(Type.String({ description: 'Search node name. Required when type="search".' })),
   rules: Type.Optional(searchRulesSchema),
   parentId: Type.Optional(Type.String({ description: 'Parent node ID. Defaults to today\'s journal node.' })),
@@ -50,6 +50,8 @@ interface Location {
 }
 
 interface SearchRuleBuildSummary {
+  appliedRuleCount: number;
+  unresolvedTags: string[];
   unresolvedFields: string[];
 }
 
@@ -93,9 +95,8 @@ function createContentNode(params: CreateToolParams): AgentToolResult<unknown> {
   pushAiOp('node_create', result.nodeId, freshNode?.name ?? parsed.name);
 
   const output: Record<string, unknown> = { id: result.nodeId };
-  if (!params.afterId) {
-    output.parentId = result.parentId;
-  }
+  output.status = 'created';
+  output.parentId = result.parentId;
   if (result.isReference) {
     output.isReference = true;
     output.targetId = result.targetId;
@@ -109,6 +110,9 @@ function createContentNode(params: CreateToolParams): AgentToolResult<unknown> {
   }
   if (result.unresolvedFields.length > 0) {
     output.unresolvedFields = [...new Set(result.unresolvedFields)];
+    output.boundary = 'Field values only resolve from fields available on the node after tags are applied. Unresolved fields were skipped.';
+    output.nextStep = 'Add a tag that defines the missing fields, then call node_edit to set those fields.';
+    output.fallback = 'If you are unsure which tag defines the field, add the likely tag first and retry the field update.';
     output.hint = 'Some fields could not be resolved because the node has no tags yet.';
   }
 
@@ -137,16 +141,24 @@ function createQueryValueNode(parentId: string, value: { text?: string; targetId
 }
 
 function buildSearchRuleTreeNoCommit(searchNodeId: string, rules: CreateSearchRules): SearchRuleBuildSummary {
-  const summary: SearchRuleBuildSummary = { unresolvedFields: [] };
+  const summary: SearchRuleBuildSummary = {
+    appliedRuleCount: 0,
+    unresolvedTags: [],
+    unresolvedFields: [],
+  };
   const rootGroupId = createQueryConditionNode(searchNodeId, { queryLogic: 'AND' });
 
   for (const tagName of rules.searchTags ?? []) {
     const tagDefId = findTagDefIdByName(tagName);
-    if (!tagDefId) continue;
+    if (!tagDefId) {
+      summary.unresolvedTags.push(tagName);
+      continue;
+    }
     createQueryConditionNode(rootGroupId, {
       queryOp: 'HAS_TAG',
       queryTagDefId: tagDefId,
     });
+    summary.appliedRuleCount += 1;
   }
 
   for (const [fieldName, fieldValue] of Object.entries(rules.fields ?? {})) {
@@ -160,6 +172,7 @@ function buildSearchRuleTreeNoCommit(searchNodeId: string, rules: CreateSearchRu
       queryFieldDefId: fieldDefId,
     });
     createQueryValueNode(conditionId, { text: fieldValue });
+    summary.appliedRuleCount += 1;
   }
 
   if (rules.linkedTo) {
@@ -167,6 +180,7 @@ function buildSearchRuleTreeNoCommit(searchNodeId: string, rules: CreateSearchRu
       queryOp: 'LINKS_TO',
     });
     createQueryValueNode(conditionId, { targetId: rules.linkedTo });
+    summary.appliedRuleCount += 1;
   }
 
   if (rules.parentId) {
@@ -174,6 +188,7 @@ function buildSearchRuleTreeNoCommit(searchNodeId: string, rules: CreateSearchRu
       queryOp: 'PARENTS_DESCENDANTS',
     });
     createQueryValueNode(conditionId, { targetId: rules.parentId });
+    summary.appliedRuleCount += 1;
   }
 
   if (rules.after) {
@@ -182,6 +197,7 @@ function buildSearchRuleTreeNoCommit(searchNodeId: string, rules: CreateSearchRu
       queryFieldDefId: CREATED_AT_FIELD_SENTINEL,
     });
     createQueryValueNode(conditionId, { text: rules.after });
+    summary.appliedRuleCount += 1;
   }
 
   if (rules.before) {
@@ -190,15 +206,19 @@ function buildSearchRuleTreeNoCommit(searchNodeId: string, rules: CreateSearchRu
       queryFieldDefId: CREATED_AT_FIELD_SENTINEL,
     });
     createQueryValueNode(conditionId, { text: rules.before });
+    summary.appliedRuleCount += 1;
   }
 
   return summary;
 }
 
-function addSearchSortNoCommit(searchNodeId: string, sortBy: string | undefined): void {
+function addSearchSortNoCommit(searchNodeId: string, sortBy: string | undefined): { stored: boolean; ignoredSortBy?: string } {
   const parsedSort = parseSortBy(sortBy);
-  if (!parsedSort || parsedSort.field === 'relevance') {
-    return;
+  if (!parsedSort) {
+    return { stored: false };
+  }
+  if (parsedSort.field === 'relevance') {
+    return { stored: false, ignoredSortBy: sortBy };
   }
 
   const store = useNodeStore.getState();
@@ -222,6 +242,7 @@ function addSearchSortNoCommit(searchNodeId: string, sortBy: string | undefined)
     sortField: mappedField,
     sortDirection: parsedSort.order,
   });
+  return { stored: true };
 }
 
 function createSearchNode(params: CreateToolParams): AgentToolResult<unknown> {
@@ -244,14 +265,17 @@ function createSearchNode(params: CreateToolParams): AgentToolResult<unknown> {
     }, { commit: false });
 
     const buildSummary = buildSearchRuleTreeNoCommit(created.id, params.rules!);
-    addSearchSortNoCommit(created.id, params.rules?.sortBy);
+    const sortSummary = addSearchSortNoCommit(created.id, params.rules?.sortBy);
     commitDoc();
     useNodeStore.getState().refreshSearchResults(created.id);
 
     return {
       nodeId: created.id,
       parentId: location.parentId,
+      appliedRuleCount: buildSummary.appliedRuleCount,
+      unresolvedTags: buildSummary.unresolvedTags,
       unresolvedFields: buildSummary.unresolvedFields,
+      ignoredSortBy: sortSummary.ignoredSortBy,
     };
   });
 
@@ -259,10 +283,23 @@ function createSearchNode(params: CreateToolParams): AgentToolResult<unknown> {
 
   const output: Record<string, unknown> = {
     id: result.nodeId,
+    status: 'created',
     parentId: result.parentId,
+    appliedRuleCount: result.appliedRuleCount,
   };
+  if (result.unresolvedTags.length > 0) {
+    output.unresolvedTags = result.unresolvedTags;
+  }
   if (result.unresolvedFields.length > 0) {
     output.unresolvedFields = result.unresolvedFields;
+  }
+  if (result.ignoredSortBy) {
+    output.ignoredSortBy = result.ignoredSortBy;
+  }
+  if (result.unresolvedTags.length > 0 || result.unresolvedFields.length > 0 || result.ignoredSortBy) {
+    output.boundary = 'Search nodes only store persistable rules. Unknown tags and fields are skipped, and relevance sort is runtime-only.';
+    output.nextStep = 'If any rule was skipped, create or locate the missing tag/field definitions, then update or recreate the search node.';
+    output.fallback = 'Retry with existing tag names, existing field names, and a persisted sort such as created, modified, name, or refCount.';
     output.hint = 'Some search field rules could not be resolved and were skipped.';
   }
 
@@ -286,14 +323,23 @@ export const createTool: AgentTool<typeof createToolParameters, unknown> = {
     'Create nodes in the knowledge graph.',
     '',
     'Content nodes (default): pass text in a Tana Paste subset.',
-    '- First line = node name',
-    '- #tag adds a tag',
-    '- field:: value sets a field',
-    '- field:: followed by indented lines creates a multi-value field',
-    '- [[Name^nodeId]] creates a reference node when it is the whole line',
-    '- Indentation uses 2 spaces for child nodes',
+    'Text rules:',
+    '- The first line creates the root node.',
+    '- A first line that is exactly [[Name^nodeId]] creates a reference node instead of a content node.',
+    '- A plain first line becomes the root node text. It may also include inline #tags, inline [[Name^nodeId]] references, or a leading [X] / [ ].',
+    '- Top-level lines after the first line may only add root metadata: #tags, [X] / [ ], or field:: lines.',
+    '- Child nodes must use 2-space indentation. Each deeper level adds 2 more spaces. Max depth = 3.',
+    '- field:: value sets a single-value field.',
+    '- field:: followed by indented value lines creates a multi-value field.',
+    '- Lines starting with "- " are accepted; the bullet prefix is stripped before parsing.',
     '',
     'Search nodes: pass type: "search" with a name and structured rules.',
+    '- searchTags = all tags must resolve to existing tags, or they are skipped and reported',
+    '- fields = field filters by display name; unknown fields are skipped and reported',
+    '- linkedTo = backlink target node ID',
+    '- parentId = descendants of this node',
+    '- after / before = creation date bounds in YYYY-MM-DD form',
+    '- sortBy = created|modified|name|refCount[:asc|desc]; relevance is runtime-only and is not persisted',
     'Use rules only for persistable query conditions. node_search stays read-only.',
     '',
     'All write operations use isolated undo — undoable with the undo tool.',

@@ -181,6 +181,25 @@ describe('node_create tool', () => {
       expect(sortRule?.sortDirection).toBe('desc');
     });
 
+    it('reports skipped search rules when tags or sort cannot be persisted', async () => {
+      const result = await executeCreate({
+        type: 'search',
+        name: 'Unknown tags',
+        rules: {
+          searchTags: ['does-not-exist'],
+          sortBy: 'relevance:desc',
+        },
+      });
+
+      expect(result.status).toBe('created');
+      expect(result.unresolvedTags).toEqual(['does-not-exist']);
+      expect(result.ignoredSortBy).toBe('relevance:desc');
+      expect(result.appliedRuleCount).toBe(0);
+      expect(result.boundary).toBeTruthy();
+      expect(result.nextStep).toBeTruthy();
+      expect(result.fallback).toBeTruthy();
+    });
+
     it('errors when required search params are missing', async () => {
       await expect(createTool.execute('tool_create', {
         type: 'search',

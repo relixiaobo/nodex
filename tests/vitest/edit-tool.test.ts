@@ -113,5 +113,19 @@ describe('node_edit tool', () => {
 
     expect(result.unresolvedFields).toEqual(['Status']);
     expect(result.hint).toBeTruthy();
+    expect(result.boundary).toBeTruthy();
+    expect(result.nextStep).toBeTruthy();
+    expect(result.fallback).toBeTruthy();
+  });
+
+  it('reports unchanged when the requested patch matches current state', async () => {
+    const result = await executeEdit({
+      nodeId: 'note_1',
+      text: 'Meeting notes - Team standup',
+    });
+
+    expect(result.status).toBe('unchanged');
+    expect(result.updated).toEqual([]);
+    expect(result.hint).toBeTruthy();
   });
 });

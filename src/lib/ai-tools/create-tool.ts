@@ -28,8 +28,8 @@ const CREATED_AT_FIELD_SENTINEL = '__createdAt__';
 const createToolParameters = Type.Object({
   type: Type.Optional(Type.Literal('search', { description: 'Set to "search" to create a search node. Omit for normal content nodes.' })),
   text: Type.Optional(Type.String({ description: [
-    'Multi-line plain text (NOT markdown). Each line is a node, field, or field value.',
-    'Use "- " prefix and 2-space indentation for hierarchy.',
+    'For content nodes: multi-line plain text (NOT markdown). Each line is a node, field, or field value. Use "- " prefix and 2-space indentation for hierarchy.',
+    'For search nodes (type="search"): the node name as a plain string (e.g. "Open tasks").',
     '',
     'Format reference:',
     '',
@@ -70,7 +70,6 @@ const createToolParameters = Type.Object({
     '6. #tagName auto-creates the tag if it does not exist.',
     '7. [[Display^nodeId]] resolves by nodeId (display text is for readability only).',
   ].join('\n') })),
-  name: Type.Optional(Type.String({ description: 'Search node name. Required when type="search".' })),
   rules: Type.Optional(searchRulesSchema),
   data: Type.Optional(Type.Record(Type.String(), Type.Unknown(), { description: 'Optional non-content node properties such as description, color, codeLanguage, showCheckbox, or type for content nodes.' })),
   duplicateId: Type.Optional(Type.String({ description: 'Duplicate an existing node (deep copy). When provided, duplicate mode ignores text, type, and rules.' })),
@@ -321,8 +320,8 @@ function createSearchNode(params: CreateToolParams): AgentToolResult<unknown> {
   if (params.type !== 'search') {
     throw new Error('Internal error: createSearchNode called without type="search".');
   }
-  if (!params.name?.trim()) {
-    throw new Error('name is required when type="search".');
+  if (!params.text?.trim()) {
+    throw new Error('text is required when type="search" — provide the search node name.');
   }
   if (!params.rules) {
     throw new Error('rules are required when type="search".');
@@ -333,7 +332,7 @@ function createSearchNode(params: CreateToolParams): AgentToolResult<unknown> {
   const result = withCommitOrigin(AI_COMMIT_ORIGIN, () => {
     const created = useNodeStore.getState().createChild(location.parentId, location.index, {
       type: 'search',
-      name: params.name!.trim(),
+      name: params.text!.trim(),
     }, { commit: false });
 
     const buildSummary = buildSearchRuleTreeNoCommit(created.id, params.rules!);
@@ -355,13 +354,13 @@ function createSearchNode(params: CreateToolParams): AgentToolResult<unknown> {
     };
   });
 
-  pushAiOp('node_create', result.nodeId, params.name.trim());
+  pushAiOp('node_create', result.nodeId, params.text!.trim());
 
   const output: Record<string, unknown> = {
     id: result.nodeId,
     status: 'created',
     type: 'search',
-    name: params.name.trim(),
+    name: params.text!.trim(),
     parentId: result.parentId,
     appliedRuleCount: result.appliedRuleCount,
     rulesApplied: result.rulesApplied,
@@ -420,7 +419,7 @@ export const createTool: AgentTool<typeof createToolParameters, unknown> = {
     'Create nodes in the knowledge graph. Three modes:',
     '',
     '1. Content node (default): pass text parameter. See text parameter description for format.',
-    '2. Search node: pass type: "search" with name and rules. See rules parameter for query fields.',
+    '2. Search node: pass type: "search", text (node name), and rules. See rules parameter for query fields.',
     '3. Duplicate: pass duplicateId to deep-copy an existing node (ignores text/type/rules).',
     '',
     'Use data for non-content properties (description, color, codeLanguage, showCheckbox).',

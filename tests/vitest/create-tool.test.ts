@@ -144,7 +144,7 @@ describe('node_create tool', () => {
     it('creates a search node for tag rules and materializes references', async () => {
       const result = await executeCreate({
         type: 'search',
-        name: 'Tasks',
+        text: 'Tasks',
         parentId: SYSTEM_NODE_IDS.SEARCHES,
         rules: { searchTags: ['task'] },
       });
@@ -169,7 +169,7 @@ describe('node_create tool', () => {
     it('creates search rules for fields, dates, scope, and sort', async () => {
       const result = await executeCreate({
         type: 'search',
-        name: 'Done tasks this month',
+        text: 'Done tasks this month',
         rules: {
           query: 'task',
           searchTags: ['task'],
@@ -225,7 +225,7 @@ describe('node_create tool', () => {
     it('reports skipped search rules when tags or sort cannot be persisted', async () => {
       const result = await executeCreate({
         type: 'search',
-        name: 'Unknown tags',
+        text: 'Unknown tags',
         rules: {
           searchTags: ['does-not-exist'],
           sortBy: 'relevance:desc',
@@ -244,7 +244,7 @@ describe('node_create tool', () => {
     it('does not let data override the search node type', async () => {
       const result = await executeCreate({
         type: 'search',
-        name: 'Locked search type',
+        text: 'Locked search type',
         rules: {
           searchTags: ['task'],
         },
@@ -263,11 +263,11 @@ describe('node_create tool', () => {
       await expect(createTool.execute('tool_create', {
         type: 'search',
         rules: { searchTags: ['task'] },
-      } as never)).rejects.toThrow('name is required');
+      } as never)).rejects.toThrow('text is required');
 
       await expect(createTool.execute('tool_create', {
         type: 'search',
-        name: 'Tasks',
+        text: 'Tasks',
       } as never)).rejects.toThrow('rules are required');
     });
   });

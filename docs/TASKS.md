@@ -18,13 +18,13 @@
 |--------|------|------|------|
 | nodex-claude | — | 空闲 | — |
 | nodex-gemini | — | 空闲 | — |
-| nodex-codex | codex/node-tools-redesign | Node 工具重构 — Tana Paste 统一格式 (#170) | 待启动 |
+| nodex-codex | — | 空闲 | — |
 
 ---
 
 ## 进行中
 
-- [ ] **Node 工具重构 — Tana Paste 统一格式** (#170, Codex) — node_create/edit 用 Tana Paste 文本替代嵌套 JSON，node_search 扁平化参数。设计：`docs/plans/node-tools-redesign.md`
+（无进行中任务）
 
 ---
 
@@ -125,6 +125,7 @@
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-21 | Node 工具重构 — Tana Paste 统一格式 + search node 创建 | codex | #170 |
 | 2026-03-20 | v0.2.0 发版 — Think with your AI | nodex | — |
 | 2026-03-20 | AI 人格设计文档 + system prompt 重写 + skills 升级 | nodex | — |
 | 2026-03-20 | 新用户引导 — 强制登录 + 内联 API key + 启动偏好 | codex | #163 |

@@ -1,6 +1,7 @@
 import { useEffect, useSyncExternalStore, type ComponentType } from 'react';
-import { ListTree, MessageSquare } from '../../lib/icons.js';
+import { ListTree, MessageSquare, Pencil } from '../../lib/icons.js';
 import { getChatTitle, subscribeChatTitles } from '../../lib/ai-service.js';
+import { useChatTitleEdit, ChatTitleInput } from '../chat/ChatPanelHeader.js';
 import { ensureChatSession } from '../../lib/chat-panel-actions.js';
 import { useNodeStore } from '../../stores/node-store.js';
 import { useUIStore } from '../../stores/ui-store.js';
@@ -86,16 +87,36 @@ function ToggleTopBar({
 }) {
   const switchToChat = useUIStore((s) => s.switchToChat);
   const switchToNode = useUIStore((s) => s.switchToNode);
-  const chatTitle = useSyncExternalStore(
-    subscribeChatTitles,
-    () => (currentChatSessionId ? getChatTitle(currentChatSessionId) : null),
-    () => (currentChatSessionId ? getChatTitle(currentChatSessionId) : null),
-  );
+  const chatEdit = currentChatSessionId ? useChatTitleEdit(currentChatSessionId) : null;
+  const chatTitle = chatEdit?.displayTitle ?? 'Chat';
   const nodeTitle = useNodeTitle(resolvedNodeId);
+  const chatActive = activeView === 'chat';
 
   return (
     <div className="flex shrink-0 items-end">
-      <TabButton active={activeView === 'chat'} icon={MessageSquare} title={chatTitle?.trim() || 'Chat'} onClick={switchToChat} connectors="right" />
+      {/* Chat tab — with inline title editing */}
+      {chatActive && chatEdit ? (
+        <div className="group/tab flex h-9 min-w-0 flex-1 items-center gap-1.5 px-3 text-[13px] outline-none tab-connector-right relative z-10 rounded-t-xl bg-background text-foreground">
+          <MessageSquare size={15} strokeWidth={1.7} className="shrink-0" />
+          {chatEdit.editing ? (
+            <ChatTitleInput edit={chatEdit} />
+          ) : (
+            <>
+              <span className="min-w-0 truncate">{chatTitle}</span>
+              <button
+                type="button"
+                onClick={chatEdit.startEdit}
+                title="Edit title"
+                className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-foreground-tertiary opacity-0 transition-opacity hover:bg-foreground/4 hover:text-foreground group-hover/tab:opacity-100"
+              >
+                <Pencil size={10} strokeWidth={1.8} />
+              </button>
+            </>
+          )}
+        </div>
+      ) : (
+        <TabButton active={false} icon={MessageSquare} title={chatTitle} onClick={switchToChat} connectors="right" />
+      )}
       <TabButton active={activeView === 'node'} icon={ListTree} title={nodeTitle} onClick={() => switchToNode()} connectors="both" />
       <div className="flex h-9 shrink-0 items-start pt-px pl-2 pr-0.5">
         <ToolbarUserMenu />

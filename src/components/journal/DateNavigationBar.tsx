@@ -133,7 +133,7 @@ export function DateNavigationBar({ dayNodeId }: DateNavigationBarProps) {
   }, [navigateTo]);
 
   return (
-    <div className="relative my-1.5 pl-4 text-[11px] text-foreground-secondary flex items-center" ref={calendarRef}>
+    <div className="relative my-0.5 pl-4 text-[11px] text-foreground-secondary flex items-center" ref={calendarRef}>
       <div className="inline-flex items-center gap-0.5">
         <Tooltip label={t('dateNavigationBar.previousDay')}>
           <button

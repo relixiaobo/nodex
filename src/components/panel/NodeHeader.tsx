@@ -207,7 +207,7 @@ export function NodeHeader({ nodeId, panelId = 'main', onTitleRef }: NodeHeaderP
   const displayHtml = marksToHtml(displayName, rawMarks, rawInlineRefs);
 
   return (
-    <div className="pt-1 pb-1 px-4">
+    <div className="pb-0.5 px-4">
       {/* ── Block ①: Icon (conditional) ── */}
       {showIconBlock && (
         <div className="mb-1">
@@ -288,7 +288,7 @@ export function NodeHeader({ nodeId, panelId = 'main', onTitleRef }: NodeHeaderP
               (titleWrapperRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
               onTitleRef?.(el);
             }}
-            className={`relative text-xl font-semibold leading-8 outline-none min-h-8 flex-1 ${canEditNode ? 'cursor-text' : 'cursor-default'} ${isDone ? 'text-foreground/40' : ''}`}
+            className={`relative text-xl font-semibold leading-7 outline-none min-h-7 flex-1 ${canEditNode ? 'cursor-text' : 'cursor-default'} ${isDone ? 'text-foreground/40' : ''}`}
             onMouseDown={handleTitleMouseDown}
           >
             {editing ? (

@@ -97,7 +97,7 @@ function ToggleTopBar({
     <div className="flex shrink-0 items-end">
       <TabButton active={activeView === 'chat'} icon={MessageSquare} title={chatTitle?.trim() || 'Chat'} onClick={switchToChat} connectors="right" />
       <TabButton active={activeView === 'node'} icon={ListTree} title={nodeTitle} onClick={() => switchToNode()} connectors="both" />
-      <div className="flex h-9 shrink-0 items-start pt-px px-1.5">
+      <div className="flex h-9 shrink-0 items-start pt-px pr-0.5">
         <ToolbarUserMenu />
       </div>
     </div>

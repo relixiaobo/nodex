@@ -112,7 +112,9 @@ export function NodePanel({ nodeId, panelId }: NodePanelProps) {
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       <div className="flex-1 overflow-y-auto scroll-pb-[40vh]">
-        <Breadcrumb nodeId={nodeId} showCurrentName={false} />
+        <div className="mt-1">
+          <Breadcrumb nodeId={nodeId} showCurrentName={false} />
+        </div>
         {isTagDef && tagDefColor && (
           <div
             className="h-28 -mb-28 pointer-events-none"

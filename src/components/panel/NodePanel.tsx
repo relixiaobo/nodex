@@ -6,6 +6,7 @@ import { useUIStore } from '../../stores/ui-store';
 import { SYSTEM_NODE_IDS } from '../../types/index.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 
+import { Breadcrumb } from './Breadcrumb';
 import { NodeHeader } from './NodeHeader';
 import { OutlinerView } from '../outliner/OutlinerView';
 import { FieldList } from '../fields/FieldList';
@@ -110,6 +111,7 @@ export function NodePanel({ nodeId, panelId }: NodePanelProps) {
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
+      <Breadcrumb nodeId={nodeId} showCurrentName={false} />
       <div className="flex-1 overflow-y-auto scroll-pb-[40vh]">
         {isTagDef && tagDefColor && (
           <div

@@ -26,9 +26,10 @@ export function FloatingChatBar() {
   }, [availableModels, selectedModelKey]);
   const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel | null>(null);
 
-  // When focusing, inject saved draft into ChatInput
+  // When focusing, inject saved draft and focus the textarea
   useEffect(() => {
-    if (focused && draft) {
+    if (focused) {
+      // setDraft also focuses the textarea via requestAnimationFrame
       chatInputRef.current?.setDraft(draft);
     }
   }, [focused]); // eslint-disable-line react-hooks/exhaustive-deps

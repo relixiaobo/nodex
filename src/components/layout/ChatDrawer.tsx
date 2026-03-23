@@ -272,12 +272,12 @@ export function ChatDrawer() {
             <div className="shrink-0 rounded-t-[22px]">
               {/* Drag handle — inside container, visually at top edge */}
               <div
-                className="flex cursor-row-resize touch-none items-center justify-center py-1.5"
+                className="group/handle flex cursor-row-resize touch-none items-center justify-center py-1.5"
                 onPointerDown={drag.onPointerDown}
                 onPointerMove={drag.onPointerMove}
                 onPointerUp={drag.onPointerUp}
               >
-                <div className="h-1 w-8 rounded-full bg-foreground/15" />
+                <div className="h-1 w-8 rounded-full bg-foreground/15 transition-colors group-hover/handle:bg-foreground/40" />
               </div>
               <DrawerHeader sessionId={currentChatSessionId} />
             </div>

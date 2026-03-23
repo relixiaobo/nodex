@@ -87,8 +87,8 @@ export function FloatingChatBar() {
       >
         {/* Handle bar — animated reveal, click opens drawer */}
         <div className={`overflow-hidden transition-all duration-200 ease-out ${focused ? 'max-h-8 opacity-100' : 'max-h-0 opacity-0'}`}>
-          <button type="button" onClick={handleOpenDrawer} className="flex w-full items-center justify-center py-1.5" aria-label="Open chat">
-            <span className="h-1 w-8 rounded-full bg-foreground/15" />
+          <button type="button" onClick={handleOpenDrawer} className="group/handle flex w-full items-center justify-center py-1.5" aria-label="Open chat">
+            <span className="h-1 w-8 rounded-full bg-foreground/15 transition-colors group-hover/handle:bg-foreground/40" />
           </button>
         </div>
 

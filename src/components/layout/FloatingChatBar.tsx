@@ -10,13 +10,13 @@ export function FloatingChatBar() {
     openChatDrawer();
   }
 
-  // Hide when drawer is open
-  if (chatDrawerOpen) return null;
-
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20" data-testid="floating-chat-bar">
+    <div
+      className={`pointer-events-none absolute inset-x-0 bottom-0 z-20 transition-all duration-300 ease-out ${chatDrawerOpen ? 'translate-y-4 opacity-0' : 'translate-y-0 opacity-100'}`}
+      data-testid="floating-chat-bar"
+    >
       <div className="h-8 bg-gradient-to-t from-background to-transparent" />
-      <div className="pointer-events-auto bg-background px-3 pb-3">
+      <div className={`bg-background px-3 pb-3 ${chatDrawerOpen ? 'pointer-events-none' : 'pointer-events-auto'}`}>
         <button
           type="button"
           onClick={handleClick}

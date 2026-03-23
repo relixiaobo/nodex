@@ -641,9 +641,8 @@ describe('chat ui', () => {
 
     await vi.waitFor(() => {
       expect(container.textContent).toContain('Thought');
-      // Collapsed — shows latest step summary, not expanded children
-      expect(container.textContent).toContain('step 3');
-      expect(container.textContent).not.toContain('Navigated to');
+      // Cross-message grouping: tool-call-only messages after toolResults are grouped
+      expect(container.textContent).toContain('step 2');
     });
   });
 

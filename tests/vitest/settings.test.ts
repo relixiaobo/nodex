@@ -152,7 +152,7 @@ describe('settings system', () => {
   it('renders the Settings node panel without triggering a React update loop', () => {
     expect(() => {
       flushSync(() => {
-        root.render(React.createElement(NodePanel, { nodeId: SYSTEM_NODE_IDS.SETTINGS }));
+        root.render(React.createElement(NodePanel, { nodeId: SYSTEM_NODE_IDS.SETTINGS, panelId: 'node-main' }));
       });
     }).not.toThrow();
 

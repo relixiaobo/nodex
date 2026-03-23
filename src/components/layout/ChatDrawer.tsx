@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, X, MessageSquare } from '../../lib/icons.js';
+import { Pencil, Plus } from '../../lib/icons.js';
 import { openNewChatDrawer } from '../../lib/chat-panel-actions.js';
 import { useUIStore } from '../../stores/ui-store.js';
 import { ChatTitleInput, useChatTitleEdit } from '../chat/ChatPanelHeader.js';
@@ -16,15 +16,12 @@ function DrawerHeader({ sessionId }: DrawerHeaderProps) {
   const titleEdit = useChatTitleEdit(sessionId);
 
   return (
-    <div className="shrink-0 border-b border-border">
+    <div className="shrink-0">
       <div className="flex items-center justify-center pt-2">
         <div className="h-1 w-10 rounded-full bg-foreground/12" aria-hidden="true" />
       </div>
       <div className="flex items-center gap-2 px-3 pb-2 pt-2">
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-foreground/[0.05] text-foreground-tertiary">
-            <MessageSquare size={14} strokeWidth={1.8} />
-          </span>
+        <div className="flex min-w-0 flex-1 items-center">
           {titleEdit.editing ? (
             <ChatTitleInput edit={titleEdit} />
           ) : (
@@ -43,7 +40,7 @@ function DrawerHeader({ sessionId }: DrawerHeaderProps) {
             className={ICON_BUTTON_CLASS}
             aria-label="Edit session title"
           >
-            <span className="text-[11px] font-medium">Aa</span>
+            <Pencil size={12} strokeWidth={1.8} />
           </button>
         )}
         <button
@@ -53,14 +50,6 @@ function DrawerHeader({ sessionId }: DrawerHeaderProps) {
           aria-label="New chat"
         >
           <Plus size={15} strokeWidth={1.8} />
-        </button>
-        <button
-          type="button"
-          onClick={closeChatDrawer}
-          className={ICON_BUTTON_CLASS}
-          aria-label="Close chat drawer"
-        >
-          <X size={15} strokeWidth={1.8} />
         </button>
       </div>
     </div>

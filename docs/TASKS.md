@@ -18,13 +18,13 @@
 |--------|------|------|------|
 | nodex-claude | — | 空闲 | — |
 | nodex-gemini | — | 空闲 | — |
-| nodex-codex | codex/chat-drawer | Chat Drawer 布局 — Outliner 底 + Chat 抽屉 (#172) | 待启动 |
+| nodex-codex | — | 空闲 | — |
 
 ---
 
 ## 进行中
 
-- [ ] **Chat Drawer 布局** (#172, Codex) — Outliner 全屏底层 + Chat 底部抽屉 + 单层 full-bleed。设计：`docs/plans/chat-drawer-design.md`
+（无进行中任务）
 
 ---
 
@@ -125,6 +125,7 @@
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-23 | Chat Drawer 布局 — Outliner 底层 + Chat 底部抽屉 + 单层 full-bleed | codex | #172 |
 | 2026-03-21 | Toggle Layout — Chat/Node 双视角切换 + 状态保持 | codex | #171 |
 | 2026-03-21 | Node 工具重构 — Tana Paste 统一格式 + search node 创建 | codex | #170 |
 | 2026-03-20 | v0.2.0 发版 — Think with your AI | nodex | — |

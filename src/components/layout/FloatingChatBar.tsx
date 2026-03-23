@@ -63,17 +63,15 @@ export function FloatingChatBar() {
       <div ref={containerRef} className="pointer-events-auto bg-background px-3 pb-3">
         {focused ? (
           /* ── Focused: full ChatInput ── */
-          <div className="rounded-xl border border-border bg-background transition-colors focus-within:border-foreground/20">
-            <ChatInput
-              ref={chatInputRef}
-              disabled={false}
-              currentModel={currentModel}
-              availableModels={availableModels}
-              onSend={handleSend}
-              onStop={() => {}}
-              onModelChange={handleModelChange}
-            />
-          </div>
+          <ChatInput
+            ref={chatInputRef}
+            disabled={false}
+            currentModel={currentModel}
+            availableModels={availableModels}
+            onSend={handleSend}
+            onStop={() => {}}
+            onModelChange={handleModelChange}
+          />
         ) : (
           /* ── Unfocused: compact single-line ── */
           <button

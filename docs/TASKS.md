@@ -37,7 +37,7 @@
 #### Chat 体验
 
 - [ ] **@ 引用节点** — Chat 输入框 `@` 触发节点选择器，精确注入上下文
-- [ ] **上下文注入丰富** — system reminder 注入常用标签、最近活动节点
+- [ ] **View Context Injection** — system reminder 注入可见树快照（跟随展开状态，JSON 格式与 node_read 一致）。设计：`docs/plans/view-context-injection.md`。依赖 #173
 
 #### AI 能力
 

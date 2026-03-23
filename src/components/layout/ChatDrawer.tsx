@@ -253,16 +253,6 @@ function DrawerContent({ sessionId, drag, drawerOpen }: {
 
   return (
     <>
-      {/* Drag handle — always visible */}
-      <div
-        className="group/handle flex shrink-0 cursor-row-resize touch-none items-center justify-center rounded-t-[22px] py-1.5"
-        onPointerDown={drag.onPointerDown}
-        onPointerMove={drag.onPointerMove}
-        onPointerUp={drag.onPointerUp}
-      >
-        <div className="h-1 w-8 rounded-full bg-foreground/15 transition-colors group-hover/handle:bg-foreground/40" />
-      </div>
-
       {/* Title row — auto-hides on scroll, hover to reveal */}
       <div
         className={`shrink-0 overflow-hidden transition-all duration-200 ease-out ${headerVisible ? 'max-h-12 opacity-100' : 'max-h-0 opacity-0'}`}
@@ -345,10 +335,22 @@ export function ChatDrawer() {
     >
       <div
         ref={drawerRef}
-        className={`pointer-events-auto relative z-10 flex min-h-0 w-full flex-col overflow-hidden rounded-t-[22px] border border-b-0 border-border bg-background shadow-[0_-18px_42px_rgba(15,23,42,0.14)] ${drawerTransition} ${chatDrawerOpen ? 'translate-y-0' : 'translate-y-full'}`}
+        className={`pointer-events-auto relative z-10 flex min-h-0 w-full flex-col ${drawerTransition} ${chatDrawerOpen ? 'translate-y-0' : 'translate-y-full'}`}
         style={{ height: `${drag.height * 100}%` }}
         data-chat-drawer="true"
       >
+        {/* Drag handle — transparent bg, above the card */}
+        <div
+          className="group/handle flex shrink-0 cursor-row-resize touch-none items-center justify-center py-1.5"
+          onPointerDown={drag.onPointerDown}
+          onPointerMove={drag.onPointerMove}
+          onPointerUp={drag.onPointerUp}
+        >
+          <div className="h-1 w-8 rounded-full bg-foreground/15 transition-colors group-hover/handle:bg-foreground/40" />
+        </div>
+
+        {/* Card body — opaque bg, rounded top */}
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-t-[22px] border border-b-0 border-border bg-background shadow-[0_-18px_42px_rgba(15,23,42,0.14)]">
         {currentChatSessionId ? (
           <DrawerContent
             sessionId={currentChatSessionId}
@@ -358,6 +360,7 @@ export function ChatDrawer() {
         ) : (
           <div className="flex flex-1 items-center justify-center text-sm text-foreground-tertiary">Loading chat…</div>
         )}
+        </div>
       </div>
     </div>
   );

@@ -1,4 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { ThinkingLevel } from '@mariozechner/pi-ai';
 import { ArrowUp, Brain, Check, ChevronDown, Plus, Settings, Square } from '../../lib/icons.js';
 
@@ -302,8 +303,17 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
                   {thinkingLevel && <span className="shrink-0 text-foreground-tertiary">Thinking</span>}
                   <ChevronDown size={12} strokeWidth={1.8} className="shrink-0 text-foreground-tertiary" />
                 </button>
-                {modelMenuOpen && (
-                  <div className="absolute bottom-full right-0 mb-1 max-h-[70vh] min-w-[260px] max-w-[300px] overflow-y-auto rounded-lg bg-background p-1 shadow-paper">
+                {modelMenuOpen && createPortal(
+                  <div
+                    ref={(el) => {
+                      if (!el || !modelMenuRef.current) return;
+                      const rect = modelMenuRef.current.getBoundingClientRect();
+                      el.style.position = 'fixed';
+                      el.style.right = `${window.innerWidth - rect.right}px`;
+                      el.style.bottom = `${window.innerHeight - rect.top + 4}px`;
+                    }}
+                    className="z-[9999] max-h-[70vh] min-w-[260px] max-w-[300px] overflow-y-auto rounded-lg bg-background p-1 shadow-paper"
+                  >
                     {/* Section 1: Models (featured + more) */}
                     <div className="py-1">
                       {featuredModels.map((model) => renderModelItem(model))}
@@ -377,7 +387,8 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
                         </button>
                       </>
                     )}
-                  </div>
+                  </div>,
+                  document.body,
                 )}
               </div>
             )}

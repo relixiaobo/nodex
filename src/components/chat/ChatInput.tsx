@@ -163,10 +163,14 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
     const el = textareaRef.current;
     if (!el) return;
 
+    if (compact) {
+      el.style.height = '24px';
+      return;
+    }
     el.style.height = '0px';
     const nextHeight = Math.min(el.scrollHeight, 160);
     el.style.height = `${Math.max(nextHeight, 24)}px`;
-  }, [draft]);
+  }, [draft, compact]);
 
   useEffect(() => {
     if (!menuOpen && !modelMenuOpen) return;
@@ -234,7 +238,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
         </div>
       )}
       <div className="rounded-xl border border-border bg-background transition-colors focus-within:border-foreground/20">
-        <div className="px-3 pb-1 pt-2.5">
+        <div className={`px-3 pt-2.5 ${compact ? 'pb-2.5' : 'pb-1'}`}>
           <textarea
             ref={textareaRef}
             value={draft}

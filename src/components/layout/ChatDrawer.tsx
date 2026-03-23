@@ -311,6 +311,9 @@ export function ChatDrawer() {
     if (!chatDrawerOpen) return;
     function onPointerDown(e: PointerEvent) {
       if (drawerRef.current?.contains(e.target as Node)) return;
+      // Don't close if clicking a portal popup (model menu, dropdowns)
+      const target = e.target as HTMLElement;
+      if (target.closest('.shadow-paper, [data-chat-drawer]')) return;
       closeChatDrawer();
     }
     document.addEventListener('pointerdown', onPointerDown, true);

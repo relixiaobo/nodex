@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { ThinkingLevel } from '@mariozechner/pi-ai';
 import { ChatInput, type ChatInputHandle } from '../chat/ChatInput.js';
 import { openChatWithPrompt } from '../../lib/chat-panel-actions.js';
 import { getAvailableModelsWithMeta } from '../../lib/ai-provider-config.js';
 import { useNodeStore } from '../../stores/node-store.js';
+import { useUIStore } from '../../stores/ui-store.js';
+import { SYSTEM_NODE_IDS } from '../../types/index.js';
 
 export function FloatingChatBar() {
   const [focused, setFocused] = useState(false);
@@ -16,6 +19,7 @@ export function FloatingChatBar() {
     return getAvailableModelsWithMeta();
   }, [settingsVersion]);
   const [selectedModelKey, setSelectedModelKey] = useState<{ id: string; provider: string } | null>(null);
+  const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel | null>(null);
   const currentModel = useMemo(() => {
     if (!selectedModelKey) return availableModels[0] ?? undefined;
     return availableModels.find((m) => m.id === selectedModelKey.id && m.provider === selectedModelKey.provider) ?? availableModels[0] ?? undefined;
@@ -51,6 +55,15 @@ export function FloatingChatBar() {
     setSelectedModelKey({ id: modelId, provider });
   }, []);
 
+  const handleThinkingChange = useCallback((level: ThinkingLevel | null) => {
+    setThinkingLevel(level);
+  }, []);
+
+  const handleOpenSettings = useCallback(() => {
+    setFocused(false);
+    useUIStore.getState().navigateToNode(SYSTEM_NODE_IDS.SETTINGS);
+  }, []);
+
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20" data-testid="floating-chat-bar">
       <div className="h-8 bg-gradient-to-t from-background to-transparent" />
@@ -63,9 +76,12 @@ export function FloatingChatBar() {
             disabled={false}
             currentModel={currentModel}
             availableModels={availableModels}
+            thinkingLevel={thinkingLevel}
             onSend={handleSend}
             onStop={() => {}}
             onModelChange={handleModelChange}
+            onThinkingChange={handleThinkingChange}
+            onOpenSettings={handleOpenSettings}
           />
         ) : (
           /* ── Unfocused: match ChatInput's outer padding (px-3 pb-3) ── */

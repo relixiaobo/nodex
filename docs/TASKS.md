@@ -18,13 +18,13 @@
 |--------|------|------|------|
 | nodex-claude | — | 空闲 | — |
 | nodex-gemini | — | 空闲 | — |
-| nodex-codex | — | 空闲 | — |
+| nodex-codex | codex/view-context-injection | View Context Injection (#174) | 待启动 |
 
 ---
 
 ## 进行中
 
-（无进行中任务）
+- [ ] **View Context Injection** (#174, Codex) — system reminder 注入可见树快照（跟随展开状态，JSON 格式与 node_read 一致）
 
 ---
 

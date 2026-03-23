@@ -364,7 +364,7 @@ export function ChatPanel({ sessionId, hideHeader }: ChatPanelProps) {
           <button
             type="button"
             onClick={() => setDebugOpen((v) => !v)}
-            className={`absolute right-3 top-2 z-10 inline-flex h-7 min-w-8 items-center justify-center rounded-full px-2 font-mono text-[11px] transition-colors ${
+            className={`absolute right-3 top-10 z-10 inline-flex h-7 min-w-8 items-center justify-center rounded-full px-2 font-mono text-[11px] transition-colors ${
               debugOpen
                 ? 'bg-foreground/8 text-foreground'
                 : 'text-foreground-tertiary hover:bg-foreground/4 hover:text-foreground'

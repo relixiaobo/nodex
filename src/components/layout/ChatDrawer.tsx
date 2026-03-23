@@ -172,7 +172,7 @@ function DrawerHeader({ sessionId }: { sessionId: string }) {
 
   return (
     <div ref={headerRef} className="relative">
-      <div className="flex items-center pb-2 pt-2 pl-4 pr-3">
+      <div className="flex items-center pb-1 pl-4 pr-3">
         {titleEdit.editing ? (
           <div className="min-w-0 flex-1">
             <ChatTitleInput edit={titleEdit} />
@@ -184,7 +184,7 @@ function DrawerHeader({ sessionId }: { sessionId: string }) {
               onClick={() => setHistoryOpen((v) => !v)}
               className="flex min-w-0 max-w-[70%] items-center gap-1 rounded-lg px-1.5 -ml-1.5 py-1 outline-none transition-colors hover:bg-foreground/4"
             >
-              <span className="min-w-0 truncate text-[13px] font-medium text-foreground">
+              <span className="min-w-0 truncate text-[13px] font-medium text-foreground-secondary">
                 {titleEdit.displayTitle}
               </span>
               <ChevronDown size={12} strokeWidth={1.8} className={`shrink-0 text-foreground-tertiary transition-transform ${historyOpen ? 'rotate-180' : ''}`} />
@@ -269,23 +269,21 @@ export function ChatDrawer() {
         style={{ height: `${drag.height * 100}%` }}
         data-chat-drawer="true"
       >
-        {/* Drag handle — pill tab above the drawer */}
-        <div
-          className="absolute -top-4 left-1/2 z-10 -translate-x-1/2 cursor-row-resize touch-none rounded-t-xl bg-background px-6 pt-2 pb-1"
-          onPointerDown={drag.onPointerDown}
-          onPointerMove={drag.onPointerMove}
-          onPointerUp={drag.onPointerUp}
-        >
-          <div className="h-1 w-8 rounded-full bg-foreground/20" />
-        </div>
-
         {currentChatSessionId ? (
           <>
-            <div className="shrink-0 rounded-t-[22px] pt-1">
+            <div className="shrink-0 rounded-t-[22px]">
+              {/* Drag handle — inside container, visually at top edge */}
+              <div
+                className="flex cursor-row-resize touch-none items-center justify-center py-1.5"
+                onPointerDown={drag.onPointerDown}
+                onPointerMove={drag.onPointerMove}
+                onPointerUp={drag.onPointerUp}
+              >
+                <div className="h-1 w-8 rounded-full bg-foreground/15" />
+              </div>
               <DrawerHeader sessionId={currentChatSessionId} />
             </div>
-            {/* Gradient fade between header and chat content */}
-            <div className="h-6 shrink-0 bg-gradient-to-b from-background via-background/80 to-transparent" />
+            <div className="h-4 shrink-0 bg-gradient-to-b from-background to-transparent" />
             <ChatPanel sessionId={currentChatSessionId} hideHeader />
           </>
         ) : (

@@ -105,8 +105,8 @@ export function FloatingChatBar() {
             <button
               type="button"
               onClick={() => setFocused(true)}
-              className={`flex w-full rounded-xl border border-border bg-background transition-colors hover:border-foreground/20 ${
-                draft ? 'items-start px-3 pt-2.5 pb-2 text-base leading-6 text-foreground' : 'h-11 items-center px-3 text-[15px] text-foreground-tertiary'
+              className={`flex w-full rounded-xl border border-border bg-background text-base leading-6 transition-colors hover:border-foreground/20 ${
+                draft ? 'items-start px-3 pt-2.5 pb-2 text-foreground' : 'items-center px-3 py-2.5 text-foreground-tertiary'
               }`}
             >
               {draft || 'Ask about your notes…'}

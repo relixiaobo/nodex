@@ -23,7 +23,7 @@ function AppPanelTitle({ panelId }: { panelId: AppPanelId }) {
 
 export function TopBar({ nodeId }: TopBarProps) {
   return (
-    <div className="flex h-9 shrink-0 items-center gap-1 border-b border-border bg-background px-2" data-testid="top-bar">
+    <div className="flex h-9 shrink-0 items-center gap-1 bg-background px-2" data-testid="top-bar">
       <NavButtons />
       {nodeId && !isAppPanel(nodeId) ? (
         <Breadcrumb nodeId={nodeId} />

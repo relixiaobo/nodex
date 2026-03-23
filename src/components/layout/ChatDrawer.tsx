@@ -219,28 +219,42 @@ function DrawerContent({ sessionId, drag, drawerOpen }: {
   // Show header when drawer opens
   useEffect(() => { if (drawerOpen) setHeaderVisible(true); }, [drawerOpen]);
 
-  // Track scroll direction inside ChatPanel
+  // Track scroll direction inside ChatPanel (debounced to prevent flicker)
   useEffect(() => {
     const el = contentRef.current;
     if (!el) return;
+    let timer: number | null = null;
+
     function onScroll(e: Event) {
       const target = e.target as HTMLElement;
       const scrollTop = target.scrollTop;
       const delta = scrollTop - lastScrollTop.current;
-      // Only toggle after meaningful scroll (> 8px)
-      if (Math.abs(delta) > 8) {
-        setHeaderVisible(delta < 0 || scrollTop < 10);
+
+      if (Math.abs(delta) > 12) {
+        const shouldShow = delta < 0 || scrollTop < 10;
         lastScrollTop.current = scrollTop;
+
+        // Debounce hide to avoid flicker from layout shifts
+        if (timer !== null) window.clearTimeout(timer);
+        if (shouldShow) {
+          setHeaderVisible(true);
+        } else {
+          timer = window.setTimeout(() => setHeaderVisible(false), 150);
+        }
       }
     }
+
     el.addEventListener('scroll', onScroll, true);
-    return () => el.removeEventListener('scroll', onScroll, true);
+    return () => {
+      el.removeEventListener('scroll', onScroll, true);
+      if (timer !== null) window.clearTimeout(timer);
+    };
   }, []);
 
   return (
     <>
       <div
-        className={`shrink-0 rounded-t-[22px] transition-all duration-200 ease-out ${headerVisible ? 'max-h-20 opacity-100' : 'max-h-0 opacity-0 overflow-hidden'}`}
+        className={`shrink-0 rounded-t-[22px] transition-all duration-200 ease-out ${headerVisible ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0 pointer-events-none'}`}
         onPointerEnter={() => setHeaderVisible(true)}
       >
         <div

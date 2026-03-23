@@ -243,7 +243,7 @@ function DrawerContent({ sessionId, drag, drawerOpen }: {
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
       {/* Title — absolute overlay, no layout impact, slides up/down */}
       <div
-        className={`absolute inset-x-0 top-0 z-10 bg-foreground/[0.03] transition-transform duration-200 ease-out ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}
+        className={`absolute inset-x-0 top-0 z-10 bg-background transition-transform duration-200 ease-out ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}
         onPointerEnter={() => setHeaderVisible(true)}
       >
         <DrawerHeader sessionId={sessionId} />

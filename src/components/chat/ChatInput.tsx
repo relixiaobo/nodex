@@ -134,6 +134,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const modelMenuRef = useRef<HTMLDivElement>(null);
+  const modelMenuPortalRef = useRef<HTMLDivElement>(null);
   const canSteer = disabled && !!onSteer;
   const inputDisabled = (disabled || busy) && !canSteer;
   const canSend = !inputDisabled && draft.trim().length > 0;
@@ -185,6 +186,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
       const target = event.target as Node;
       if (menuRef.current?.contains(target)) return;
       if (modelMenuRef.current?.contains(target)) return;
+      if (modelMenuPortalRef.current?.contains(target)) return;
       setMenuOpen(false);
       setModelMenuOpen(false);
     }
@@ -306,6 +308,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
                 {modelMenuOpen && createPortal(
                   <div
                     ref={(el) => {
+                      modelMenuPortalRef.current = el;
                       if (!el || !modelMenuRef.current) return;
                       const rect = modelMenuRef.current.getBoundingClientRect();
                       el.style.position = 'fixed';

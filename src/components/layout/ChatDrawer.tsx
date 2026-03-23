@@ -327,15 +327,25 @@ export function ChatDrawer() {
 
   const drawerTransition = drag.isDragging ? '' : 'transition-transform duration-300 ease-out';
 
+  // Close drawer when clicking outside (on outliner)
+  useEffect(() => {
+    if (!chatDrawerOpen) return;
+    function onPointerDown(e: PointerEvent) {
+      if (drawerRef.current?.contains(e.target as Node)) return;
+      closeChatDrawer();
+    }
+    document.addEventListener('pointerdown', onPointerDown, true);
+    return () => document.removeEventListener('pointerdown', onPointerDown, true);
+  }, [chatDrawerOpen, closeChatDrawer]);
+
   return (
     <div
-      className={`absolute inset-0 z-30 flex items-end transition-opacity duration-250 ${chatDrawerOpen ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'}`}
+      className={`absolute inset-x-0 bottom-0 z-30 flex items-end pointer-events-none ${chatDrawerOpen ? 'opacity-100' : 'opacity-0'} transition-opacity duration-250`}
       data-testid="chat-drawer"
     >
-      <button type="button" onClick={closeChatDrawer} className="absolute inset-0" aria-label="Close" />
       <div
         ref={drawerRef}
-        className={`relative z-10 flex min-h-0 w-full flex-col overflow-hidden rounded-t-[22px] border border-b-0 border-border bg-background shadow-[0_-18px_42px_rgba(15,23,42,0.14)] ${drawerTransition} ${chatDrawerOpen ? 'translate-y-0' : 'translate-y-full'}`}
+        className={`pointer-events-auto relative z-10 flex min-h-0 w-full flex-col overflow-hidden rounded-t-[22px] border border-b-0 border-border bg-background shadow-[0_-18px_42px_rgba(15,23,42,0.14)] ${drawerTransition} ${chatDrawerOpen ? 'translate-y-0' : 'translate-y-full'}`}
         style={{ height: `${drag.height * 100}%` }}
         data-chat-drawer="true"
       >

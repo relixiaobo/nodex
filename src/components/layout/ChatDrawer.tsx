@@ -1,22 +1,90 @@
-import { useEffect, useState } from 'react';
-import { Pencil, Plus } from '../../lib/icons.js';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ChevronDown, Pencil, Plus } from '../../lib/icons.js';
 import { openNewChatDrawer } from '../../lib/chat-panel-actions.js';
+import { listChatSessionMetasPage, type ChatSessionMeta } from '../../lib/ai-persistence.js';
 import { useUIStore } from '../../stores/ui-store.js';
 import { ChatTitleInput, useChatTitleEdit } from '../chat/ChatPanelHeader.js';
 import { ChatPanel } from '../chat/ChatPanel.js';
 
 const ICON_BUTTON_CLASS = 'flex h-7 w-7 items-center justify-center rounded-full text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground';
+const HISTORY_LIMIT = 20;
+
+// ── Session history dropdown ──
+
+function SessionHistoryDropdown({ currentSessionId, onClose }: { currentSessionId: string; onClose: () => void }) {
+  const [sessions, setSessions] = useState<ChatSessionMeta[]>([]);
+  const [loading, setLoading] = useState(true);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    void listChatSessionMetasPage({ limit: HISTORY_LIMIT, offset: 0 }).then(({ items }) => {
+      setSessions(items);
+      setLoading(false);
+    });
+  }, []);
+
+  useEffect(() => {
+    function onPointerDown(e: PointerEvent) {
+      if (dropdownRef.current?.contains(e.target as Node)) return;
+      onClose();
+    }
+    document.addEventListener('pointerdown', onPointerDown, true);
+    return () => document.removeEventListener('pointerdown', onPointerDown, true);
+  }, [onClose]);
+
+  function formatTime(ts: number): string {
+    const d = new Date(ts);
+    const now = new Date();
+    if (d.toDateString() === now.toDateString()) {
+      return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    }
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  }
+
+  return (
+    <div ref={dropdownRef} className="absolute left-0 right-0 top-full z-50 mx-3 max-h-[50vh] overflow-y-auto rounded-lg bg-background p-1 shadow-paper">
+      {loading ? (
+        <div className="px-3 py-2 text-sm text-foreground-tertiary">Loading…</div>
+      ) : sessions.length === 0 ? (
+        <div className="px-3 py-2 text-sm text-foreground-tertiary">No conversations yet</div>
+      ) : (
+        sessions.map((s) => (
+          <button
+            key={s.id}
+            type="button"
+            onClick={() => {
+              useUIStore.getState().openChatDrawer(s.id);
+              onClose();
+            }}
+            className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm transition-colors hover:bg-foreground/4 ${
+              s.id === currentSessionId ? 'text-foreground' : 'text-foreground-secondary'
+            }`}
+          >
+            <span className="min-w-0 flex-1 truncate">{s.title?.trim() || 'Chat'}</span>
+            <span className="shrink-0 text-xs text-foreground-tertiary">{formatTime(s.updatedAt)}</span>
+          </button>
+        ))
+      )}
+    </div>
+  );
+}
+
+// ── Drawer header ──
 
 interface DrawerHeaderProps {
   sessionId: string;
 }
 
 function DrawerHeader({ sessionId }: DrawerHeaderProps) {
-  const closeChatDrawer = useUIStore((s) => s.closeChatDrawer);
   const titleEdit = useChatTitleEdit(sessionId);
+  const [historyOpen, setHistoryOpen] = useState(false);
+
+  const toggleHistory = useCallback(() => {
+    setHistoryOpen((v) => !v);
+  }, []);
 
   return (
-    <div className="shrink-0">
+    <div className="relative shrink-0">
       <div className="flex items-center justify-center pt-2">
         <div className="h-1 w-10 rounded-full bg-foreground/12" aria-hidden="true" />
       </div>
@@ -25,9 +93,16 @@ function DrawerHeader({ sessionId }: DrawerHeaderProps) {
           {titleEdit.editing ? (
             <ChatTitleInput edit={titleEdit} />
           ) : (
-            <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground">
-              {titleEdit.displayTitle}
-            </span>
+            <button
+              type="button"
+              onClick={toggleHistory}
+              className="flex min-w-0 flex-1 items-center gap-1 rounded-md px-1 -ml-1 py-0.5 transition-colors hover:bg-foreground/4"
+            >
+              <span className="min-w-0 truncate text-[13px] font-medium text-foreground">
+                {titleEdit.displayTitle}
+              </span>
+              <ChevronDown size={12} strokeWidth={1.8} className={`shrink-0 text-foreground-tertiary transition-transform ${historyOpen ? 'rotate-180' : ''}`} />
+            </button>
           )}
         </div>
         {!titleEdit.editing && (
@@ -52,16 +127,20 @@ function DrawerHeader({ sessionId }: DrawerHeaderProps) {
           <Plus size={15} strokeWidth={1.8} />
         </button>
       </div>
+      {historyOpen && (
+        <SessionHistoryDropdown currentSessionId={sessionId} onClose={() => setHistoryOpen(false)} />
+      )}
     </div>
   );
 }
+
+// ── Drawer ──
 
 export function ChatDrawer() {
   const chatDrawerOpen = useUIStore((s) => s.chatDrawerOpen);
   const currentChatSessionId = useUIStore((s) => s.currentChatSessionId);
   const closeChatDrawer = useUIStore((s) => s.closeChatDrawer);
 
-  // Track if drawer has ever been opened (to mount content lazily)
   const [hasOpened, setHasOpened] = useState(false);
   useEffect(() => {
     if (chatDrawerOpen) setHasOpened(true);
@@ -69,12 +148,10 @@ export function ChatDrawer() {
 
   useEffect(() => {
     if (!chatDrawerOpen) return;
-
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key !== 'Escape') return;
       closeChatDrawer();
     }
-
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [chatDrawerOpen, closeChatDrawer]);

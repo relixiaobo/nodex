@@ -9,6 +9,7 @@ import { SYSTEM_NODE_IDS } from '../../types/index.js';
 
 export function FloatingChatBar() {
   const [focused, setFocused] = useState(false);
+  const [draft, setDraft] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<ChatInputHandle>(null);
 
@@ -19,34 +20,48 @@ export function FloatingChatBar() {
     return getAvailableModelsWithMeta();
   }, [settingsVersion]);
   const [selectedModelKey, setSelectedModelKey] = useState<{ id: string; provider: string } | null>(null);
-  const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel | null>(null);
   const currentModel = useMemo(() => {
     if (!selectedModelKey) return availableModels[0] ?? undefined;
     return availableModels.find((m) => m.id === selectedModelKey.id && m.provider === selectedModelKey.provider) ?? availableModels[0] ?? undefined;
   }, [availableModels, selectedModelKey]);
+  const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel | null>(null);
 
-  // Close on click outside
+  // When focusing, inject saved draft into ChatInput
+  useEffect(() => {
+    if (focused && draft) {
+      chatInputRef.current?.setDraft(draft);
+    }
+  }, [focused]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Close on click outside — save draft first
   useEffect(() => {
     if (!focused) return;
     function handlePointerDown(e: PointerEvent) {
       if (containerRef.current?.contains(e.target as Node)) return;
+      const currentDraft = chatInputRef.current?.getDraft() ?? '';
+      setDraft(currentDraft);
       setFocused(false);
     }
     document.addEventListener('pointerdown', handlePointerDown, true);
     return () => document.removeEventListener('pointerdown', handlePointerDown, true);
   }, [focused]);
 
-  // Close on Escape
+  // Close on Escape — save draft first
   useEffect(() => {
     if (!focused) return;
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') setFocused(false);
+      if (e.key === 'Escape') {
+        const currentDraft = chatInputRef.current?.getDraft() ?? '';
+        setDraft(currentDraft);
+        setFocused(false);
+      }
     }
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [focused]);
 
   const handleSend = useCallback(async (prompt: string) => {
+    setDraft('');
     setFocused(false);
     await openChatWithPrompt(prompt);
   }, []);
@@ -60,6 +75,8 @@ export function FloatingChatBar() {
   }, []);
 
   const handleOpenSettings = useCallback(() => {
+    const currentDraft = chatInputRef.current?.getDraft() ?? '';
+    setDraft(currentDraft);
     setFocused(false);
     useUIStore.getState().navigateToNode(SYSTEM_NODE_IDS.SETTINGS);
   }, []);
@@ -70,7 +87,6 @@ export function FloatingChatBar() {
 
       <div ref={containerRef} className="pointer-events-auto bg-background">
         {focused ? (
-          /* ── Focused: ChatInput (it has its own px-3 pb-3 pt-1 + rounded-xl border) ── */
           <ChatInput
             ref={chatInputRef}
             disabled={false}
@@ -84,14 +100,15 @@ export function FloatingChatBar() {
             onOpenSettings={handleOpenSettings}
           />
         ) : (
-          /* ── Unfocused: match ChatInput's outer padding (px-3 pb-3) ── */
           <div className="px-3 pb-3 pt-1">
             <button
               type="button"
               onClick={() => setFocused(true)}
-              className="flex w-full items-start rounded-xl border border-border bg-background px-3 pt-2.5 pb-2 text-base leading-6 text-foreground-tertiary transition-colors hover:border-foreground/20"
+              className={`flex w-full rounded-xl border border-border bg-background transition-colors hover:border-foreground/20 ${
+                draft ? 'items-start px-3 pt-2.5 pb-2 text-base leading-6 text-foreground' : 'h-11 items-center px-3 text-[15px] text-foreground-tertiary'
+              }`}
             >
-              Ask about your notes…
+              {draft || 'Ask about your notes…'}
             </button>
           </div>
         )}

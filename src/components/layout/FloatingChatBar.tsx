@@ -27,7 +27,7 @@ export function FloatingChatBar() {
     return availableModels.find((m) => m.id === selectedModelKey.id && m.provider === selectedModelKey.provider) ?? availableModels[0];
   }, [availableModels, selectedModelKey]);
 
-  // Unfocus when focus leaves the container
+  // Unfocus when focus leaves the container or user interacts outside
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -38,6 +38,16 @@ export function FloatingChatBar() {
     el.addEventListener('focusout', onFocusOut);
     return () => el.removeEventListener('focusout', onFocusOut);
   }, []);
+
+  useEffect(() => {
+    if (!focused) return;
+    function onPointerDown(e: PointerEvent) {
+      if (containerRef.current?.contains(e.target as Node)) return;
+      setFocused(false);
+    }
+    document.addEventListener('pointerdown', onPointerDown, true);
+    return () => document.removeEventListener('pointerdown', onPointerDown, true);
+  }, [focused]);
 
   const handleSend = useCallback(async (prompt: string) => {
     setFocused(false);

@@ -1,17 +1,66 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronDown, Pencil, Plus, RefreshCw } from '../../lib/icons.js';
+import { Check, ChevronDown, Pencil, Plus, RefreshCw } from '../../lib/icons.js';
 import { openNewChatDrawer } from '../../lib/chat-panel-actions.js';
 import { listChatSessionMetasPage, type ChatSessionMeta } from '../../lib/ai-persistence.js';
-import { regenerateChatTitle } from '../../lib/ai-service.js';
+import { getChatTitle, regenerateChatTitle, subscribeChatTitles } from '../../lib/ai-service.js';
 import { useUIStore } from '../../stores/ui-store.js';
 import { ChatTitleInput, useChatTitleEdit } from '../chat/ChatPanelHeader.js';
 import { ChatPanel } from '../chat/ChatPanel.js';
 
 const ICON_BTN = 'flex h-7 w-7 items-center justify-center rounded-full text-foreground-tertiary outline-none transition-colors hover:bg-foreground/4 hover:text-foreground';
-const ROW_ACTION = 'flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-foreground-tertiary opacity-0 outline-none transition-opacity hover:bg-foreground/4 hover:text-foreground group-hover/row:opacity-100';
+const SMALL_BTN = 'flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-foreground-tertiary outline-none transition-colors hover:bg-foreground/4 hover:text-foreground';
 const HISTORY_LIMIT = 20;
 const MIN_HEIGHT = 0.3;
 const MAX_HEIGHT = 0.95;
+
+// ── Inline title editor (inside dropdown row) ──
+
+function InlineRowEditor({ sessionId, initialTitle, onDone }: { sessionId: string; initialTitle: string; onDone: () => void }) {
+  const [draft, setDraft] = useState(initialTitle);
+  const [regenerating, setRegenerating] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { inputRef.current?.select(); }, []);
+
+  async function save() {
+    const trimmed = draft.trim();
+    if (trimmed && trimmed !== initialTitle) {
+      // Update via getChatSession + saveChatSession for any session
+      const { getChatSession, saveChatSession } = await import('../../lib/ai-persistence.js');
+      const session = await getChatSession(sessionId);
+      if (session) {
+        session.title = trimmed;
+        await saveChatSession(session);
+      }
+    }
+    onDone();
+  }
+
+  async function handleAiRename() {
+    setRegenerating(true);
+    const title = await regenerateChatTitle(sessionId);
+    if (title) setDraft(title);
+    setRegenerating(false);
+  }
+
+  return (
+    <div className="flex items-center gap-1 px-2 py-1">
+      <input
+        ref={inputRef}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter') void save(); if (e.key === 'Escape') onDone(); }}
+        className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none"
+      />
+      <button type="button" onClick={() => void handleAiRename()} disabled={regenerating} className={SMALL_BTN} aria-label="AI rename">
+        <RefreshCw size={12} strokeWidth={1.8} className={regenerating ? 'animate-spin' : ''} />
+      </button>
+      <button type="button" onClick={() => void save()} className={SMALL_BTN} aria-label="Confirm">
+        <Check size={14} strokeWidth={2} />
+      </button>
+    </div>
+  );
+}
 
 // ── Session history dropdown ──
 
@@ -19,24 +68,24 @@ function SessionHistoryDropdown({
   currentSessionId,
   headerRef,
   onClose,
-  onEditTitle,
 }: {
   currentSessionId: string;
   headerRef: React.RefObject<HTMLDivElement | null>;
   onClose: () => void;
-  onEditTitle: () => void;
 }) {
   const [sessions, setSessions] = useState<ChatSessionMeta[]>([]);
   const [loading, setLoading] = useState(true);
-  const [regenerating, setRegenerating] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  function loadSessions() {
     void listChatSessionMetasPage({ limit: HISTORY_LIMIT, offset: 0 }).then(({ items }) => {
       setSessions(items);
       setLoading(false);
     });
-  }, []);
+  }
+
+  useEffect(loadSessions, []);
 
   useEffect(() => {
     function onPointerDown(e: PointerEvent) {
@@ -57,15 +106,6 @@ function SessionHistoryDropdown({
     return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   }
 
-  async function handleRegenerate(sessionId: string) {
-    setRegenerating(true);
-    await regenerateChatTitle(sessionId);
-    // Refresh the list to show updated title
-    const { items } = await listChatSessionMetasPage({ limit: HISTORY_LIMIT, offset: 0 });
-    setSessions(items);
-    setRegenerating(false);
-  }
-
   return (
     <div ref={ref} className="absolute left-0 right-0 top-full z-50 mx-3 max-h-[50vh] overflow-y-auto rounded-lg bg-background p-1 shadow-paper">
       {loading ? (
@@ -75,6 +115,19 @@ function SessionHistoryDropdown({
       ) : (
         sessions.map((s) => {
           const isCurrent = s.id === currentSessionId;
+
+          if (editingId === s.id) {
+            return (
+              <div key={s.id} className="rounded-md bg-foreground/[0.04]">
+                <InlineRowEditor
+                  sessionId={s.id}
+                  initialTitle={s.title?.trim() || 'Chat'}
+                  onDone={() => { setEditingId(null); loadSessions(); }}
+                />
+              </div>
+            );
+          }
+
           return (
             <div
               key={s.id}
@@ -85,34 +138,23 @@ function SessionHistoryDropdown({
               <button
                 type="button"
                 onClick={() => { useUIStore.getState().openChatDrawer(s.id); onClose(); }}
-                className={`flex min-w-0 flex-1 items-center gap-2 px-2.5 py-1.5 text-left text-sm ${
-                  isCurrent ? 'font-medium text-foreground' : 'text-foreground-secondary'
+                className={`flex min-w-0 flex-1 flex-col gap-0.5 px-2.5 py-1.5 text-left ${
+                  isCurrent ? 'text-foreground' : 'text-foreground-secondary'
                 }`}
               >
-                <span className="min-w-0 flex-1 truncate">{s.title?.trim() || 'Chat'}</span>
-                <span className="shrink-0 text-xs text-foreground-tertiary">{formatTime(s.updatedAt)}</span>
+                <span className={`min-w-0 truncate text-sm ${isCurrent ? 'font-medium' : ''}`}>
+                  {s.title?.trim() || 'Chat'}
+                </span>
+                <span className="text-xs text-foreground-tertiary">{formatTime(s.updatedAt)}</span>
               </button>
-              {isCurrent && (
-                <div className="flex shrink-0 items-center gap-0.5 mr-1">
-                  <button
-                    type="button"
-                    onClick={() => { onClose(); onEditTitle(); }}
-                    className={ROW_ACTION}
-                    aria-label="Edit title"
-                  >
-                    <Pencil size={11} strokeWidth={1.8} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void handleRegenerate(s.id)}
-                    disabled={regenerating}
-                    className={`${ROW_ACTION} ${regenerating ? '!opacity-100 animate-spin' : ''}`}
-                    aria-label="AI rename"
-                  >
-                    <RefreshCw size={11} strokeWidth={1.8} />
-                  </button>
-                </div>
-              )}
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setEditingId(s.id); }}
+                className={`${SMALL_BTN} mr-1 opacity-0 group-hover/row:opacity-100`}
+                aria-label="Edit title"
+              >
+                <Pencil size={11} strokeWidth={1.8} />
+              </button>
             </div>
           );
         })
@@ -159,9 +201,6 @@ function DrawerHeader({ sessionId }: { sessionId: string }) {
           currentSessionId={sessionId}
           headerRef={headerRef}
           onClose={() => setHistoryOpen(false)}
-          onEditTitle={() => {
-            requestAnimationFrame(() => titleEdit.startEdit({ stopPropagation: () => {} } as React.MouseEvent<HTMLButtonElement>));
-          }}
         />
       )}
     </div>

@@ -44,7 +44,7 @@ export function formatLocalTimestamp(date: Date): string {
 
 function buildPanelContext(): string | null {
   const ui = useUIStore.getState();
-  const currentPanelId = ui.activeView === 'node' ? ui.currentNodeId : null;
+  const currentPanelId = ui.currentNodeId;
   if (!currentPanelId || isAppPanel(currentPanelId)) return null;
 
   const panelNode = loroDoc.toNodexNode(currentPanelId);

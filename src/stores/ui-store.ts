@@ -1,8 +1,7 @@
 /**
- * UI state store: dual-view toggle layout, expanded nodes, focus.
+ * UI state store: outliner surface, chat drawer, expanded nodes, focus.
  *
  * Persisted to chrome.storage.local:
- * - activeView
  * - currentNodeId
  * - currentChatSessionId
  * - expandedNodes
@@ -14,7 +13,6 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { chromeLocalStorage } from '../lib/chrome-storage';
 import { commitUIMarker, registerUndoUICallbacks } from '../lib/loro-doc.js';
-import { ensureTodayNode } from '../lib/journal.js';
 import {
   buildExpandedNodeKey,
   expandedNodeSetsEqual,
@@ -24,21 +22,19 @@ import {
 import { chatPanelSessionId, isAppPanel, isChatPanel } from '../types/index.js';
 import { useNodeStore } from './node-store.js';
 
-type ActiveView = 'chat' | 'node';
-
 interface PendingChatPrompt {
   sessionId: string;
   prompt: string;
 }
 
 interface UIStore {
-  activeView: ActiveView;
+  chatDrawerOpen: boolean;
   currentNodeId: string | null;
   currentChatSessionId: string | null;
   nodeHistory: string[];
   nodeHistoryIndex: number;
-  switchToChat(): void;
-  switchToNode(nodeId?: string): void;
+  openChatDrawer(sessionId?: string): void;
+  closeChatDrawer(): void;
   navigateToNode(nodeId: string): void;
   replaceCurrentNode(nodeId: string): void;
   goBackNode(): void;
@@ -149,7 +145,6 @@ interface UIStore {
 }
 
 export interface PersistedUIStoreState {
-  activeView: ActiveView;
   currentNodeId: string | null;
   currentChatSessionId: string | null;
   expandedNodes: Set<string>;
@@ -162,7 +157,6 @@ export const selectCurrentNodeId = (s: UIStore): string | null => s.currentNodeI
 
 export function partializeUIStore(state: UIStore): PersistedUIStoreState {
   return {
-    activeView: state.activeView,
     currentNodeId: state.currentNodeId,
     currentChatSessionId: state.currentChatSessionId,
     expandedNodes: normalizeExpandedNodeSet(state.expandedNodes),
@@ -187,25 +181,6 @@ function getTodayDateKey(): string {
   const month = String(now.getMonth() + 1).padStart(2, '0');
   const day = String(now.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
-}
-
-function resolvePreferredExistingNodeTarget(
-  state: Pick<UIStore, 'currentNodeId' | 'lastVisitDate'>,
-  requestedNodeId?: string,
-): string | null {
-  if (requestedNodeId && hasBackingNode(requestedNodeId)) {
-    return requestedNodeId;
-  }
-
-  if (!state.currentNodeId || !hasBackingNode(state.currentNodeId)) {
-    return null;
-  }
-
-  if (state.lastVisitDate !== getTodayDateKey()) {
-    return null;
-  }
-
-  return state.currentNodeId;
 }
 
 function pushNodeHistory(
@@ -296,31 +271,26 @@ function migrateExpandedNodes(state: Record<string, unknown>) {
 export const useUIStore = create<UIStore>()(
   persist(
     (set): UIStore => ({
-      activeView: 'chat',
+      chatDrawerOpen: false,
       currentNodeId: null,
       currentChatSessionId: null,
       nodeHistory: [],
       nodeHistoryIndex: -1,
 
-      switchToChat: () => set({ activeView: 'chat' }),
+      openChatDrawer: (sessionId) =>
+        set((s) => ({
+          chatDrawerOpen: true,
+          currentChatSessionId: sessionId ?? s.currentChatSessionId,
+        })),
 
-      switchToNode: (nodeId) =>
-        set((s) => {
-          const targetNodeId = resolvePreferredExistingNodeTarget(s, nodeId) ?? ensureTodayNode();
-          const nextNodeState = pushNodeHistory(s, targetNodeId);
-          return {
-            activeView: 'node',
-            lastVisitDate: getTodayDateKey(),
-            ...nextNodeState,
-            ...clearedFocus(),
-          };
-        }),
+      closeChatDrawer: () => set({ chatDrawerOpen: false }),
 
       navigateToNode: (nodeId) =>
         set((s) => {
           if (!hasBackingNode(nodeId)) return {};
           return {
             ...pushNodeHistory(s, nodeId),
+            lastVisitDate: getTodayDateKey(),
             ...clearedFocus(),
           };
         }),
@@ -329,7 +299,6 @@ export const useUIStore = create<UIStore>()(
         set((s) => {
           if (!hasBackingNode(nodeId)) return {};
           return {
-            activeView: 'node',
             ...replaceNodeHistory(s, nodeId),
             lastVisitDate: getTodayDateKey(),
             ...clearedFocus(),
@@ -341,7 +310,6 @@ export const useUIStore = create<UIStore>()(
           const nextIndex = findHistoryIndex(s.nodeHistory, s.nodeHistoryIndex - 1, -1);
           if (nextIndex < 0) return {};
           return {
-            activeView: 'node',
             currentNodeId: s.nodeHistory[nextIndex] ?? null,
             nodeHistoryIndex: nextIndex,
             lastVisitDate: getTodayDateKey(),
@@ -354,7 +322,6 @@ export const useUIStore = create<UIStore>()(
           const nextIndex = findHistoryIndex(s.nodeHistory, s.nodeHistoryIndex + 1, 1);
           if (nextIndex < 0) return {};
           return {
-            activeView: 'node',
             currentNodeId: s.nodeHistory[nextIndex] ?? null,
             nodeHistoryIndex: nextIndex,
             lastVisitDate: getTodayDateKey(),
@@ -367,10 +334,10 @@ export const useUIStore = create<UIStore>()(
       navigateTo: (nodeId) => {
         if (isChatPanel(nodeId)) {
           useUIStore.getState().setCurrentChatSessionId(chatPanelSessionId(nodeId));
-          useUIStore.getState().switchToChat();
+          useUIStore.getState().openChatDrawer();
           return;
         }
-        useUIStore.getState().switchToNode(nodeId);
+        useUIStore.getState().navigateToNode(nodeId);
       },
 
       expandedNodes: new Set<string>(),
@@ -543,7 +510,7 @@ export const useUIStore = create<UIStore>()(
     }),
     {
       name: 'nodex-ui',
-      version: 6,
+      version: 7,
       storage: chromeLocalStorage,
       partialize: partializeUIStore,
       migrate: (persisted: unknown, version: number) => {
@@ -558,7 +525,6 @@ export const useUIStore = create<UIStore>()(
           const fallbackNodeId = panels.find((panel) => typeof panel.nodeId === 'string' && !isChatPanel(panel.nodeId))?.nodeId ?? null;
           const fallbackChatNodeId = panels.find((panel) => typeof panel.nodeId === 'string' && isChatPanel(panel.nodeId))?.nodeId ?? null;
 
-          state.activeView = activeNodeId && !isChatPanel(activeNodeId) ? 'node' : 'chat';
           state.currentNodeId = activeNodeId && !isChatPanel(activeNodeId) ? activeNodeId : fallbackNodeId;
           state.currentChatSessionId = activeNodeId && isChatPanel(activeNodeId)
             ? chatPanelSessionId(activeNodeId)
@@ -571,6 +537,9 @@ export const useUIStore = create<UIStore>()(
           delete state.activePanelId;
           delete state.navHistory;
           delete state.navIndex;
+        }
+        if (version < 7) {
+          delete state.activeView;
         }
         migrateExpandedNodes(state);
         return state;

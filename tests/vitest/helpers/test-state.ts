@@ -20,7 +20,7 @@ export function resetStores(): void {
   });
 
   useUIStore.setState({
-    activeView: 'chat',
+    chatDrawerOpen: false,
     currentNodeId: null,
     currentChatSessionId: null,
     nodeHistory: [],

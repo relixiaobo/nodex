@@ -14,7 +14,6 @@ beforeEach(() => {
 describe('node history navigation', () => {
   it('seed initializes the node view with Today', () => {
     const s = useUIStore.getState();
-    expect(s.activeView).toBe('node');
     expect(s.currentNodeId).toBe(ensureTodayNode());
     expect(s.nodeHistory).toEqual([ensureTodayNode()]);
     expect(s.nodeHistoryIndex).toBe(0);

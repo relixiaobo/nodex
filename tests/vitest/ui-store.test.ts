@@ -25,7 +25,6 @@ describe('ui-store navigation and UI state', () => {
     const todayId = ensureTodayNode();
     const noteExpandKey = buildExpandedNodeKey(todayId, 'note_2');
 
-    expect(useUIStore.getState().activeView).toBe('node');
     expect(currentNodeId()).toBe(todayId);
     expect(useUIStore.getState().nodeHistory).toEqual([todayId]);
     expect(useUIStore.getState().nodeHistoryIndex).toBe(0);
@@ -78,40 +77,28 @@ describe('ui-store navigation and UI state', () => {
     expect(useUIStore.getState().searchQuery).toBe('');
 
     ui.navigateTo('chat:session_test');
-    expect(useUIStore.getState().activeView).toBe('chat');
+    expect(useUIStore.getState().chatDrawerOpen).toBe(true);
     expect(useUIStore.getState().currentChatSessionId).toBe('session_test');
     expect(useUIStore.getState().currentNodeId).toBe('note_2');
   });
 
-  it('switchToNode falls back to Today on first visit and preserves the last node on the same day', () => {
+  it('opens and closes the chat drawer without affecting node history', () => {
     resetAndSeed();
     useUIStore.setState({
-      activeView: 'chat',
-      currentNodeId: null,
-      nodeHistory: [],
-      nodeHistoryIndex: -1,
-      lastVisitDate: null,
-    });
-    const ui = useUIStore.getState();
-    const todayId = ensureTodayNode();
-
-    ui.switchToNode();
-    expect(useUIStore.getState().activeView).toBe('node');
-    expect(currentNodeId()).toBe(todayId);
-    expect(useUIStore.getState().nodeHistory).toEqual([todayId]);
-
-    useUIStore.setState({
-      activeView: 'chat',
       currentNodeId: 'note_1',
       nodeHistory: ['note_1'],
       nodeHistoryIndex: 0,
-      lastVisitDate: getTodayDateKey(),
     });
+    const ui = useUIStore.getState();
 
-    ui.switchToNode();
-    expect(useUIStore.getState().activeView).toBe('node');
-    expect(currentNodeId()).toBe('note_1');
+    ui.openChatDrawer('session_test');
+    expect(useUIStore.getState().chatDrawerOpen).toBe(true);
+    expect(useUIStore.getState().currentChatSessionId).toBe('session_test');
     expect(useUIStore.getState().nodeHistory).toEqual(['note_1']);
+
+    ui.closeChatDrawer();
+    expect(useUIStore.getState().chatDrawerOpen).toBe(false);
+    expect(currentNodeId()).toBe('note_1');
   });
 
   it('replaceCurrentNode seeds the node view when no current node exists', () => {
@@ -119,7 +106,6 @@ describe('ui-store navigation and UI state', () => {
     useUIStore.getState().replaceCurrentNode('note_1');
 
     const state = useUIStore.getState();
-    expect(state.activeView).toBe('node');
     expect(state.currentNodeId).toBe('note_1');
     expect(state.nodeHistory).toEqual(['note_1']);
     expect(state.nodeHistoryIndex).toBe(0);

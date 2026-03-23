@@ -208,7 +208,7 @@ describe('UI marker → undoDoc/redoDoc', () => {
     const todayId = ensureTodayNode();
 
     useUIStore.setState({
-      activeView: 'chat',
+      chatDrawerOpen: false,
       currentNodeId: null,
       nodeHistory: [],
       nodeHistoryIndex: -1,
@@ -218,13 +218,11 @@ describe('UI marker → undoDoc/redoDoc', () => {
     expect(useUIStore.getState().currentNodeId).toBe(todayId);
     expect(canUndoDoc()).toBe(false);
     const before = {
-      activeView: useUIStore.getState().activeView,
       currentNodeId: useUIStore.getState().currentNodeId,
       nodeHistory: [...useUIStore.getState().nodeHistory],
       nodeHistoryIndex: useUIStore.getState().nodeHistoryIndex,
     };
     expect(undoDoc()).toBe(false);
-    expect(useUIStore.getState().activeView).toBe(before.activeView);
     expect(useUIStore.getState().currentNodeId).toBe(before.currentNodeId);
     expect(useUIStore.getState().nodeHistory).toEqual(before.nodeHistory);
     expect(useUIStore.getState().nodeHistoryIndex).toBe(before.nodeHistoryIndex);

@@ -6,7 +6,7 @@ import { useUIStore } from '../../src/stores/ui-store.js';
 import {
   ensureChatSession,
   focusOrOpenChat,
-  openChatPanel,
+  openNewChatDrawer,
   openChatWithPrompt,
 } from '../../src/lib/chat-panel-actions.js';
 import { resetAndSeed } from './helpers/test-state.js';
@@ -26,7 +26,7 @@ describe('chat-panel-actions', () => {
     const sessionId = await ensureChatSession();
 
     const state = useUIStore.getState();
-    expect(state.activeView).toBe('node');
+    expect(state.chatDrawerOpen).toBe(false);
     expect(state.currentNodeId).toBe('proj_1');
     expect(state.currentChatSessionId).toBe(sessionId);
 
@@ -47,11 +47,11 @@ describe('chat-panel-actions', () => {
     expect(useUIStore.getState().currentChatSessionId).toBe(firstSessionId);
   });
 
-  it('openChatPanel creates a new persisted session and switches to chat view', async () => {
-    const sessionId = await openChatPanel();
+  it('openNewChatDrawer creates a new persisted session and opens the drawer', async () => {
+    const sessionId = await openNewChatDrawer();
 
     const state = useUIStore.getState();
-    expect(state.activeView).toBe('chat');
+    expect(state.chatDrawerOpen).toBe(true);
     expect(state.currentChatSessionId).toBe(sessionId);
     expect(state.currentNodeId).toBe('proj_1');
 
@@ -62,22 +62,22 @@ describe('chat-panel-actions', () => {
   it('focusOrOpenChat focuses an existing session instead of creating another one', async () => {
     const existingSessionId = await ensureChatSession();
 
-    useUIStore.getState().switchToNode('proj_1');
+    useUIStore.getState().closeChatDrawer();
     await focusOrOpenChat();
 
     const state = useUIStore.getState();
-    expect(state.activeView).toBe('chat');
+    expect(state.chatDrawerOpen).toBe(true);
     expect(state.currentChatSessionId).toBe(existingSessionId);
   });
 
   it('openChatWithPrompt reuses the existing chat session and queues the prompt', async () => {
     const existingSessionId = await ensureChatSession();
 
-    useUIStore.getState().switchToNode('proj_1');
+    useUIStore.getState().closeChatDrawer();
     await openChatWithPrompt('Explain this page');
 
     const state = useUIStore.getState();
-    expect(state.activeView).toBe('chat');
+    expect(state.chatDrawerOpen).toBe(true);
     expect(state.currentChatSessionId).toBe(existingSessionId);
     expect(state.pendingChatPrompt).toEqual({
       sessionId: existingSessionId,
@@ -89,7 +89,7 @@ describe('chat-panel-actions', () => {
     await openChatWithPrompt('Start fresh');
 
     const state = useUIStore.getState();
-    expect(state.activeView).toBe('chat');
+    expect(state.chatDrawerOpen).toBe(true);
     expect(state.currentChatSessionId).toBeTruthy();
     expect(state.pendingChatPrompt).toEqual({
       sessionId: state.currentChatSessionId!,

@@ -7,14 +7,13 @@ import { useChatShortcut } from '../../hooks/use-chat-shortcut.js';
 import { useTodayShortcut } from '../../hooks/use-today-shortcut';
 import { useGlobalSelectionDismiss } from '../../hooks/use-global-selection-dismiss.js';
 import { LoginScreen } from '../../components/auth/LoginScreen.js';
-import { ToggleLayout } from '../../components/layout/ToggleLayout.js';
+import { DrawerLayout } from '../../components/layout/DrawerLayout.js';
 import { CommandPalette } from '../../components/search/CommandPalette';
 import { BatchTagSelector } from '../../components/tags/BatchTagSelector';
 import { initLoroDoc } from '../../lib/loro-doc.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { findUnexpectedShortcutConflicts } from '../../lib/shortcut-registry.js';
 import { ensureTodayNode } from '../../lib/journal.js';
-import { getStartupPagePreference, STARTUP_PAGE } from '../../lib/startup-page-preference.js';
 import { ensureHighlightTagDef, ensureNoteTagDef, getClipNodeIdForHighlight, type HighlightNodeStore } from '../../lib/highlight-service.js';
 import {
   createHighlightFromPayload,
@@ -137,10 +136,9 @@ function useBootstrap(skip: boolean): BootstrapResult {
     });
    }
 
-   // Toggle-layout bootstrap:
-   // - New users default to Chat unless startup preference explicitly prefers Today
-   // - Returning users restore the last active view
-   // - First node visit of a new day resets the node view to Today
+   // Drawer-layout bootstrap:
+   // - Outliner is always the base layer, so we always need a valid current node
+   // - First node visit of a new day resets the node target to Today
    const uiState = useUIStore.getState();
    const today = new Date();
    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
@@ -150,14 +148,10 @@ function useBootstrap(skip: boolean): BootstrapResult {
     && !isAppPanel(currentNodeId)
     && !loroDoc.hasNode(currentNodeId);
 
-   if (uiState.activeView === 'node') {
-    if (hasInvalidCurrentNode || !currentNodeId || isFirstNodeVisitOfDay) {
-     useUIStore.getState().switchToNode(ensureTodayNode());
-    } else {
-     useUIStore.getState().setLastVisitDate(todayStr);
-    }
-   } else if (getStartupPagePreference() === STARTUP_PAGE.TODAY && !currentNodeId && !uiState.currentChatSessionId) {
-    useUIStore.getState().switchToNode(ensureTodayNode());
+   if (hasInvalidCurrentNode || !currentNodeId || isFirstNodeVisitOfDay) {
+    useUIStore.getState().replaceCurrentNode(ensureTodayNode());
+   } else {
+    useUIStore.getState().setLastVisitDate(todayStr);
    }
 
    // ── Drain pending highlight queue ──
@@ -462,7 +456,7 @@ export function App({ skipBootstrap = false }: AppProps) {
 
  // Global Cmd+Z / Cmd+Shift+Z for node history navigation
  useNavUndoKeyboard();
- // Global Cmd+L / Cmd+Shift+L for chat view
+ // Global Cmd+L / Cmd+Shift+L for chat entry focus
  useChatShortcut();
  // Global Cmd+Shift+D for go to today
  useTodayShortcut();
@@ -483,11 +477,11 @@ export function App({ skipBootstrap = false }: AppProps) {
   <ErrorBoundary>
    <TooltipProvider>
     <div
-     className="flex h-screen w-full flex-col overflow-hidden bg-background-recessed text-foreground"
+     className="flex h-screen w-full flex-col overflow-hidden bg-background text-foreground"
      onPointerDownCapture={selectionDismissHandlers.onPointerDownCapture}
      onFocusCapture={selectionDismissHandlers.onFocusCapture}
     >
-     <ToggleLayout />
+     <DrawerLayout />
      <CommandPalette />
      <BatchTagSelector />
      <Toaster

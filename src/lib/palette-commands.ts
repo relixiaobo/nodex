@@ -22,7 +22,7 @@ import {
   type WebClipCaptureResponse,
 } from './webclip-messaging.js';
 import { createClipShell, fillClipShell } from './webclip-service.js';
-import { openChatPanel } from './chat-panel-actions.js';
+import { openNewChatDrawer } from './chat-panel-actions.js';
 import { useNodeStore } from '../stores/node-store.js';
 import { useUIStore } from '../stores/ui-store.js';
 import { t } from '../i18n/strings.js';
@@ -150,7 +150,7 @@ export function getSystemCommands(): PaletteCommand[] {
       keywords: ['chat', 'ai', 'ask', 'conversation'],
       action: (ctx) => {
         ctx.closeSearch();
-        void openChatPanel();
+        void openNewChatDrawer();
       },
     },
     // Sign in / Sign out: handled by ToolbarUserMenu avatar, not in command palette.

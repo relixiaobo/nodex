@@ -12,7 +12,7 @@ describe('ui-store persistence helpers', () => {
     const expanded = new Set<string>(['main:a:b', 'a:c']);
     const usage = { cmd_1: { count: 3, lastUsedAt: 1000 } };
     const result = partializeUIStore({
-      activeView: 'node',
+      chatDrawerOpen: true,
       currentNodeId: 'note_1',
       currentChatSessionId: 'session_1',
       expandedNodes: expanded,
@@ -25,7 +25,6 @@ describe('ui-store persistence helpers', () => {
     } as never);
 
     expect(result).toEqual({
-      activeView: 'node',
       currentNodeId: 'note_1',
       currentChatSessionId: 'session_1',
       expandedNodes: new Set(['a:b', 'a:c']),
@@ -36,13 +35,13 @@ describe('ui-store persistence helpers', () => {
   });
 });
 
-describe('ui-store persist migration v5→v6', () => {
+describe('ui-store persist migration', () => {
   beforeEach(async () => {
     resetStores();
     await useUIStore.persist.clearStorage();
   });
 
-  it('migrates a node-active panel layout into the toggle model', async () => {
+  it('migrates a node-active panel layout into the drawer model', async () => {
     await chromeLocalStorage?.setItem('nodex-ui', {
       state: {
         panels: [
@@ -59,7 +58,6 @@ describe('ui-store persist migration v5→v6', () => {
     await useUIStore.persist.rehydrate();
 
     const state = useUIStore.getState();
-    expect(state.activeView).toBe('node');
     expect(state.currentNodeId).toBe('note_1');
     expect(state.currentChatSessionId).toBe('session_old');
     expect(state.expandedNodes).toEqual(new Set(['proj_1:task_1', 'proj_1:task_2']));
@@ -67,7 +65,7 @@ describe('ui-store persist migration v5→v6', () => {
     expect(state.nodeHistoryIndex).toBe(-1);
   });
 
-  it('migrates a chat-active panel layout while preserving the fallback node view target', async () => {
+  it('migrates a chat-active panel layout while preserving the fallback node target', async () => {
     await chromeLocalStorage?.setItem('nodex-ui', {
       state: {
         panels: [
@@ -84,7 +82,6 @@ describe('ui-store persist migration v5→v6', () => {
     await useUIStore.persist.rehydrate();
 
     const state = useUIStore.getState();
-    expect(state.activeView).toBe('chat');
     expect(state.currentNodeId).toBe('note_1');
     expect(state.currentChatSessionId).toBe('session_focus');
     expect(state.expandedNodes).toEqual(new Set(['today:proj_1']));

@@ -9,7 +9,8 @@ interface NodeReferenceProps {
 
 export function NodeReference({ nodeId, children }: NodeReferenceProps) {
   const node = useNode(nodeId);
-  const switchToNode = useUIStore((s) => s.switchToNode);
+  const navigateToNode = useUIStore((s) => s.navigateToNode);
+  const closeChatDrawer = useUIStore((s) => s.closeChatDrawer);
 
   if (!node) {
     return (
@@ -20,7 +21,8 @@ export function NodeReference({ nodeId, children }: NodeReferenceProps) {
   }
 
   const handleOpen = () => {
-    switchToNode(nodeId);
+    closeChatDrawer();
+    navigateToNode(nodeId);
   };
 
   return (

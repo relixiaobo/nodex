@@ -9,11 +9,15 @@ const { mockEnsureChatSession } = vi.hoisted(() => ({
 
 vi.mock('../../src/lib/chat-panel-actions.js', () => ({
   ensureChatSession: mockEnsureChatSession,
+  openChatDrawer: vi.fn(),
+  openChatWithPrompt: vi.fn(),
 }));
 
 vi.mock('../../src/lib/ai-service.js', () => ({
+  getAgentForSession: vi.fn(),
   getChatTitle: (sessionId: string) => sessionId === 'session_1' ? 'Session One' : 'Chat',
   subscribeChatTitles: () => () => {},
+  updateSessionTitle: vi.fn(),
 }));
 
 vi.mock('../../src/components/chat/ChatPanel.js', () => ({
@@ -42,15 +46,20 @@ vi.mock('../../src/components/panel/AppPanel.js', () => ({
     }),
 }));
 
+vi.mock('../../src/components/panel/Breadcrumb.js', () => ({
+  Breadcrumb: ({ nodeId }: { nodeId: string }) =>
+    React.createElement('div', { 'data-testid': 'breadcrumb', 'data-node-id': nodeId }),
+}));
+
 vi.mock('../../src/components/toolbar/ToolbarUserMenu.js', () => ({
   ToolbarUserMenu: () => React.createElement('div', { 'data-testid': 'user-menu' }),
 }));
 
-import { ToggleLayout } from '../../src/components/layout/ToggleLayout.js';
+import { DrawerLayout } from '../../src/components/layout/DrawerLayout.js';
 import { useUIStore } from '../../src/stores/ui-store.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
-describe('ToggleLayout', () => {
+describe('DrawerLayout', () => {
   let container: HTMLDivElement;
   let root: Root;
 
@@ -78,15 +87,8 @@ describe('ToggleLayout', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
   }
 
-  function getViewWrappers(): HTMLElement[] {
-    const layout = container.firstElementChild as HTMLDivElement | null;
-    const viewContainer = layout?.children[1] as HTMLDivElement | undefined;
-    return Array.from(viewContainer?.children ?? []) as HTMLElement[];
-  }
-
-  it('keeps both views mounted and switches visibility through the top-bar toggles', async () => {
+  it('renders the outliner base layer with top bar and floating chat bar', async () => {
     useUIStore.setState({
-      activeView: 'chat',
       currentChatSessionId: 'session_1',
       currentNodeId: 'proj_1',
       nodeHistory: ['proj_1'],
@@ -94,34 +96,20 @@ describe('ToggleLayout', () => {
     });
 
     flushSync(() => {
-      root.render(React.createElement(ToggleLayout));
+      root.render(React.createElement(DrawerLayout));
     });
     await tick();
 
-    const wrappers = getViewWrappers();
-    expect(container.querySelector('[data-testid="chat-panel"]')).not.toBeNull();
-    expect(container.querySelector('[data-testid="node-panel"]')).not.toBeNull();
-    expect(wrappers).toHaveLength(2);
-    expect(wrappers[0]?.getAttribute('aria-hidden')).toBe('false');
-    expect(wrappers[1]?.getAttribute('aria-hidden')).toBe('true');
-    expect(container.textContent).toContain('Session One');
-
-    const buttons = container.querySelectorAll('button');
-    flushSync(() => {
-      buttons[1]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
-    await tick();
-
-    const nextWrappers = getViewWrappers();
-    expect(useUIStore.getState().activeView).toBe('node');
-    expect(nextWrappers[0]?.getAttribute('aria-hidden')).toBe('true');
-    expect(nextWrappers[1]?.getAttribute('aria-hidden')).toBe('false');
-    expect(container.textContent).toContain('My Project');
+    expect(container.querySelector('[data-testid="top-bar"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="breadcrumb"][data-node-id="proj_1"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="user-menu"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="node-panel"][data-node-id="proj_1"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="floating-chat-bar"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="chat-drawer"]')).toBeNull();
   });
 
-  it('ensures a hidden chat session exists without stealing node focus', async () => {
+  it('ensures a hidden chat session exists without changing the current node', async () => {
     useUIStore.setState({
-      activeView: 'node',
       currentChatSessionId: null,
       currentNodeId: 'proj_1',
       nodeHistory: ['proj_1'],
@@ -129,7 +117,7 @@ describe('ToggleLayout', () => {
     });
 
     flushSync(() => {
-      root.render(React.createElement(ToggleLayout));
+      root.render(React.createElement(DrawerLayout));
     });
 
     await vi.waitFor(() => {
@@ -137,13 +125,13 @@ describe('ToggleLayout', () => {
       expect(useUIStore.getState().currentChatSessionId).toBe('session_auto');
     });
 
-    expect(useUIStore.getState().activeView).toBe('node');
+    expect(useUIStore.getState().chatDrawerOpen).toBe(false);
     expect(useUIStore.getState().currentNodeId).toBe('proj_1');
   });
 
-  it('renders app panels inside the node view', async () => {
+  it('renders app panels in the base layer and closes the drawer from the backdrop', async () => {
     useUIStore.setState({
-      activeView: 'node',
+      chatDrawerOpen: true,
       currentChatSessionId: 'session_1',
       currentNodeId: 'app:about',
       nodeHistory: ['app:about'],
@@ -151,11 +139,23 @@ describe('ToggleLayout', () => {
     });
 
     flushSync(() => {
-      root.render(React.createElement(ToggleLayout));
+      root.render(React.createElement(DrawerLayout));
     });
     await tick();
 
     expect(container.querySelector('[data-testid="app-panel"][data-panel-id="app:about"]')).not.toBeNull();
-    expect(container.querySelector('[data-testid="node-panel"]')).toBeNull();
+    expect(container.querySelector('[data-testid="chat-drawer"]')).not.toBeNull();
+    expect(
+      container
+        .querySelector('[data-testid="chat-panel"][data-session-id="session_1"]')
+        ?.getAttribute('data-hide-header'),
+    ).toBe('true');
+
+    const backdrop = container.querySelector('[aria-label="Close chat drawer"]');
+    flushSync(() => {
+      backdrop?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(useUIStore.getState().chatDrawerOpen).toBe(false);
   });
 });

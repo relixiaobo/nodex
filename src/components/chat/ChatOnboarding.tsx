@@ -44,7 +44,7 @@ export function ChatOnboarding() {
   function handleStartWithOutliner() {
     setStartupPagePreference(STARTUP_PAGE.TODAY);
     const todayId = ensureTodayNode();
-    useUIStore.getState().switchToNode(todayId);
+    useUIStore.getState().navigateToNode(todayId);
   }
 
   return (

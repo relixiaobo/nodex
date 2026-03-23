@@ -50,7 +50,7 @@ interface NodePopoverProps {
 }
 
 export function NodePopover({ nodeId, anchorRect, onClose }: NodePopoverProps) {
-  const switchToNode = useUIStore((s) => s.switchToNode);
+  const navigateToNode = useUIStore((s) => s.navigateToNode);
   const setExpanded = useUIStore((s) => s.setExpanded);
   const node = useNode(nodeId);
   const realParentId = loroDoc.getParentId(nodeId) ?? nodeId;
@@ -64,9 +64,9 @@ export function NodePopover({ nodeId, anchorRect, onClose }: NodePopoverProps) {
   }, [nodeId, realParentId, hasChildren, setExpanded]);
 
   const handleOpenInPanel = useCallback(() => {
-    switchToNode(nodeId);
+    navigateToNode(nodeId);
     onClose();
-  }, [nodeId, onClose, switchToNode]);
+  }, [navigateToNode, nodeId, onClose]);
 
   return (
     <PopoverShell anchorRect={anchorRect} onClose={onClose}>

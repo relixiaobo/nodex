@@ -9,7 +9,7 @@ import { ChatPanelHeader } from '../../src/components/chat/ChatPanelHeader.js';
 import { ChatMessage } from '../../src/components/chat/ChatMessage.js';
 import { ChatPanel, shouldStickChatScroll } from '../../src/components/chat/ChatPanel.js';
 import { extractInlineMarkup, splitMarkdownBlocks } from '../../src/components/chat/MarkdownRenderer.js';
-import { ToggleLayout } from '../../src/components/layout/ToggleLayout.js';
+import { DrawerLayout } from '../../src/components/layout/DrawerLayout.js';
 import { appendMessage, createSession, editMessage, getLinearPath, linearToTree, switchBranch as switchChatBranch } from '../../src/lib/ai-chat-tree.js';
 import { resetChatPersistenceForTests, saveChatSession } from '../../src/lib/ai-persistence.js';
 import { resetAIAgentForTests } from '../../src/lib/ai-service.js';
@@ -461,7 +461,7 @@ describe('chat ui', () => {
     resetAndSeed();
 
     flushSync(() => {
-      root.render(React.createElement(ChatPanel, { panelId: 'chat-panel', sessionId: 'session-empty' }));
+      root.render(React.createElement(ChatPanel, { sessionId: 'session-empty' }));
     });
 
     await vi.waitFor(() => {
@@ -484,7 +484,7 @@ describe('chat ui', () => {
     });
 
     flushSync(() => {
-      root.render(React.createElement(ChatPanel, { panelId: 'chat-panel', sessionId: 'session-no-models' }));
+      root.render(React.createElement(ChatPanel, { sessionId: 'session-no-models' }));
     });
 
     await vi.waitFor(() => {
@@ -509,7 +509,7 @@ describe('chat ui', () => {
     resetAndSeed();
 
     flushSync(() => {
-      root.render(React.createElement(ChatPanel, { panelId: 'chat-panel', sessionId: 'session-keyless-enabled' }));
+      root.render(React.createElement(ChatPanel, { sessionId: 'session-keyless-enabled' }));
     });
 
     await vi.waitFor(() => {
@@ -542,7 +542,7 @@ describe('chat ui', () => {
     useUIStore.getState().navigateTo('chat:session-startup');
 
     flushSync(() => {
-      root.render(React.createElement(ChatPanel, { panelId: 'main', sessionId: 'session-startup' }));
+      root.render(React.createElement(ChatPanel, { sessionId: 'session-startup' }));
     });
 
     await vi.waitFor(() => {
@@ -558,7 +558,6 @@ describe('chat ui', () => {
 
     await vi.waitFor(() => {
       expect(getStartupPagePreference()).toBe(STARTUP_PAGE.TODAY);
-      expect(useUIStore.getState().activeView).toBe('node');
       expect(useUIStore.getState().currentNodeId).toBe(ensureTodayNode());
     });
   });
@@ -586,7 +585,7 @@ describe('chat ui', () => {
     await saveChatSession(session);
 
     flushSync(() => {
-      root.render(React.createElement(ChatPanel, { panelId: 'chat-panel', sessionId: session.id }));
+      root.render(React.createElement(ChatPanel, { sessionId: session.id }));
     });
 
     await vi.waitFor(() => {
@@ -637,7 +636,7 @@ describe('chat ui', () => {
     await saveChatSession(session);
 
     flushSync(() => {
-      root.render(React.createElement(ChatPanel, { panelId: 'chat-panel', sessionId: session.id }));
+      root.render(React.createElement(ChatPanel, { sessionId: session.id }));
     });
 
     await vi.waitFor(() => {
@@ -670,7 +669,7 @@ describe('chat ui', () => {
     await saveChatSession(session);
 
     flushSync(() => {
-      root.render(React.createElement(ChatPanel, { panelId: 'chat-panel', sessionId: session.id }));
+      root.render(React.createElement(ChatPanel, { sessionId: session.id }));
     });
 
     await vi.waitFor(() => {
@@ -756,13 +755,13 @@ describe('chat ui', () => {
     expect(textarea.value).toBe('');
   });
 
-  it('keeps the toggle layout visible on narrow screens instead of swapping to a chat-only view', async () => {
+  it('keeps the drawer layout visible on narrow screens instead of swapping to a chat-only view', async () => {
     resetAndSeed();
     window.innerWidth = 480;
     const session = createSession();
     await saveChatSession(session);
     useUIStore.setState({
-      activeView: 'chat',
+      chatDrawerOpen: false,
       currentChatSessionId: session.id,
       currentNodeId: ensureTodayNode(),
       nodeHistory: [ensureTodayNode()],
@@ -770,15 +769,12 @@ describe('chat ui', () => {
     });
 
     flushSync(() => {
-      root.render(React.createElement(ToggleLayout));
+      root.render(React.createElement(DrawerLayout));
     });
 
     await vi.waitFor(() => {
-      const layout = container.firstElementChild as HTMLDivElement | null;
-      const viewContainer = layout?.children[1] as HTMLDivElement | undefined;
-      expect(viewContainer?.children).toHaveLength(2);
-      expect((viewContainer?.children[0] as HTMLElement | undefined)?.getAttribute('aria-hidden')).toBe('false');
-      expect((viewContainer?.children[1] as HTMLElement | undefined)?.getAttribute('aria-hidden')).toBe('true');
+      expect(container.querySelector('[data-testid="top-bar"]')).not.toBeNull();
+      expect(container.querySelector('[data-testid="floating-chat-bar"]')).not.toBeNull();
     });
   });
 });

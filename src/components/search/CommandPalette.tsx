@@ -41,7 +41,7 @@ import { ensureTodayNode, isDayNode } from '../../lib/journal.js';
 import { parseDayNodeName, parseYearNodeName, isToday } from '../../lib/date-utils.js';
 
 import { ensureUndoFocusAfterNavigation } from '../../lib/focus-utils.js';
-import { openChatWithPrompt, openChatPanel, switchToChatSession } from '../../lib/chat-panel-actions.js';
+import { openChatWithPrompt, openNewChatDrawer, switchToChatSession } from '../../lib/chat-panel-actions.js';
 import { listChatSessionMetas, type ChatSessionMeta } from '../../lib/ai-persistence.js';
 import { t } from '../../i18n/strings.js';
 import { Kbd } from '../ui/Kbd';
@@ -334,7 +334,7 @@ export function CommandPalette() {
     type: 'command',
     typeLabel: t('search.commandPalette.typeLabelCommand'),
     action: () => {
-      void openChatPanel();
+      void openNewChatDrawer();
       closeAndClear();
     },
   }), [closeAndClear]);

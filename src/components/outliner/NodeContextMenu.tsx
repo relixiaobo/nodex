@@ -233,7 +233,7 @@ const NodeContextMenuContent = forwardRef<HTMLDivElement, NodeContextMenuContent
     // ── Handlers ──
 
     const handleOpenInOutliner = useCallback(() => {
-      useUIStore.getState().switchToNode(nodeId);
+      useUIStore.getState().navigateToNode(nodeId);
       onClose();
     }, [nodeId, onClose]);
 

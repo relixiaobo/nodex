@@ -45,8 +45,8 @@ vi.mock('../../src/hooks/use-global-selection-dismiss.js', () => ({
   }),
 }));
 
-vi.mock('../../src/components/layout/ToggleLayout.js', () => ({
-  ToggleLayout: () => React.createElement('div', { 'data-testid': 'toggle-layout' }),
+vi.mock('../../src/components/layout/DrawerLayout.js', () => ({
+  DrawerLayout: () => React.createElement('div', { 'data-testid': 'drawer-layout' }),
 }));
 
 vi.mock('../../src/components/search/CommandPalette', () => ({
@@ -137,12 +137,10 @@ describe('App bootstrap', () => {
 
     await vi.waitFor(() => {
       const state = useUIStore.getState();
-      expect(state.activeView).toBe('node');
       expect(state.currentNodeId).toBe(ensureTodayNode());
-      expect(container.querySelector('[data-testid="toggle-layout"]')).not.toBeNull();
+      expect(container.querySelector('[data-testid="drawer-layout"]')).not.toBeNull();
     });
 
-    expect(useUIStore.getState().activeView).toBe('node');
     expect(useUIStore.getState().currentChatSessionId).toBeNull();
   });
 });

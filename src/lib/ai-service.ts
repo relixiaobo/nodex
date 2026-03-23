@@ -352,16 +352,18 @@ function deriveSessionTitle(messages: AgentMessage[]): string | null {
 
 async function generateSessionTitle(session: ChatSession, agent: Agent): Promise<string | null> {
   try {
-    // Collect conversation summary (first user + first assistant, limited to 500 chars)
+    // Collect last 3 turns of user + assistant text (no tool calls)
     const messages = agent.state.messages;
-    const firstUser = messages.find((m) => m.role === 'user');
-    const firstAssistant = messages.find((m) => m.role === 'assistant');
-    if (!firstUser) return null;
-
-    let summary = getMessageText(firstUser).slice(0, 300);
-    if (firstAssistant) {
-      summary += '\n\nAssistant: ' + getMessageText(firstAssistant).slice(0, 200);
+    const turns: string[] = [];
+    for (let i = messages.length - 1; i >= 0 && turns.length < 6; i--) {
+      const m = messages[i];
+      if (m.role === 'user' || m.role === 'assistant') {
+        const text = getMessageText(m).slice(0, 200);
+        if (text) turns.unshift(`${m.role === 'user' ? 'User' : 'Assistant'}: ${text}`);
+      }
     }
+    if (turns.length === 0) return null;
+    const summary = turns.join('\n\n');
 
     const resolvedModel = resolveModel(session, agent.state.model.id);
     const normalizedProvider = normalizeProviderId(resolvedModel.provider);
@@ -411,6 +413,22 @@ export function updateSessionTitle(agent: Agent, title: string): void {
   session.title = title;
   notifyChatTitleChange(session.id, title);
   void persistChatSession(agent);
+}
+
+/**
+ * Regenerate a chat session title using AI.
+ * Loads the session, generates a title, and persists it.
+ */
+export async function regenerateChatTitle(sessionId: string): Promise<string | null> {
+  const agent = agentRegistry.get(sessionId);
+  if (!agent) return null;
+  const session = getCurrentSession(agent);
+  if (!session) return null;
+  const title = await generateSessionTitle(session, agent);
+  if (title) {
+    updateSessionTitle(agent, title);
+  }
+  return title;
 }
 
 function setCurrentSession(agent: Agent, session: ChatSession): ChatSession {

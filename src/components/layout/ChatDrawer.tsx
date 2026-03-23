@@ -215,9 +215,19 @@ function DrawerContent({ sessionId, drag, drawerOpen }: {
   const [headerVisible, setHeaderVisible] = useState(true);
   const lastScrollTop = useRef(0);
   const contentRef = useRef<HTMLDivElement>(null);
+  // Grace period: ignore scroll events right after drawer opens so
+  // ChatPanel's initial auto-scroll-to-bottom doesn't hide the header.
+  const scrollEnabledRef = useRef(false);
 
-  // Show header when drawer opens
-  useEffect(() => { if (drawerOpen) setHeaderVisible(true); }, [drawerOpen]);
+  // Show header when drawer opens + reset grace period
+  useEffect(() => {
+    if (drawerOpen) {
+      setHeaderVisible(true);
+      scrollEnabledRef.current = false;
+      const id = setTimeout(() => { scrollEnabledRef.current = true; }, 500);
+      return () => clearTimeout(id);
+    }
+  }, [drawerOpen]);
 
   // Track scroll direction — no layout shift, so no debounce needed
   const isDraggingRef = useRef(drag.isDragging);
@@ -229,6 +239,7 @@ function DrawerContent({ sessionId, drag, drawerOpen }: {
 
     function onScroll(e: Event) {
       if (isDraggingRef.current) return;
+      if (!scrollEnabledRef.current) return;
       const target = e.target as HTMLElement;
       const scrollTop = target.scrollTop;
       const delta = scrollTop - lastScrollTop.current;

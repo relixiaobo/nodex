@@ -23,7 +23,7 @@ describe('ui-store navigation and UI state', () => {
   it('handles node history, view toggles, and common UI state', () => {
     const ui = useUIStore.getState();
     const todayId = ensureTodayNode();
-    const noteExpandKey = buildExpandedNodeKey(todayId, 'note_2');
+    const noteExpandKey = buildExpandedNodeKey('node-main', todayId, 'note_2');
 
     expect(currentNodeId()).toBe(todayId);
     expect(useUIStore.getState().nodeHistory).toEqual([todayId]);

@@ -60,7 +60,7 @@ function isTextArea(el: EventTarget | null): boolean {
 
 const DRAG_SELECT_SCOPE_ATTR = 'data-drag-select-scope';
 
-export function useDragSelect({ containerRef, rootChildIds, rootNodeId, panelId = 'main' }: UseDragSelectOptions) {
+export function useDragSelect({ containerRef, rootChildIds, rootNodeId, panelId = 'node-main' }: UseDragSelectOptions) {
   const contextRef = useRef({ rootChildIds, rootNodeId, panelId });
   contextRef.current = { rootChildIds, rootNodeId, panelId };
 

@@ -181,7 +181,7 @@ describe('UI marker → undoDoc/redoDoc', () => {
 
   it('展开/折叠通过 Loro undo/redo 恢复 expandedNodes', () => {
     const ui = useUIStore.getState();
-    const expandKey = buildExpandedNodeKey(ensureTodayNode(), 'note_2');
+    const expandKey = buildExpandedNodeKey('node-main', ensureTodayNode(), 'note_2');
 
     ui.setExpanded(expandKey, true);
     expect(useUIStore.getState().expandedNodes.has(expandKey)).toBe(true);
@@ -195,7 +195,7 @@ describe('UI marker → undoDoc/redoDoc', () => {
 
   it('程序性 setExpanded(skipUndo) 不创建 undo step', () => {
     const ui = useUIStore.getState();
-    const expandKey = buildExpandedNodeKey(ensureTodayNode(), 'note_2');
+    const expandKey = buildExpandedNodeKey('node-main', ensureTodayNode(), 'note_2');
 
     expect(canUndoDoc()).toBe(false);
     ui.setExpanded(expandKey, true, true);

@@ -257,7 +257,7 @@ export function OutlinerView({ rootNodeId, showTemplateFields, panelId }: Outlin
           parentId={rootNodeId}
           depth={0}
           autoFocus={!isSearchNode && visibleChildren.length === 0}
-          parentExpandKey={buildExpandedNodeKey(loroDoc.getParentId(rootNodeId) ?? '', rootNodeId)}
+          parentExpandKey={buildExpandedNodeKey(panelId, loroDoc.getParentId(rootNodeId) ?? '', rootNodeId)}
           panelId={panelId}
           isSearchContext={isSearchNode}
           onNavigateOut={(direction) => {

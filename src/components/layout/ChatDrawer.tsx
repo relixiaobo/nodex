@@ -6,23 +6,17 @@ import { useUIStore } from '../../stores/ui-store.js';
 import { ChatTitleInput, useChatTitleEdit } from '../chat/ChatPanelHeader.js';
 import { ChatPanel } from '../chat/ChatPanel.js';
 
-const ICON_BUTTON_CLASS = 'flex h-7 w-7 items-center justify-center rounded-full text-foreground-tertiary outline-none transition-colors hover:bg-foreground/4 hover:text-foreground';
+const ICON_BTN = 'flex h-7 w-7 items-center justify-center rounded-full text-foreground-tertiary outline-none transition-colors hover:bg-foreground/4 hover:text-foreground';
 const HISTORY_LIMIT = 20;
-const MIN_DRAWER_HEIGHT = 0.3;
-const MAX_DRAWER_HEIGHT = 0.95;
+const MIN_HEIGHT = 0.3;
+const MAX_HEIGHT = 0.95;
 
 // ── Session history dropdown ──
 
-function SessionHistoryDropdown({
-  currentSessionId,
-  onClose,
-}: {
-  currentSessionId: string;
-  onClose: () => void;
-}) {
+function SessionHistoryDropdown({ currentSessionId, onClose }: { currentSessionId: string; onClose: () => void }) {
   const [sessions, setSessions] = useState<ChatSessionMeta[]>([]);
   const [loading, setLoading] = useState(true);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     void listChatSessionMetasPage({ limit: HISTORY_LIMIT, offset: 0 }).then(({ items }) => {
@@ -33,7 +27,7 @@ function SessionHistoryDropdown({
 
   useEffect(() => {
     function onPointerDown(e: PointerEvent) {
-      if (dropdownRef.current?.contains(e.target as Node)) return;
+      if (ref.current?.contains(e.target as Node)) return;
       onClose();
     }
     document.addEventListener('pointerdown', onPointerDown, true);
@@ -50,31 +44,25 @@ function SessionHistoryDropdown({
   }
 
   return (
-    <div ref={dropdownRef} className="absolute left-0 right-0 top-full z-50 mx-3 max-h-[50vh] overflow-y-auto rounded-lg bg-background p-1 shadow-paper">
+    <div ref={ref} className="absolute left-0 right-0 top-full z-50 mx-3 max-h-[50vh] overflow-y-auto rounded-lg bg-background p-1 shadow-paper">
       {loading ? (
         <div className="px-3 py-2 text-sm text-foreground-tertiary">Loading…</div>
       ) : sessions.length === 0 ? (
         <div className="px-3 py-2 text-sm text-foreground-tertiary">No conversations yet</div>
       ) : (
-        sessions.map((s) => {
-          const isCurrent = s.id === currentSessionId;
-          return (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => {
-                useUIStore.getState().openChatDrawer(s.id);
-                onClose();
-              }}
-              className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm transition-colors hover:bg-foreground/4 ${
-                isCurrent ? 'font-medium text-foreground' : 'text-foreground-secondary'
-              }`}
-            >
-              <span className="min-w-0 flex-1 truncate">{s.title?.trim() || 'Chat'}</span>
-              <span className="shrink-0 text-xs text-foreground-tertiary">{formatTime(s.updatedAt)}</span>
-            </button>
-          );
-        })
+        sessions.map((s) => (
+          <button
+            key={s.id}
+            type="button"
+            onClick={() => { useUIStore.getState().openChatDrawer(s.id); onClose(); }}
+            className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm transition-colors hover:bg-foreground/4 ${
+              s.id === currentSessionId ? 'font-medium text-foreground' : 'text-foreground-secondary'
+            }`}
+          >
+            <span className="min-w-0 flex-1 truncate">{s.title?.trim() || 'Chat'}</span>
+            <span className="shrink-0 text-xs text-foreground-tertiary">{formatTime(s.updatedAt)}</span>
+          </button>
+        ))
       )}
     </div>
   );
@@ -94,73 +82,63 @@ function DrawerHeader({ sessionId }: { sessionId: string }) {
             <ChatTitleInput edit={titleEdit} />
           </div>
         ) : (
-          <button
-            type="button"
-            onClick={() => setHistoryOpen((v) => !v)}
-            className="group/title flex min-w-0 flex-1 items-center gap-1 rounded-lg px-1.5 -ml-1.5 py-1 outline-none transition-colors hover:bg-foreground/4"
-          >
-            <span className="min-w-0 truncate text-[13px] font-medium text-foreground">
-              {titleEdit.displayTitle}
-            </span>
-            <span
-              role="button"
-              tabIndex={-1}
-              onClick={(e) => { e.stopPropagation(); titleEdit.startEdit(e as unknown as React.MouseEvent<HTMLButtonElement>); }}
-              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-foreground-tertiary opacity-0 transition-opacity hover:bg-foreground/8 hover:text-foreground group-hover/title:opacity-100"
+          <div className="group/title flex min-w-0 flex-1 items-center gap-1 rounded-lg px-1.5 -ml-1.5 py-1 transition-colors hover:bg-foreground/4">
+            <button
+              type="button"
+              onClick={() => setHistoryOpen((v) => !v)}
+              className="flex min-w-0 flex-1 items-center gap-1 outline-none"
+            >
+              <span className="min-w-0 truncate text-[13px] font-medium text-foreground">
+                {titleEdit.displayTitle}
+              </span>
+              <ChevronDown size={12} strokeWidth={1.8} className={`shrink-0 text-foreground-tertiary transition-transform ${historyOpen ? 'rotate-180' : ''}`} />
+            </button>
+            <button
+              type="button"
+              onClick={titleEdit.startEdit}
+              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-foreground-tertiary opacity-0 outline-none transition-opacity hover:bg-foreground/8 hover:text-foreground group-hover/title:opacity-100"
+              aria-label="Edit title"
             >
               <Pencil size={10} strokeWidth={1.8} />
-            </span>
-            <ChevronDown size={12} strokeWidth={1.8} className={`shrink-0 text-foreground-tertiary transition-transform ${historyOpen ? 'rotate-180' : ''}`} />
-          </button>
+            </button>
+          </div>
         )}
-        <button
-          type="button"
-          onClick={() => void openNewChatDrawer()}
-          className={ICON_BUTTON_CLASS}
-          aria-label="New chat"
-        >
+        <button type="button" onClick={() => void openNewChatDrawer()} className={ICON_BTN} aria-label="New chat">
           <Plus size={15} strokeWidth={1.8} />
         </button>
       </div>
       {historyOpen && (
-        <SessionHistoryDropdown
-          currentSessionId={sessionId}
-          onClose={() => setHistoryOpen(false)}
-        />
+        <SessionHistoryDropdown currentSessionId={sessionId} onClose={() => setHistoryOpen(false)} />
       )}
     </div>
   );
 }
 
-// ── Drag handle ──
+// ── Drag resize ──
 
 function useDragResize(drawerRef: React.RefObject<HTMLDivElement | null>) {
   const [height, setHeight] = useState(0.75);
-  const dragging = useRef(false);
-  const startY = useRef(0);
-  const startHeight = useRef(0.75);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragState = useRef({ startY: 0, startHeight: 0.75 });
 
   const onPointerDown = useCallback((e: React.PointerEvent) => {
     e.preventDefault();
-    dragging.current = true;
-    startY.current = e.clientY;
-    startHeight.current = height;
+    dragState.current = { startY: e.clientY, startHeight: height };
+    setIsDragging(true);
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
   }, [height]);
 
   const onPointerMove = useCallback((e: React.PointerEvent) => {
-    if (!dragging.current || !drawerRef.current) return;
-    const containerHeight = drawerRef.current.parentElement?.clientHeight ?? window.innerHeight;
-    const deltaRatio = (startY.current - e.clientY) / containerHeight;
-    const next = Math.max(MIN_DRAWER_HEIGHT, Math.min(MAX_DRAWER_HEIGHT, startHeight.current + deltaRatio));
-    setHeight(next);
-  }, [drawerRef]);
+    if (!isDragging) return;
+    const container = drawerRef.current?.parentElement;
+    if (!container) return;
+    const delta = (dragState.current.startY - e.clientY) / container.clientHeight;
+    setHeight(Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, dragState.current.startHeight + delta)));
+  }, [isDragging, drawerRef]);
 
-  const onPointerUp = useCallback(() => {
-    dragging.current = false;
-  }, []);
+  const onPointerUp = useCallback(() => setIsDragging(false), []);
 
-  return { height, onPointerDown, onPointerMove, onPointerUp };
+  return { height, isDragging, onPointerDown, onPointerMove, onPointerUp };
 }
 
 // ── Drawer ──
@@ -173,58 +151,47 @@ export function ChatDrawer() {
   const drag = useDragResize(drawerRef);
 
   const [hasOpened, setHasOpened] = useState(false);
-  useEffect(() => {
-    if (chatDrawerOpen) setHasOpened(true);
-  }, [chatDrawerOpen]);
+  useEffect(() => { if (chatDrawerOpen) setHasOpened(true); }, [chatDrawerOpen]);
 
   useEffect(() => {
     if (!chatDrawerOpen) return;
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key !== 'Escape') return;
-      closeChatDrawer();
-    }
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') closeChatDrawer(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
   }, [chatDrawerOpen, closeChatDrawer]);
 
   if (!hasOpened) return null;
+
+  // Disable transition during drag to avoid lag
+  const drawerTransition = drag.isDragging ? '' : 'transition-transform duration-300 ease-out';
 
   return (
     <div
       className={`absolute inset-0 z-30 flex items-end transition-opacity duration-250 ${chatDrawerOpen ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'}`}
       data-testid="chat-drawer"
     >
-      <button
-        type="button"
-        onClick={closeChatDrawer}
-        className="absolute inset-0 bg-foreground/10 backdrop-blur-[1px]"
-        aria-label="Close chat drawer"
-      />
+      <button type="button" onClick={closeChatDrawer} className="absolute inset-0 bg-foreground/10 backdrop-blur-[1px]" aria-label="Close" />
       <div
         ref={drawerRef}
-        className={`relative z-10 flex min-h-0 w-full flex-col overflow-hidden rounded-t-[22px] border border-b-0 border-border bg-background shadow-[0_-18px_42px_rgba(15,23,42,0.14)] transition-transform duration-300 ease-out ${chatDrawerOpen ? 'translate-y-0' : 'translate-y-full'}`}
+        className={`relative z-10 flex min-h-0 w-full flex-col overflow-hidden rounded-t-[22px] border border-b-0 border-border bg-background shadow-[0_-18px_42px_rgba(15,23,42,0.14)] ${drawerTransition} ${chatDrawerOpen ? 'translate-y-0' : 'translate-y-full'}`}
         style={{ height: `${drag.height * 100}%` }}
         data-chat-drawer="true"
       >
-        {/* Drag handle */}
         <div
           className="flex cursor-row-resize touch-none items-center justify-center pt-2 pb-1"
           onPointerDown={drag.onPointerDown}
           onPointerMove={drag.onPointerMove}
           onPointerUp={drag.onPointerUp}
         >
-          <div className="h-1 w-10 rounded-full bg-foreground/12" aria-hidden="true" />
+          <div className="h-1 w-10 rounded-full bg-foreground/12" />
         </div>
-
         {currentChatSessionId ? (
           <>
             <DrawerHeader sessionId={currentChatSessionId} />
             <ChatPanel sessionId={currentChatSessionId} hideHeader />
           </>
         ) : (
-          <div className="flex flex-1 items-center justify-center text-sm text-foreground-tertiary">
-            Loading chat…
-          </div>
+          <div className="flex flex-1 items-center justify-center text-sm text-foreground-tertiary">Loading chat…</div>
         )}
       </div>
     </div>

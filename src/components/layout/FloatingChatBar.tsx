@@ -82,7 +82,7 @@ export function FloatingChatBar() {
 
       <div ref={containerRef} className="pointer-events-auto bg-background">
         {/* Drag handle — click to open chat drawer */}
-        {focused && (
+        <div className={`overflow-hidden transition-all duration-200 ease-out ${focused ? 'max-h-8 opacity-100' : 'max-h-0 opacity-0'}`}>
           <button
             type="button"
             onClick={() => {
@@ -99,7 +99,7 @@ export function FloatingChatBar() {
           >
             <span className="h-1 w-8 rounded-full bg-foreground/15" />
           </button>
-        )}
+        </div>
         <ChatInput
           ref={chatInputRef}
           disabled={false}

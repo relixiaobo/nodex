@@ -9,7 +9,6 @@ import { SYSTEM_NODE_IDS } from '../../types/index.js';
 
 export function FloatingChatBar() {
   const [focused, setFocused] = useState(false);
-  const [draft, setDraft] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<ChatInputHandle>(null);
 
@@ -26,43 +25,40 @@ export function FloatingChatBar() {
   }, [availableModels, selectedModelKey]);
   const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel | null>(null);
 
-  // When focusing, inject saved draft and focus the textarea
+  // Track focus via focus/blur on the container
   useEffect(() => {
-    if (focused) {
-      // setDraft also focuses the textarea via requestAnimationFrame
-      chatInputRef.current?.setDraft(draft);
-    }
-  }, [focused]); // eslint-disable-line react-hooks/exhaustive-deps
+    const container = containerRef.current;
+    if (!container) return;
 
-  // Close on click outside — save draft first
+    function handleFocusIn() {
+      setFocused(true);
+    }
+    function handleFocusOut(e: FocusEvent) {
+      // Only unfocus if the new focus target is outside our container
+      if (container!.contains(e.relatedTarget as Node)) return;
+      setFocused(false);
+    }
+
+    container.addEventListener('focusin', handleFocusIn);
+    container.addEventListener('focusout', handleFocusOut);
+    return () => {
+      container.removeEventListener('focusin', handleFocusIn);
+      container.removeEventListener('focusout', handleFocusOut);
+    };
+  }, []);
+
+  // Click outside closes
   useEffect(() => {
     if (!focused) return;
     function handlePointerDown(e: PointerEvent) {
       if (containerRef.current?.contains(e.target as Node)) return;
-      const currentDraft = chatInputRef.current?.getDraft() ?? '';
-      setDraft(currentDraft);
       setFocused(false);
     }
     document.addEventListener('pointerdown', handlePointerDown, true);
     return () => document.removeEventListener('pointerdown', handlePointerDown, true);
   }, [focused]);
 
-  // Close on Escape — save draft first
-  useEffect(() => {
-    if (!focused) return;
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') {
-        const currentDraft = chatInputRef.current?.getDraft() ?? '';
-        setDraft(currentDraft);
-        setFocused(false);
-      }
-    }
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [focused]);
-
   const handleSend = useCallback(async (prompt: string) => {
-    setDraft('');
     setFocused(false);
     await openChatWithPrompt(prompt);
   }, []);
@@ -76,8 +72,6 @@ export function FloatingChatBar() {
   }, []);
 
   const handleOpenSettings = useCallback(() => {
-    const currentDraft = chatInputRef.current?.getDraft() ?? '';
-    setDraft(currentDraft);
     setFocused(false);
     useUIStore.getState().navigateToNode(SYSTEM_NODE_IDS.SETTINGS);
   }, []);
@@ -87,32 +81,19 @@ export function FloatingChatBar() {
       <div className="h-8 bg-gradient-to-t from-background to-transparent" />
 
       <div ref={containerRef} className="pointer-events-auto bg-background">
-        {focused ? (
-          <ChatInput
-            ref={chatInputRef}
-            disabled={false}
-            currentModel={currentModel}
-            availableModels={availableModels}
-            thinkingLevel={thinkingLevel}
-            onSend={handleSend}
-            onStop={() => {}}
-            onModelChange={handleModelChange}
-            onThinkingChange={handleThinkingChange}
-            onOpenSettings={handleOpenSettings}
-          />
-        ) : (
-          <div className="px-3 pb-3 pt-1">
-            <button
-              type="button"
-              onClick={() => setFocused(true)}
-              className={`flex w-full rounded-xl border border-border bg-background text-base leading-6 transition-colors hover:border-foreground/20 ${
-                draft ? 'items-start px-3 pt-2.5 pb-2 text-foreground' : 'items-center px-3 py-2.5 text-foreground-tertiary'
-              }`}
-            >
-              {draft || 'Ask about your notes…'}
-            </button>
-          </div>
-        )}
+        <ChatInput
+          ref={chatInputRef}
+          disabled={false}
+          compact={!focused}
+          currentModel={currentModel}
+          availableModels={availableModels}
+          thinkingLevel={thinkingLevel}
+          onSend={handleSend}
+          onStop={() => {}}
+          onModelChange={handleModelChange}
+          onThinkingChange={handleThinkingChange}
+          onOpenSettings={handleOpenSettings}
+        />
       </div>
     </div>
   );

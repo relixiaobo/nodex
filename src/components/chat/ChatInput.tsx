@@ -19,6 +19,8 @@ interface ChatInputProps {
   disabled: boolean;
   busy?: boolean;
   error?: string;
+  /** When true, hide the toolbar row (Plus, model selector, send button). Used by FloatingChatBar for collapsed state. */
+  compact?: boolean;
   currentModel?: ChatInputModel;
   availableModels?: ChatInputModel[];
   thinkingLevel?: ThinkingLevel | null;
@@ -98,6 +100,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
   disabled,
   busy = false,
   error,
+  compact = false,
   currentModel,
   availableModels,
   thinkingLevel,
@@ -248,7 +251,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
             }}
           />
         </div>
-        <div className="flex items-center justify-between px-2.5 pb-2">
+        <div className={`flex items-center justify-between px-2.5 pb-2${compact ? ' hidden' : ''}`}>
           <div ref={menuRef} className="relative flex items-center">
             <button
               type="button"

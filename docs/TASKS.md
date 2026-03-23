@@ -18,13 +18,13 @@
 |--------|------|------|------|
 | nodex-claude | — | 空闲 | — |
 | nodex-gemini | — | 空闲 | — |
-| nodex-codex | — | 空闲 | — |
+| nodex-codex | codex/scoped-expand-keys | Expand key 作用域隔离 (#173) | 待启动 |
 
 ---
 
 ## 进行中
 
-（无进行中任务）
+- [ ] **Expand key 作用域隔离** (#173, Codex) — expandedNodeKey 加 panelId scope，chat embed 和主 outliner 独立展开状态
 
 ---
 

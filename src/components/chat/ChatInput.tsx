@@ -12,6 +12,7 @@ export interface ChatInputModel {
 
 export interface ChatInputHandle {
   setDraft(text: string): void;
+  getDraft(): string;
 }
 
 interface ChatInputProps {
@@ -114,7 +115,10 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
       setDraft(text);
       requestAnimationFrame(() => textareaRef.current?.focus());
     },
-  }), []);
+    getDraft() {
+      return draft;
+    },
+  }), [draft]);
   const [menuOpen, setMenuOpen] = useState(false);
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
   const [moreModelsOpen, setMoreModelsOpen] = useState(false);

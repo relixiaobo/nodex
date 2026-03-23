@@ -1,7 +1,7 @@
 import { ArrowLeft, ArrowRight } from '../../lib/icons.js';
 import { useUIStore } from '../../stores/ui-store.js';
 
-const BUTTON_CLASS = 'flex h-7 w-7 items-center justify-center rounded-full text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground disabled:cursor-default disabled:text-foreground-quaternary disabled:hover:bg-transparent';
+const BUTTON_CLASS = 'flex h-6 w-6 items-center justify-center rounded-md text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground disabled:cursor-default disabled:text-foreground-quaternary disabled:hover:bg-transparent';
 
 export function NavButtons() {
   const goBackNode = useUIStore((s) => s.goBackNode);
@@ -18,7 +18,7 @@ export function NavButtons() {
         className={BUTTON_CLASS}
         aria-label="Go back"
       >
-        <ArrowLeft size={15} strokeWidth={1.7} />
+        <ArrowLeft size={14} strokeWidth={1.7} />
       </button>
       <button
         type="button"
@@ -27,7 +27,7 @@ export function NavButtons() {
         className={BUTTON_CLASS}
         aria-label="Go forward"
       >
-        <ArrowRight size={15} strokeWidth={1.7} />
+        <ArrowRight size={14} strokeWidth={1.7} />
       </button>
     </div>
   );

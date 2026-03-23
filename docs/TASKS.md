@@ -18,13 +18,13 @@
 |--------|------|------|------|
 | nodex-claude | — | 空闲 | — |
 | nodex-gemini | — | 空闲 | — |
-| nodex-codex | — | 空闲 | — |
+| nodex-codex | codex/chat-drawer | Chat Drawer 布局 — Outliner 底 + Chat 抽屉 (#172) | 待启动 |
 
 ---
 
 ## 进行中
 
-（无进行中任务）
+- [ ] **Chat Drawer 布局** (#172, Codex) — Outliner 全屏底层 + Chat 底部抽屉 + 单层 full-bleed。设计：`docs/plans/chat-drawer-design.md`
 
 ---
 

@@ -220,12 +220,15 @@ function DrawerContent({ sessionId, drag, drawerOpen }: {
   useEffect(() => { if (drawerOpen) setHeaderVisible(true); }, [drawerOpen]);
 
   // Track scroll direction — no layout shift, so no debounce needed
+  const isDraggingRef = useRef(drag.isDragging);
+  isDraggingRef.current = drag.isDragging;
+
   useEffect(() => {
     const el = contentRef.current;
     if (!el) return;
 
     function onScroll(e: Event) {
-      if (drag.isDragging) return;
+      if (isDraggingRef.current) return;
       const target = e.target as HTMLElement;
       const scrollTop = target.scrollTop;
       const delta = scrollTop - lastScrollTop.current;
@@ -237,7 +240,7 @@ function DrawerContent({ sessionId, drag, drawerOpen }: {
 
     el.addEventListener('scroll', onScroll, true);
     return () => el.removeEventListener('scroll', onScroll, true);
-  }, [drag.isDragging]);
+  }, []);
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -341,15 +344,11 @@ export function ChatDrawer() {
 
         {/* Card body — opaque bg, rounded top */}
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-t-[22px] border border-b-0 border-border bg-background pt-3 shadow-[0_-18px_42px_rgba(15,23,42,0.14)]">
-        {currentChatSessionId ? (
-          <DrawerContent
-            sessionId={currentChatSessionId}
-            drag={drag}
-            drawerOpen={chatDrawerOpen}
-          />
-        ) : (
-          <div className="flex flex-1 items-center justify-center text-sm text-foreground-tertiary">Loading chat…</div>
-        )}
+          {currentChatSessionId ? (
+            <DrawerContent sessionId={currentChatSessionId} drag={drag} drawerOpen={chatDrawerOpen} />
+          ) : (
+            <div className="flex flex-1 items-center justify-center text-sm text-foreground-tertiary">Loading chat…</div>
+          )}
         </div>
       </div>
     </div>

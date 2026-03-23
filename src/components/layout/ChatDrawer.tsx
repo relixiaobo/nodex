@@ -171,7 +171,7 @@ function DrawerHeader({ sessionId }: { sessionId: string }) {
   const headerRef = useRef<HTMLDivElement>(null);
 
   return (
-    <div ref={headerRef} className="relative shrink-0 border-b border-border/50">
+    <div ref={headerRef} className="relative">
       <div className="flex items-center pb-2 pt-2 pl-4 pr-3">
         {titleEdit.editing ? (
           <div className="min-w-0 flex-1">
@@ -269,21 +269,33 @@ export function ChatDrawer() {
         style={{ height: `${drag.height * 100}%` }}
         data-chat-drawer="true"
       >
-        <div
-          className="flex cursor-row-resize touch-none items-center justify-center pt-2 pb-1"
-          onPointerDown={drag.onPointerDown}
-          onPointerMove={drag.onPointerMove}
-          onPointerUp={drag.onPointerUp}
-        >
-          <div className="h-1 w-10 rounded-full bg-foreground/12" />
-        </div>
         {currentChatSessionId ? (
           <>
-            <DrawerHeader sessionId={currentChatSessionId} />
+            <div className="shrink-0 border-b border-border/60 bg-foreground/[0.02]">
+              <div
+                className="flex cursor-row-resize touch-none items-center justify-center pt-1.5 pb-0.5"
+                onPointerDown={drag.onPointerDown}
+                onPointerMove={drag.onPointerMove}
+                onPointerUp={drag.onPointerUp}
+              >
+                <div className="h-1 w-10 rounded-full bg-foreground/12" />
+              </div>
+              <DrawerHeader sessionId={currentChatSessionId} />
+            </div>
             <ChatPanel sessionId={currentChatSessionId} hideHeader />
           </>
         ) : (
-          <div className="flex flex-1 items-center justify-center text-sm text-foreground-tertiary">Loading chat…</div>
+          <>
+            <div
+              className="flex cursor-row-resize touch-none items-center justify-center pt-1.5 pb-0.5 border-b border-border/60 bg-foreground/[0.02]"
+              onPointerDown={drag.onPointerDown}
+              onPointerMove={drag.onPointerMove}
+              onPointerUp={drag.onPointerUp}
+            >
+              <div className="h-1 w-10 rounded-full bg-foreground/12" />
+            </div>
+            <div className="flex flex-1 items-center justify-center text-sm text-foreground-tertiary">Loading chat…</div>
+          </>
         )}
       </div>
     </div>

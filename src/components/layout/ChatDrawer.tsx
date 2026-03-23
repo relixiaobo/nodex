@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Check, ChevronDown, Pencil, Plus, RefreshCw } from '../../lib/icons.js';
 import { openNewChatDrawer } from '../../lib/chat-panel-actions.js';
-import { listChatSessionMetasPage, type ChatSessionMeta } from '../../lib/ai-persistence.js';
-import { getChatTitle, regenerateChatTitle, subscribeChatTitles } from '../../lib/ai-service.js';
+import { getChatSession, listChatSessionMetasPage, saveChatSession, type ChatSessionMeta } from '../../lib/ai-persistence.js';
+import { regenerateChatTitle } from '../../lib/ai-service.js';
 import { useUIStore } from '../../stores/ui-store.js';
 import { ChatTitleInput, useChatTitleEdit } from '../chat/ChatPanelHeader.js';
 import { ChatPanel } from '../chat/ChatPanel.js';
@@ -25,8 +25,6 @@ function InlineRowEditor({ sessionId, initialTitle, onDone }: { sessionId: strin
   async function save() {
     const trimmed = draft.trim();
     if (trimmed && trimmed !== initialTitle) {
-      // Update via getChatSession + saveChatSession for any session
-      const { getChatSession, saveChatSession } = await import('../../lib/ai-persistence.js');
       const session = await getChatSession(sessionId);
       if (session) {
         session.title = trimmed;
@@ -283,7 +281,6 @@ export function ChatDrawer() {
               </div>
               <DrawerHeader sessionId={currentChatSessionId} />
             </div>
-            <div className="h-4 shrink-0 bg-gradient-to-b from-background to-transparent" />
             <ChatPanel sessionId={currentChatSessionId} hideHeader />
           </>
         ) : (

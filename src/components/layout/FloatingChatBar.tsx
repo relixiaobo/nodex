@@ -45,8 +45,15 @@ export function FloatingChatBar() {
       if (containerRef.current?.contains(e.target as Node)) return;
       setFocused(false);
     }
+    function onScroll() {
+      setFocused(false);
+    }
     document.addEventListener('pointerdown', onPointerDown, true);
-    return () => document.removeEventListener('pointerdown', onPointerDown, true);
+    document.addEventListener('scroll', onScroll, true);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown, true);
+      document.removeEventListener('scroll', onScroll, true);
+    };
   }, [focused]);
 
   const handleSend = useCallback(async (prompt: string) => {

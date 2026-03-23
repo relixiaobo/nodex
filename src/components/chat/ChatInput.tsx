@@ -252,7 +252,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
                 setMenuOpen((open) => !open);
                 setModelMenuOpen(false);
               }}
-              className="flex h-7 w-7 items-center justify-center rounded-lg text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground"
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-foreground-tertiary outline-none transition-colors hover:bg-foreground/4 hover:text-foreground"
               aria-label="More options"
               aria-haspopup="menu"
               aria-expanded={menuOpen}
@@ -274,7 +274,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
                     setModelMenuOpen((open) => !open);
                     setMenuOpen(false);
                   }}
-                  className="inline-flex h-7 max-w-[220px] items-center gap-1 rounded-lg px-2 text-sm text-foreground-secondary transition-colors hover:bg-foreground/4 hover:text-foreground"
+                  className="inline-flex h-7 max-w-[220px] items-center gap-1 rounded-lg px-2 text-sm text-foreground-secondary outline-none transition-colors hover:bg-foreground/4 hover:text-foreground"
                   aria-label="Select model"
                   aria-haspopup="menu"
                   aria-expanded={modelMenuOpen}
@@ -376,7 +376,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
                 type="button"
                 onClick={() => void handleSend()}
                 disabled={!canSend}
-                className={`flex h-7 w-7 items-center justify-center rounded-lg transition-colors ${
+                className={`flex h-7 w-7 items-center justify-center rounded-lg outline-none transition-colors ${
                   canSend
                     ? 'bg-foreground text-background hover:bg-foreground/90'
                     : 'bg-foreground/10 text-foreground-tertiary'

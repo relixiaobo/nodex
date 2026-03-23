@@ -79,30 +79,33 @@ function DrawerHeader({ sessionId }: { sessionId: string }) {
 
   return (
     <div ref={headerRef} className="relative shrink-0">
-      <div className="flex items-center gap-1 px-3 pb-2 pt-2">
+      <div className="flex items-center pb-2 pt-2 pl-4 pr-3">
         {titleEdit.editing ? (
-          <div className="min-w-0 flex-1 px-1.5 -ml-1.5">
+          <div className="min-w-0 flex-1">
             <ChatTitleInput edit={titleEdit} />
           </div>
         ) : (
-          <button
-            type="button"
-            onClick={() => setHistoryOpen((v) => !v)}
-            className="group/title flex min-w-0 max-w-[70%] items-center rounded-lg px-1.5 -ml-1.5 py-1 outline-none transition-colors hover:bg-foreground/4"
-          >
-            <span className="min-w-0 truncate text-[13px] font-medium text-foreground">
-              {titleEdit.displayTitle}
-            </span>
-            <span
-              role="button"
-              tabIndex={-1}
-              onClick={(e) => { e.stopPropagation(); titleEdit.startEdit(e as never); }}
-              className="ml-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-foreground-tertiary opacity-0 transition-opacity hover:bg-foreground/8 hover:text-foreground group-hover/title:opacity-100"
+          <>
+            <button
+              type="button"
+              onClick={() => setHistoryOpen((v) => !v)}
+              className="group/title flex min-w-0 max-w-[70%] items-center gap-1 rounded-lg px-1.5 -ml-1.5 py-1 outline-none transition-colors hover:bg-foreground/4"
             >
-              <Pencil size={10} strokeWidth={1.8} />
-            </span>
-            <ChevronDown size={12} strokeWidth={1.8} className={`ml-auto shrink-0 text-foreground-tertiary transition-transform ${historyOpen ? 'rotate-180' : ''}`} />
-          </button>
+              <span className="min-w-0 truncate text-[13px] font-medium text-foreground">
+                {titleEdit.displayTitle}
+              </span>
+              <span
+                role="button"
+                tabIndex={-1}
+                onClick={(e) => { e.stopPropagation(); titleEdit.startEdit(e as never); }}
+                className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-foreground-tertiary opacity-0 transition-opacity hover:bg-foreground/8 hover:text-foreground group-hover/title:opacity-100"
+              >
+                <Pencil size={10} strokeWidth={1.8} />
+              </span>
+              <ChevronDown size={12} strokeWidth={1.8} className={`shrink-0 text-foreground-tertiary transition-transform ${historyOpen ? 'rotate-180' : ''}`} />
+            </button>
+            <div className="flex-1" />
+          </>
         )}
         <button type="button" onClick={() => void openNewChatDrawer()} className={ICON_BTN} aria-label="New chat">
           <Plus size={15} strokeWidth={1.8} />

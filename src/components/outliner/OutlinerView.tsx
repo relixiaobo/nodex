@@ -175,8 +175,8 @@ export function OutlinerView({ rootNodeId, showTemplateFields, panelId }: Outlin
       ? (useNodeStore.getState().getNode(id)?.name ?? '').length
       : textOffset;
     useUIStore.getState().setFocusClickCoords({ nodeId: id, parentId, textOffset: offset });
-    setFocusedNode(id, parentId);
-  }, [setFocusedNode]);
+    setFocusedNode(id, parentId, panelId);
+  }, [panelId, setFocusedNode]);
 
   return (
     <div
@@ -275,7 +275,7 @@ export function OutlinerView({ rootNodeId, showTemplateFields, panelId }: Outlin
                 parentId: lastNode.parentId,
                 textOffset: getNodeTextLengthById(lastNode.nodeId),
               });
-              setFocusedNode(lastNode.nodeId, lastNode.parentId);
+              setFocusedNode(lastNode.nodeId, lastNode.parentId, panelId);
               return;
             }
           }}

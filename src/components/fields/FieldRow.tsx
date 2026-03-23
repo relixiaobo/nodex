@@ -328,6 +328,7 @@ interface SystemConfigValueContext {
   fieldEntryId: string;
   dataType: string;
   isVirtual: boolean;
+  panelId?: string;
   onNavigateOut?: (direction: 'up' | 'down') => void;
   configOptions?: Array<{ value: string; label: string }>;
 }
@@ -335,22 +336,24 @@ interface SystemConfigValueContext {
 type SystemConfigValueRenderer = (context: SystemConfigValueContext) => ReactNode;
 
 const SYSTEM_CONFIG_VALUE_RENDERERS: Partial<Record<ConfigFieldDef['control'], SystemConfigValueRenderer>> = {
-  outliner: ({ nodeId, onNavigateOut }) => <ConfigOutliner nodeId={nodeId} onNavigateOut={onNavigateOut} />,
-  color_picker: ({ fieldEntryId, attrDefId, nodeId, isVirtual, onNavigateOut }) => (
+  outliner: ({ nodeId, panelId, onNavigateOut }) => <ConfigOutliner nodeId={nodeId} onNavigateOut={onNavigateOut} panelId={panelId ?? 'node-main'} />,
+  color_picker: ({ fieldEntryId, attrDefId, nodeId, isVirtual, panelId, onNavigateOut }) => (
     <FieldValueOutliner
       fieldEntryId={fieldEntryId}
       fieldDataType={SYS_D.COLOR}
       attrDefId={attrDefId}
       configNodeId={isVirtual ? nodeId : undefined}
+      panelId={panelId ?? 'node-main'}
       onNavigateOut={onNavigateOut}
     />
   ),
-  toggle: ({ fieldEntryId, attrDefId, nodeId, isVirtual, onNavigateOut }) => (
+  toggle: ({ fieldEntryId, attrDefId, nodeId, isVirtual, panelId, onNavigateOut }) => (
     <FieldValueOutliner
       fieldEntryId={fieldEntryId}
       fieldDataType={SYS_D.BOOLEAN}
       attrDefId={attrDefId}
       configNodeId={isVirtual ? nodeId : undefined}
+      panelId={panelId ?? 'node-main'}
       onNavigateOut={onNavigateOut}
     />
   ),
@@ -394,6 +397,7 @@ function renderDefaultSystemConfigValue(context: SystemConfigValueContext): Reac
       fieldDataType={context.dataType}
       attrDefId={context.attrDefId}
       configNodeId={context.isVirtual ? context.nodeId : undefined}
+      panelId={context.panelId ?? 'node-main'}
       onNavigateOut={context.onNavigateOut}
     />
   );
@@ -441,10 +445,11 @@ export function FieldRow({
   const setFocusedNode = useUIStore((s) => s.setFocusedNode);
   const clearFocus = useUIStore((s) => s.clearFocus);
   const clearSelection = useUIStore((s) => s.clearSelection);
+  const resolvedPanelId = panelId ?? 'node-main';
   // Unified selection state + pointer handlers from OutlinerRow
-  const { isSelected: isFieldSelected } = useRowSelectionState(fieldEntryId, nodeId);
+  const { isSelected: isFieldSelected } = useRowSelectionState(fieldEntryId, nodeId, resolvedPanelId);
   const { handleCmdClick, handleShiftClick } = useRowPointerHandlers(
-    fieldEntryId, nodeId, rootChildIds ?? [], rootNodeId ?? nodeId, panelId ?? 'main',
+    fieldEntryId, nodeId, rootChildIds ?? [], rootNodeId ?? nodeId, resolvedPanelId,
   );
   const createChild = useNodeStore((s) => s.createChild);
   const moveFieldEntry = useNodeStore((s) => s.moveFieldEntry);
@@ -462,7 +467,7 @@ export function FieldRow({
   const { isDragging, isDropTarget, dropPosition, dragHandlers } = useDragDropRow({
     nodeId: fieldEntryId,
     parentId: nodeId,
-    panelId: panelId ?? 'main',
+    panelId: resolvedPanelId,
     rowRef,
   });
 
@@ -570,7 +575,7 @@ export function FieldRow({
           ? (useNodeStore.getState().getNode(target.id)?.name ?? '').length
           : 0,
       });
-      setFocusedNode(target.id, nodeId);
+      setFocusedNode(target.id, nodeId, resolvedPanelId);
       return true;
     }
     if (direction === 'down' && focusTrailingInputForParent(nodeId)) {
@@ -581,7 +586,7 @@ export function FieldRow({
       return true;
     }
     return false;
-  }, [renderableSiblings, fieldEntryId, clearFocus, setEditingFieldName, nodeId, setFocusedNode, onNavigateOut]);
+  }, [renderableSiblings, fieldEntryId, clearFocus, setEditingFieldName, nodeId, resolvedPanelId, setFocusedNode, onNavigateOut]);
 
   const handleIndentField = useCallback(() => {
     if (!canManageFieldStructure) return;
@@ -630,8 +635,8 @@ export function FieldRow({
     const position = fieldEntryIdx >= 0 ? fieldEntryIdx + 1 : undefined;
 
     const newNode = createChild(insertParentId, position);
-    setFocusedNode(newNode.id, insertParentId);
-  }, [canManageFieldStructure, fieldEntryId, nodeId, createChild, setFocusedNode]);
+    setFocusedNode(newNode.id, insertParentId, resolvedPanelId);
+  }, [canManageFieldStructure, fieldEntryId, nodeId, createChild, resolvedPanelId, setFocusedNode]);
 
   const handleNameDoubleClick = useCallback((e: React.MouseEvent<HTMLElement>) => {
     if (!canEditFieldDefinition || !canManageFieldStructure) return;
@@ -876,6 +881,7 @@ export function FieldRow({
       fieldEntryId,
       dataType,
       isVirtual,
+      panelId: resolvedPanelId,
       onNavigateOut,
       configOptions: configDef?.options,
     };
@@ -930,7 +936,7 @@ export function FieldRow({
         parentId: nodeId,
         rootChildIds: rootChildIds ?? renderableSiblings.map((item) => item.id),
         rootNodeId: rootNodeId ?? nodeId,
-        panelId: panelId ?? 'main',
+        panelId: resolvedPanelId,
         isEditing,
         enterEdit: () => setEditingFieldName(fieldEntryId),
         exitEdit: () => setEditingFieldName(null),
@@ -987,6 +993,7 @@ export function FieldRow({
               <FieldNameInput
                 fieldEntryId={fieldEntryId}
                 nodeId={nodeId}
+                panelId={resolvedPanelId}
                 attrDefId={attrDefId}
                 currentName={attrDefName}
                 onEnterConfirm={handleEnterConfirm}
@@ -1028,9 +1035,9 @@ export function FieldRow({
       <div className={FIELD_ROW_VALUE_COLUMN_CLASS} data-field-value>
         <div className="flex-1 min-w-0">
           {isOutliner ? (
-            <ConfigOutliner nodeId={nodeId} onNavigateOut={onNavigateOut} panelId={panelId ?? 'main'} />
+            <ConfigOutliner nodeId={nodeId} onNavigateOut={onNavigateOut} panelId={resolvedPanelId} />
           ) : (
-            <FieldValueOutliner fieldEntryId={fieldEntryId} fieldDataType={dataType} attrDefId={attrDefId} onNavigateOut={onNavigateOut} panelId={panelId ?? 'main'} />
+            <FieldValueOutliner fieldEntryId={fieldEntryId} fieldDataType={dataType} attrDefId={attrDefId} onNavigateOut={onNavigateOut} panelId={resolvedPanelId} />
           )}
         </div>
         {validationWarning && (

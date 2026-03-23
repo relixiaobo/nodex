@@ -1,7 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 import type { ThinkingLevel } from '@mariozechner/pi-ai';
 import { ArrowUp, Brain, Check, ChevronDown, Plus, Settings, Square } from '../../lib/icons.js';
+import { DropdownPanel } from '../ui/DropdownPanel.js';
 
 export interface ChatInputModel {
   id: string;
@@ -134,7 +134,6 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const modelMenuRef = useRef<HTMLDivElement>(null);
-  const modelMenuPortalRef = useRef<HTMLDivElement>(null);
   const canSteer = disabled && !!onSteer;
   const inputDisabled = (disabled || busy) && !canSteer;
   const canSend = !inputDisabled && draft.trim().length > 0;
@@ -180,20 +179,17 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
   }, [draft, compact]);
 
   useEffect(() => {
-    if (!menuOpen && !modelMenuOpen) return;
+    if (!menuOpen) return;
 
     function onPointerDown(event: PointerEvent) {
       const target = event.target as Node;
       if (menuRef.current?.contains(target)) return;
-      if (modelMenuRef.current?.contains(target)) return;
-      if (modelMenuPortalRef.current?.contains(target)) return;
       setMenuOpen(false);
-      setModelMenuOpen(false);
     }
 
     document.addEventListener('pointerdown', onPointerDown, true);
     return () => document.removeEventListener('pointerdown', onPointerDown, true);
-  }, [menuOpen, modelMenuOpen]);
+  }, [menuOpen]);
 
   useEffect(() => {
     if (!modelMenuOpen) {
@@ -305,17 +301,11 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
                   {thinkingLevel && <span className="shrink-0 text-foreground-tertiary">Thinking</span>}
                   <ChevronDown size={12} strokeWidth={1.8} className="shrink-0 text-foreground-tertiary" />
                 </button>
-                {modelMenuOpen && createPortal(
-                  <div
-                    ref={(el) => {
-                      modelMenuPortalRef.current = el;
-                      if (!el || !modelMenuRef.current) return;
-                      const rect = modelMenuRef.current.getBoundingClientRect();
-                      el.style.position = 'fixed';
-                      el.style.right = `${window.innerWidth - rect.right}px`;
-                      el.style.bottom = `${window.innerHeight - rect.top + 4}px`;
-                    }}
-                    className="z-[9999] max-h-[70vh] min-w-[260px] max-w-[300px] overflow-y-auto rounded-lg bg-background p-1 shadow-paper"
+                {modelMenuOpen && (
+                  <DropdownPanel
+                    anchorRef={modelMenuRef}
+                    onClose={() => setModelMenuOpen(false)}
+                    width={300}
                   >
                     {/* Section 1: Models (featured + more) */}
                     <div className="py-1">
@@ -390,8 +380,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
                         </button>
                       </>
                     )}
-                  </div>,
-                  document.body,
+                  </DropdownPanel>
                 )}
               </div>
             )}

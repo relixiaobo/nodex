@@ -192,8 +192,8 @@ export function ConfigOutliner({ nodeId, panelId = 'node-main', onNavigateOut }:
   }, [clearFocus, setEditingFieldName]);
 
   const navToContent = useCallback((id: string, parentId: string) => {
-    setFocusedNode(id, parentId);
-  }, [setFocusedNode]);
+    setFocusedNode(id, parentId, panelId);
+  }, [panelId, setFocusedNode]);
 
   const handleTrailingNavigateOut = useCallback((direction: 'up' | 'down') => {
     // TrailingInput is conceptually at index = mergedItems.length
@@ -222,6 +222,7 @@ export function ConfigOutliner({ nodeId, panelId = 'node-main', onNavigateOut }:
                 {...toFieldRowEntryProps(row.fieldEntry)}
                 rootChildIds={selectableRootIds}
                 rootNodeId={nodeId}
+                panelId={panelId}
                 isLastInGroup={i === rows.length - 1 || rows[i + 1].type !== 'field'}
                 ownerTagColor={ownerColor}
                 onNavigateOut={(direction) => navigateToSiblingRow({

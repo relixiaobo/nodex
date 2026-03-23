@@ -46,13 +46,16 @@ export function DropdownPanel({
       }
     };
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      onClose();
     };
     document.addEventListener('mousedown', handleClick);
-    document.addEventListener('keydown', handleKey);
+    document.addEventListener('keydown', handleKey, true);
     return () => {
       document.removeEventListener('mousedown', handleClick);
-      document.removeEventListener('keydown', handleKey);
+      document.removeEventListener('keydown', handleKey, true);
     };
   }, [anchorRef, onClose]);
 

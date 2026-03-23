@@ -77,16 +77,18 @@ interface OutlinerRowProps {
 
 // ── Selection state derivation ──
 
-export function useRowSelectionState(rowId: string, parentId: string) {
+export function useRowSelectionState(rowId: string, parentId: string, panelId: string) {
   const isInSelectedSet = useUIStore((s) => s.selectedNodeIds.has(rowId));
   const isMultiSelected = useUIStore((s) => s.selectedNodeIds.size > 1);
   const isSelectionAnchor = useUIStore((s) => s.selectionAnchorId === rowId);
   const focusedNodeId = useUIStore((s) => s.focusedNodeId);
+  const focusedPanelId = useUIStore((s) => s.focusedPanelId);
   const selectedParentId = useUIStore((s) => s.selectedParentId);
+  const selectedPanelId = useUIStore((s) => s.selectedPanelId);
 
-  const isFocused = focusedNodeId === rowId;
+  const isFocused = focusedNodeId === rowId && focusedPanelId === panelId;
 
-  const isSelected = isInSelectedSet && (
+  const isSelected = selectedPanelId === panelId && isInSelectedSet && (
     isMultiSelected ||
     selectedParentId === null ||
     selectedParentId === parentId
@@ -134,7 +136,7 @@ export function OutlinerRow({ config, children }: OutlinerRowProps) {
   const cycleNodeCheckbox = useNodeStore((s) => s.cycleNodeCheckbox);
 
   const { isSelected, isMultiSelected, isSelectionAnchor, isFocused } =
-    useRowSelectionState(rowId, parentId);
+    useRowSelectionState(rowId, parentId, panelId);
 
   // ── Selection-mode keyboard handler ──
 
@@ -188,7 +190,7 @@ export function OutlinerRow({ config, children }: OutlinerRowProps) {
           (cid) => !getNode(cid)?.type,
         );
         if (topLevelIds.length > 0) {
-          setSelectedNodes(new Set(topLevelIds), topLevelIds[0]);
+          setSelectedNodes(new Set(topLevelIds), topLevelIds[0], panelId);
         }
         return;
       }
@@ -221,7 +223,7 @@ export function OutlinerRow({ config, children }: OutlinerRowProps) {
         }
         clearSelection();
         if (prev) {
-          setFocusedNode(prev.nodeId, prev.parentId);
+          setFocusedNode(prev.nodeId, prev.parentId, panelId);
         }
         return;
       }
@@ -304,7 +306,7 @@ export function OutlinerRow({ config, children }: OutlinerRowProps) {
         cutNodesToClipboard(orderedIds);
         clearSelection();
         if (prev) {
-          setFocusedNode(prev.nodeId, prev.parentId);
+          setFocusedNode(prev.nodeId, prev.parentId, panelId);
         }
         return;
       }
@@ -355,7 +357,7 @@ export function OutlinerRow({ config, children }: OutlinerRowProps) {
           rangeIds.add(flatList[i].nodeId);
         }
         const filtered = filterToRootLevel(rangeIds, undefined, flatList);
-        setSelectedNodes(filtered, anchor);
+        setSelectedNodes(filtered, anchor, panelId);
         return;
       }
 
@@ -375,7 +377,7 @@ export function OutlinerRow({ config, children }: OutlinerRowProps) {
             parentId: prev.parentId,
             textOffset: getNodeTextLengthById(prev.nodeId),
           });
-          setFocusedNode(prev.nodeId, prev.parentId);
+          setFocusedNode(prev.nodeId, prev.parentId, panelId);
         }
         return;
       }
@@ -392,7 +394,7 @@ export function OutlinerRow({ config, children }: OutlinerRowProps) {
             parentId: next.parentId,
             textOffset: 0,
           });
-          setFocusedNode(next.nodeId, next.parentId);
+          setFocusedNode(next.nodeId, next.parentId, panelId);
         }
         return;
       }
@@ -417,7 +419,7 @@ export function OutlinerRow({ config, children }: OutlinerRowProps) {
           parentId: first.parentId,
           textOffset: editAtEnd,
         });
-        setFocusedNode(first.nodeId, first.parentId);
+        setFocusedNode(first.nodeId, first.parentId, panelId);
         return;
       }
     };
@@ -462,19 +464,19 @@ export function useRowPointerHandlers(
     if (!newAnchor && newSelection.has(rowId)) {
       newAnchor = rowId;
     }
-    setSelectedNodes(newSelection, newAnchor);
+    setSelectedNodes(newSelection, newAnchor, panelId);
   }, [rowId, setSelectedNodes]);
 
   const handleShiftClick = useCallback(() => {
     const state = useUIStore.getState();
     const anchor = state.selectionAnchorId;
     if (!anchor) {
-      setSelectedNode(rowId, parentId);
+      setSelectedNode(rowId, parentId, 'global', panelId);
       return;
     }
     const flatList = getFlattenedVisibleNodes(rootChildIds, state.expandedNodes, rootNodeId, panelId);
     const range = computeRangeSelection(anchor, rowId, flatList);
-    setSelectedNodes(range, anchor);
+    setSelectedNodes(range, anchor, panelId);
   }, [rowId, parentId, rootChildIds, rootNodeId, panelId, setSelectedNode, setSelectedNodes]);
 
   return { handleCmdClick, handleShiftClick };

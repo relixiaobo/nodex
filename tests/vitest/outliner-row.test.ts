@@ -49,6 +49,17 @@ describe('useRowSelectionState derivation', () => {
     expect(state.selectedNodeIds.size).toBe(0);
     expect(state.selectionAnchorId).toBeNull();
   });
+
+  it('isolates focus and selection by panel id', () => {
+    useUIStore.getState().setFocusedNode('node1', 'parent1', 'chat-panel');
+    const state = useUIStore.getState();
+
+    expect(state.focusedNodeId).toBe('node1');
+    expect(state.focusedParentId).toBe('parent1');
+    expect(state.focusedPanelId).toBe('chat-panel');
+    expect(state.selectedNodeIds.has('node1')).toBe(true);
+    expect(state.selectedPanelId).toBe('chat-panel');
+  });
 });
 
 // ── Pointer handler logic (toggle/range) ──

@@ -81,6 +81,25 @@ export function FloatingChatBar() {
       <div className="h-8 bg-gradient-to-t from-background to-transparent" />
 
       <div ref={containerRef} className="pointer-events-auto bg-background">
+        {/* Drag handle — click to open chat drawer */}
+        {focused && (
+          <button
+            type="button"
+            onClick={() => {
+              const currentDraft = chatInputRef.current?.getDraft() ?? '';
+              setFocused(false);
+              if (currentDraft.trim()) {
+                void openChatWithPrompt(currentDraft);
+              } else {
+                useUIStore.getState().openChatDrawer();
+              }
+            }}
+            className="mx-auto flex w-full items-center justify-center py-1.5"
+            aria-label="Open chat"
+          >
+            <span className="h-1 w-8 rounded-full bg-foreground/15" />
+          </button>
+        )}
         <ChatInput
           ref={chatInputRef}
           disabled={false}

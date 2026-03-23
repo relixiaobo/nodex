@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Plus, X, MessageSquare } from '../../lib/icons.js';
 import { openNewChatDrawer } from '../../lib/chat-panel-actions.js';
 import { useUIStore } from '../../stores/ui-store.js';
@@ -72,6 +72,12 @@ export function ChatDrawer() {
   const currentChatSessionId = useUIStore((s) => s.currentChatSessionId);
   const closeChatDrawer = useUIStore((s) => s.closeChatDrawer);
 
+  // Track if drawer has ever been opened (to mount content lazily)
+  const [hasOpened, setHasOpened] = useState(false);
+  useEffect(() => {
+    if (chatDrawerOpen) setHasOpened(true);
+  }, [chatDrawerOpen]);
+
   useEffect(() => {
     if (!chatDrawerOpen) return;
 
@@ -84,19 +90,23 @@ export function ChatDrawer() {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [chatDrawerOpen, closeChatDrawer]);
 
-  if (!chatDrawerOpen) {
-    return null;
-  }
+  if (!hasOpened) return null;
 
   return (
-    <div className="absolute inset-0 z-30 flex items-end" data-testid="chat-drawer">
+    <div
+      className={`absolute inset-0 z-30 flex items-end transition-opacity duration-250 ${chatDrawerOpen ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'}`}
+      data-testid="chat-drawer"
+    >
       <button
         type="button"
         onClick={closeChatDrawer}
         className="absolute inset-0 bg-foreground/10 backdrop-blur-[1px]"
         aria-label="Close chat drawer"
       />
-      <div className="relative z-10 flex h-[75%] min-h-0 w-full flex-col overflow-hidden rounded-t-[22px] border border-b-0 border-border bg-background shadow-[0_-18px_42px_rgba(15,23,42,0.14)]" data-chat-drawer="true">
+      <div
+        className={`relative z-10 flex h-[75%] min-h-0 w-full flex-col overflow-hidden rounded-t-[22px] border border-b-0 border-border bg-background shadow-[0_-18px_42px_rgba(15,23,42,0.14)] transition-transform duration-300 ease-out ${chatDrawerOpen ? 'translate-y-0' : 'translate-y-full'}`}
+        data-chat-drawer="true"
+      >
         {currentChatSessionId ? (
           <>
             <DrawerHeader sessionId={currentChatSessionId} />

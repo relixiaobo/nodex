@@ -260,7 +260,10 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
             }}
           />
         </div>
-        <div className={`flex items-center justify-between px-2.5 pb-2${compact ? ' hidden' : ''}`}>
+        <div
+          className="flex items-center justify-between px-2.5 overflow-hidden transition-all duration-200 ease-out"
+          style={{ maxHeight: compact ? 0 : 40, paddingBottom: compact ? 0 : 8, opacity: compact ? 0 : 1 }}
+        >
           <div ref={menuRef} className="relative flex items-center">
             <button
               type="button"

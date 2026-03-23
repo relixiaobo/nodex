@@ -13,7 +13,7 @@ const MAX_HEIGHT = 0.95;
 
 // ── Session history dropdown ──
 
-function SessionHistoryDropdown({ currentSessionId, onClose }: { currentSessionId: string; onClose: () => void }) {
+function SessionHistoryDropdown({ currentSessionId, onClose, headerRef }: { currentSessionId: string; onClose: () => void; headerRef: React.RefObject<HTMLDivElement | null> }) {
   const [sessions, setSessions] = useState<ChatSessionMeta[]>([]);
   const [loading, setLoading] = useState(true);
   const ref = useRef<HTMLDivElement>(null);
@@ -27,12 +27,14 @@ function SessionHistoryDropdown({ currentSessionId, onClose }: { currentSessionI
 
   useEffect(() => {
     function onPointerDown(e: PointerEvent) {
+      // Ignore clicks inside dropdown or header (header has its own toggle)
       if (ref.current?.contains(e.target as Node)) return;
+      if (headerRef.current?.contains(e.target as Node)) return;
       onClose();
     }
     document.addEventListener('pointerdown', onPointerDown, true);
     return () => document.removeEventListener('pointerdown', onPointerDown, true);
-  }, [onClose]);
+  }, [onClose, headerRef]);
 
   function formatTime(ts: number): string {
     const d = new Date(ts);
@@ -55,8 +57,8 @@ function SessionHistoryDropdown({ currentSessionId, onClose }: { currentSessionI
             key={s.id}
             type="button"
             onClick={() => { useUIStore.getState().openChatDrawer(s.id); onClose(); }}
-            className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm transition-colors hover:bg-foreground/4 ${
-              s.id === currentSessionId ? 'font-medium text-foreground' : 'text-foreground-secondary'
+            className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm transition-colors ${
+              s.id === currentSessionId ? 'bg-foreground/[0.06] font-medium text-foreground' : 'text-foreground-secondary hover:bg-foreground/4'
             }`}
           >
             <span className="min-w-0 flex-1 truncate">{s.title?.trim() || 'Chat'}</span>
@@ -73,9 +75,10 @@ function SessionHistoryDropdown({ currentSessionId, onClose }: { currentSessionI
 function DrawerHeader({ sessionId }: { sessionId: string }) {
   const titleEdit = useChatTitleEdit(sessionId);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const headerRef = useRef<HTMLDivElement>(null);
 
   return (
-    <div className="relative shrink-0">
+    <div ref={headerRef} className="relative shrink-0">
       <div className="flex items-center gap-1 px-3 pb-2 pt-2">
         {titleEdit.editing ? (
           <div className="min-w-0 flex-1">
@@ -108,7 +111,7 @@ function DrawerHeader({ sessionId }: { sessionId: string }) {
         </button>
       </div>
       {historyOpen && (
-        <SessionHistoryDropdown currentSessionId={sessionId} onClose={() => setHistoryOpen(false)} />
+        <SessionHistoryDropdown currentSessionId={sessionId} onClose={() => setHistoryOpen(false)} headerRef={headerRef} />
       )}
     </div>
   );

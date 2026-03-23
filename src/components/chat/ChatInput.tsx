@@ -238,7 +238,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
         </div>
       )}
       <div className="rounded-xl border border-border bg-background transition-colors focus-within:border-foreground/20">
-        <div className={`px-3 pt-2.5 ${compact ? 'pb-2.5' : 'pb-1'}`}>
+        <div className={compact ? 'px-3 py-2' : 'px-3 pt-2.5 pb-1'}>
           <textarea
             ref={textareaRef}
             value={draft}

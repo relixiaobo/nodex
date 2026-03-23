@@ -85,13 +85,13 @@ export function FloatingChatBar() {
           />
         ) : (
           /* ── Unfocused: match ChatInput's outer padding (px-3 pb-3) ── */
-          <div className="px-3 pb-3">
+          <div className="px-3 pb-3 pt-1">
             <button
               type="button"
               onClick={() => setFocused(true)}
-              className="flex h-11 w-full items-center rounded-xl border border-border bg-background px-3 text-[15px] text-foreground-tertiary transition-colors hover:border-foreground/20"
+              className="flex w-full items-start rounded-xl border border-border bg-background px-3 pt-2.5 pb-2 text-base leading-6 text-foreground-tertiary transition-colors hover:border-foreground/20"
             >
-              Ask about your notes...
+              Ask about your notes…
             </button>
           </div>
         )}

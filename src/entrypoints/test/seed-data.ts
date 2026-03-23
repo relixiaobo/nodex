@@ -534,7 +534,7 @@ export async function seedTestData(options?: { forceFresh?: boolean }): Promise<
     await useUIStore.persist.clearStorage();
     await useWorkspaceStore.persist.clearStorage();
     useUIStore.setState({
-      activeView: 'chat',
+      chatDrawerOpen: false,
       currentNodeId: null,
       currentChatSessionId: null,
       nodeHistory: [],

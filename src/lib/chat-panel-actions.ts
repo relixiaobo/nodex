@@ -3,6 +3,8 @@ import { saveChatSession } from './ai-persistence.js';
 import { useUIStore } from '../stores/ui-store.js';
 
 let pendingEnsureChatSession: Promise<string> | null = null;
+const FLOATING_CHAT_INPUT_SELECTOR = '[data-floating-chat-input="true"]';
+const CHAT_DRAWER_TEXTAREA_SELECTOR = '[data-chat-drawer="true"] textarea';
 
 async function createChatSession(): Promise<string> {
   const session = createSession();
@@ -15,12 +17,29 @@ async function createChatSession(): Promise<string> {
   return session.id;
 }
 
-function selectChatSession(sessionId: string, switchView: boolean): void {
+function selectChatSession(sessionId: string, openDrawer: boolean): void {
   const ui = useUIStore.getState();
   ui.setCurrentChatSessionId(sessionId);
-  if (switchView) {
-    ui.switchToChat();
+  if (openDrawer) {
+    ui.openChatDrawer();
   }
+}
+
+function focusFloatingChatInput(): boolean {
+  const input = document.querySelector<HTMLInputElement>(FLOATING_CHAT_INPUT_SELECTOR);
+  if (!input) return false;
+  input.focus();
+  input.select();
+  return true;
+}
+
+function focusDrawerChatInput(): boolean {
+  const textarea = document.querySelector<HTMLTextAreaElement>(CHAT_DRAWER_TEXTAREA_SELECTOR);
+  if (!textarea) return false;
+  textarea.focus();
+  const end = textarea.value.length;
+  textarea.setSelectionRange(end, end);
+  return true;
 }
 
 export async function ensureChatSession(): Promise<string> {
@@ -47,20 +66,39 @@ export async function ensureChatSession(): Promise<string> {
   return pendingEnsureChatSession;
 }
 
-export async function openChatPanel(): Promise<string> {
+export async function openNewChatDrawer(): Promise<string> {
   const sessionId = await createChatSession();
   selectChatSession(sessionId, true);
   return sessionId;
 }
 
 export async function focusOrOpenChat(): Promise<void> {
-  const { currentChatSessionId, switchToChat } = useUIStore.getState();
-  if (currentChatSessionId) {
-    switchToChat();
+  const { chatDrawerOpen, currentChatSessionId, openChatDrawer } = useUIStore.getState();
+  if (chatDrawerOpen) {
+    if (!focusDrawerChatInput()) {
+      requestAnimationFrame(() => {
+        void focusDrawerChatInput();
+      });
+    }
     return;
   }
 
-  await openChatPanel();
+  if (focusFloatingChatInput()) {
+    return;
+  }
+
+  if (currentChatSessionId) {
+    openChatDrawer();
+    requestAnimationFrame(() => {
+      void focusDrawerChatInput();
+    });
+    return;
+  }
+
+  await openNewChatDrawer();
+  requestAnimationFrame(() => {
+    void focusDrawerChatInput();
+  });
 }
 
 export function switchToChatSession(sessionId: string): void {
@@ -75,7 +113,7 @@ export async function openChatWithPrompt(prompt: string): Promise<void> {
     sessionId = await createChatSession();
     selectChatSession(sessionId, true);
   } else {
-    ui.switchToChat();
+    ui.openChatDrawer();
   }
 
   ui.setPendingChatPrompt({ sessionId, prompt });

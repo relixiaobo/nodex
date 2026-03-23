@@ -3,7 +3,7 @@
  *
  * Cmd+Z / Cmd+Shift+Z navigate the node-view history only when:
  * - the user is not editing text
- * - Node view is active
+ * - the outliner surface is available
  */
 import { useEffect } from 'react';
 import { getShortcutKeys, matchesShortcutEvent } from '../lib/shortcut-registry';
@@ -42,7 +42,7 @@ export function useNavUndoKeyboard() {
       if (!action) return;
 
       const state = useUIStore.getState();
-      if (state.activeView !== 'node') return;
+      if (!state.currentNodeId) return;
 
       if (action === 'redo') {
         state.goForwardNode();

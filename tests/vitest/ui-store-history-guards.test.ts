@@ -46,7 +46,6 @@ describe('ui-store history guard behaviors', () => {
     ui.replaceCurrentNode('note_1');
 
     const state = useUIStore.getState();
-    expect(state.activeView).toBe('node');
     expect(state.currentNodeId).toBe('note_1');
     expect(state.nodeHistory).toEqual(['note_1']);
     expect(state.nodeHistoryIndex).toBe(0);

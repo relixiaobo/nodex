@@ -37,7 +37,7 @@ export function useTodayShortcut(): void {
       e.stopPropagation();
 
       const dayNodeId = ensureTodayNode();
-      useUIStore.getState().switchToNode(dayNodeId);
+      useUIStore.getState().navigateToNode(dayNodeId);
     }
 
     document.addEventListener('keydown', handleKeyDown, true);

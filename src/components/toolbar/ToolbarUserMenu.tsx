@@ -218,7 +218,7 @@ export function ToolbarUserMenu() {
                     <button
                         onClick={() => {
                             setOpen(false);
-                            useUIStore.getState().switchToNode(SYSTEM_NODE_IDS.SETTINGS);
+                            useUIStore.getState().navigateToNode(SYSTEM_NODE_IDS.SETTINGS);
                         }}
                         className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-foreground-secondary transition-colors hover:bg-foreground/4 hover:text-foreground"
                     >
@@ -231,7 +231,7 @@ export function ToolbarUserMenu() {
                     <button
                         onClick={() => {
                             setOpen(false);
-                            useUIStore.getState().switchToNode(APP_PANELS.ABOUT);
+                            useUIStore.getState().navigateToNode(APP_PANELS.ABOUT);
                         }}
                         className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-foreground-secondary transition-colors hover:bg-foreground/4 hover:text-foreground"
                     >

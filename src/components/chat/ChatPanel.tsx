@@ -20,7 +20,6 @@ import { ChatMessage } from './ChatMessage.js';
 const AUTO_SCROLL_THRESHOLD = 48;
 
 export interface ChatPanelProps {
-  panelId: string;
   sessionId: string;
   /** When true, hide the panel-level header because the surrounding layout already renders it. */
   hideHeader?: boolean;
@@ -84,11 +83,11 @@ function mergeToolCallOnlyEntries(entries: ToolCallOnlyEntry[]): ChatMessageEntr
   };
 }
 
-export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
+export function ChatPanel({ sessionId, hideHeader }: ChatPanelProps) {
   const pendingChatPrompt = useUIStore((s) => s.pendingChatPrompt);
   const setPendingChatPrompt = useUIStore((s) => s.setPendingChatPrompt);
-  const activeView = useUIStore((s) => s.activeView);
-  const isActive = activeView === 'chat';
+  const chatDrawerOpen = useUIStore((s) => s.chatDrawerOpen);
+  const isActive = hideHeader ? chatDrawerOpen : true;
   const {
     agent,
     messages,
@@ -266,7 +265,7 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
   }
 
   function handleOpenSettings() {
-    useUIStore.getState().switchToNode(SYSTEM_NODE_IDS.SETTINGS);
+    useUIStore.getState().navigateToNode(SYSTEM_NODE_IDS.SETTINGS);
   }
 
   async function handleModelChange(modelId: string, provider: string) {

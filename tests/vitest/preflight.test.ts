@@ -17,7 +17,6 @@ describe('preflight', () => {
     expect(nodeIds.length).toBeGreaterThanOrEqual(20);
     expect(ws.currentWorkspaceId).toBe('ws_default');
     expect(ws.userId).toBe('user_default');
-    expect(ui.activeView).toBe('node');
     expect(ui.currentNodeId).toBe(ensureTodayNode());
     expect(ui.nodeHistory).toEqual([ensureTodayNode()]);
     expect(ui.nodeHistoryIndex).toBe(0);

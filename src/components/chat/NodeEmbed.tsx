@@ -20,7 +20,8 @@ interface NodeEmbedProps {
 export function NodeEmbed({ nodeId }: NodeEmbedProps) {
   const node = useNode(nodeId);
   const setExpanded = useUIStore((s) => s.setExpanded);
-  const switchToNode = useUIStore((s) => s.switchToNode);
+  const navigateToNode = useUIStore((s) => s.navigateToNode);
+  const closeChatDrawer = useUIStore((s) => s.closeChatDrawer);
   const realParentId = loroDoc.getParentId(nodeId) ?? nodeId;
   const hasChildren = (node?.children?.length ?? 0) > 0;
 
@@ -52,7 +53,10 @@ export function NodeEmbed({ nodeId }: NodeEmbedProps) {
       <div className="flex items-center justify-end border-t border-border px-2 py-1">
         <button
           type="button"
-          onClick={() => switchToNode(nodeId)}
+          onClick={() => {
+            closeChatDrawer();
+            navigateToNode(nodeId);
+          }}
           className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-foreground-secondary transition-colors hover:bg-foreground/4 hover:text-foreground"
         >
           <ExternalLink size={12} />

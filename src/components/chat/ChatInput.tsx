@@ -116,7 +116,12 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
   useImperativeHandle(ref, () => ({
     setDraft(text: string) {
       setDraft(text);
-      requestAnimationFrame(() => textareaRef.current?.focus());
+      requestAnimationFrame(() => {
+        const el = textareaRef.current;
+        if (!el) return;
+        el.focus();
+        el.selectionStart = el.selectionEnd = el.value.length;
+      });
     },
     getDraft() {
       return draft;

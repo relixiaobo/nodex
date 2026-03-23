@@ -323,10 +323,6 @@ export function ChatDrawer() {
     return () => document.removeEventListener('keydown', onKey);
   }, [chatDrawerOpen, closeChatDrawer]);
 
-  if (!hasOpened) return null;
-
-  const drawerTransition = drag.isDragging ? '' : 'transition-transform duration-300 ease-out';
-
   // Close drawer when clicking outside (on outliner)
   useEffect(() => {
     if (!chatDrawerOpen) return;
@@ -337,6 +333,10 @@ export function ChatDrawer() {
     document.addEventListener('pointerdown', onPointerDown, true);
     return () => document.removeEventListener('pointerdown', onPointerDown, true);
   }, [chatDrawerOpen, closeChatDrawer]);
+
+  if (!hasOpened) return null;
+
+  const drawerTransition = drag.isDragging ? '' : 'transition-transform duration-300 ease-out';
 
   return (
     <div

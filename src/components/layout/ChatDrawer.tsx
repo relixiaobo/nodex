@@ -171,7 +171,7 @@ function DrawerHeader({ sessionId }: { sessionId: string }) {
   const headerRef = useRef<HTMLDivElement>(null);
 
   return (
-    <div ref={headerRef} className="relative shrink-0">
+    <div ref={headerRef} className="relative shrink-0 border-b border-border/50">
       <div className="flex items-center pb-2 pt-2 pl-4 pr-3">
         {titleEdit.editing ? (
           <div className="min-w-0 flex-1">

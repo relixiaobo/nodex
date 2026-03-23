@@ -175,9 +175,9 @@ export function useDragSelect({ containerRef, rootChildIds, rootNodeId, panelId 
 
         // Select start node as anchor + clear focus (unmount any editor).
         // setSelectedNodes clears focusedNodeId/focusedParentId.
-        const { panelId: pId } = contextRef.current;
+        const { panelId: currentPanelId } = contextRef.current;
         const setSelectedNodes = useUIStore.getState().setSelectedNodes;
-        setSelectedNodes(new Set([s.startNodeId]), s.startNodeId, pId);
+        setSelectedNodes(new Set([s.startNodeId]), s.startNodeId, currentPanelId);
       }
 
       // During active drag: prevent text selection + update range
@@ -187,8 +187,8 @@ export function useDragSelect({ containerRef, rootChildIds, rootNodeId, panelId 
       if (!hoverNode) return;
 
       const uiState = useUIStore.getState();
-      const { rootChildIds: rcIds, rootNodeId: rnId, panelId: pId } = contextRef.current;
-      const flatList = getFlattenedVisibleNodes(rcIds, uiState.expandedNodes, rnId, pId);
+      const { rootChildIds: rcIds, rootNodeId: rnId, panelId: currentPanelId } = contextRef.current;
+      const flatList = getFlattenedVisibleNodes(rcIds, uiState.expandedNodes, rnId, currentPanelId);
 
       // Validate hover node belongs to this outliner context
       if (!flatList.some((item) => item.nodeId === hoverNode.nodeId)) return;
@@ -202,7 +202,7 @@ export function useDragSelect({ containerRef, rootChildIds, rootNodeId, panelId 
       // (fields first, then content) may differ from data order in the flat list,
       // causing the anchor to fall outside the computed range.
       range.add(s.startNodeId!);
-      useUIStore.getState().setSelectedNodes(range, s.startNodeId, pId);
+      useUIStore.getState().setSelectedNodes(range, s.startNodeId, currentPanelId);
     };
 
     const onDocMouseUp = () => {

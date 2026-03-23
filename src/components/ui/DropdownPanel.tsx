@@ -48,7 +48,7 @@ export function DropdownPanel({
     const handleKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       e.preventDefault();
-      e.stopPropagation();
+      e.stopImmediatePropagation();
       onClose();
     };
     document.addEventListener('mousedown', handleClick);

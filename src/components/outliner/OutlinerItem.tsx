@@ -1144,7 +1144,7 @@ export function OutlinerItem({
     if (!isReferenceLikeRow) {
       setFocusedNode(nodeId, parentId, panelId);
     }
-  }, [isLoadingNode, nodeId, parentId, isReferenceLikeRow, isReference, setSelectedNode, setFocusedNode, navigateTo]);
+  }, [isLoadingNode, nodeId, parentId, panelId, isReferenceLikeRow, isReference, setSelectedNode, setFocusedNode, navigateTo]);
 
   const handleContentDoubleClick = useCallback((e: React.MouseEvent) => {
     // Double click on reference node → enter edit mode
@@ -1158,7 +1158,7 @@ export function OutlinerItem({
       );
       setFocusedNode(nodeId, parentId, panelId);
     }
-  }, [nodeId, parentId, isReference, isPendingConversion, isOptionsValueNode, setFocusedNode]);
+  }, [nodeId, parentId, panelId, isReference, isPendingConversion, isOptionsValueNode, setFocusedNode]);
 
   const handleToggle = useCallback(() => {
     const ek = buildExpandedNodeKey(panelId, parentId, nodeId);
@@ -1279,7 +1279,7 @@ export function OutlinerItem({
       const lastId = createSiblingNodesFromPaste(nodeId, nodes);
       if (lastId) setFocusedNode(lastId, parentId, panelId);
     },
-    [nodeId, parentId, createSiblingNodesFromPaste, setFocusedNode],
+    [nodeId, parentId, panelId, createSiblingNodesFromPaste, setFocusedNode],
   );
 
   const handleIndent = useCallback(() => {
@@ -1314,7 +1314,7 @@ export function OutlinerItem({
     if (grandparentId) {
       setFocusedNode(nodeId, grandparentId, panelId);
     }
-  }, [nodeId, parentId, outdentNode, setFocusedNode]);
+  }, [nodeId, parentId, panelId, outdentNode, setFocusedNode]);
 
   const handleDelete = useCallback((): boolean => {
     // Read current name from store — the closure's `node` may be stale
@@ -1365,6 +1365,7 @@ export function OutlinerItem({
     hardDeleteNode,
     removeReference,
     setFocusedNode,
+    panelId,
     hasChildren,
     triggerDeleteBlockedPulse,
   ]);
@@ -1446,6 +1447,7 @@ export function OutlinerItem({
     nodeId,
     parentId,
     isReferenceLikeRow,
+    panelId,
     clearFocus,
     setEditingFieldName,
     updateNodeContent,
@@ -1486,6 +1488,7 @@ export function OutlinerItem({
     nodeId,
     revertRefConversion,
     setPendingRefConversion,
+    panelId,
     clearFocus,
     setSelectedNode,
   ]);

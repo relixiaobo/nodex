@@ -59,7 +59,7 @@ export function shouldShowConfigTrailingInput(
   return shouldShowTrailingInput(items);
 }
 
-export function ConfigOutliner({ nodeId, panelId = 'main', onNavigateOut }: ConfigOutlinerProps) {
+export function ConfigOutliner({ nodeId, panelId = 'node-main', onNavigateOut }: ConfigOutlinerProps) {
   useChildren(nodeId);
 
   const _version = useNodeStore((s) => s._version);
@@ -175,7 +175,7 @@ export function ConfigOutliner({ nodeId, panelId = 'main', onNavigateOut }: Conf
 
   // Drag select: document-level mouse tracking for multi-node selection
   const containerRef = useRef<HTMLDivElement>(null);
-  useDragSelect({ containerRef, rootChildIds: selectableRootIds, rootNodeId: nodeId });
+  useDragSelect({ containerRef, rootChildIds: selectableRootIds, rootNodeId: nodeId, panelId });
 
   const setFocusedNode = useUIStore((s) => s.setFocusedNode);
   const clearFocus = useUIStore((s) => s.clearFocus);
@@ -261,7 +261,7 @@ export function ConfigOutliner({ nodeId, panelId = 'main', onNavigateOut }: Conf
           parentId={nodeId}
           depth={0}
           panelId={panelId}
-          parentExpandKey={buildExpandedNodeKey(ownerId, nodeId)}
+          parentExpandKey={buildExpandedNodeKey(panelId, ownerId, nodeId)}
           onNavigateOut={handleTrailingNavigateOut}
         />
       )}

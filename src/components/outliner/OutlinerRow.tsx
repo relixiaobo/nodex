@@ -244,7 +244,7 @@ export function OutlinerRow({ config, children }: OutlinerRowProps) {
             const index = parent.children.indexOf(id);
             if (index <= 0) continue;
             const newParentId = parent.children[index - 1];
-            setExpanded(buildExpandedNodeKey(ownerId, newParentId), true, true);
+            setExpanded(buildExpandedNodeKey(panelId, ownerId, newParentId), true, true);
             indentNode(id);
           }
         }

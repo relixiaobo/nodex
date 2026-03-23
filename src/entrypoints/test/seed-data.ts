@@ -501,21 +501,21 @@ function seedBody(): void {
 
   // Expand some nodes by default for testing (skipUndo=true to avoid
   // creating undo entries during seed — Bug 1 fix)
-  uiStore.setExpanded(buildExpandedNodeKey(todayDayId, 'proj_1'), true, true);
-  uiStore.setExpanded(buildExpandedNodeKey('proj_1', 'task_1'), true, true);
-  uiStore.setExpanded(buildExpandedNodeKey('proj_1', 'task_2'), true, true);
-  uiStore.setExpanded(buildExpandedNodeKey(todayDayId, 'note_rich'), true, true);
+  uiStore.setExpanded(buildExpandedNodeKey('node-main', todayDayId, 'proj_1'), true, true);
+  uiStore.setExpanded(buildExpandedNodeKey('node-main', 'proj_1', 'task_1'), true, true);
+  uiStore.setExpanded(buildExpandedNodeKey('node-main', 'proj_1', 'task_2'), true, true);
+  uiStore.setExpanded(buildExpandedNodeKey('node-main', todayDayId, 'note_rich'), true, true);
 
   // Store image nodes: expand article nodes with children
-  uiStore.setExpanded(buildExpandedNodeKey('si_reading_notes', 'si_deep_reading'), true, true);
-  uiStore.setExpanded(buildExpandedNodeKey('si_mental_models', 'si_mm_sot'), true, true);
-  uiStore.setExpanded(buildExpandedNodeKey('si_mental_models', 'si_mm_inv'), true, true);
-  uiStore.setExpanded(buildExpandedNodeKey('si_mental_models', 'si_mm_dte'), true, true);
-  uiStore.setExpanded(buildExpandedNodeKey(todayDayId, 'j_pg'), true, true);
-  uiStore.setExpanded(buildExpandedNodeKey(todayDayId, 'j_deep'), true, true);
-  uiStore.setExpanded(buildExpandedNodeKey('j_deep_2', 'j_deep_2a'), true, true);
-  uiStore.setExpanded(buildExpandedNodeKey(todayDayId, 'j_leaders'), true, true);
-  uiStore.setExpanded(buildExpandedNodeKey(todayDayId, 'j_range'), true, true);
+  uiStore.setExpanded(buildExpandedNodeKey('node-main', 'si_reading_notes', 'si_deep_reading'), true, true);
+  uiStore.setExpanded(buildExpandedNodeKey('node-main', 'si_mental_models', 'si_mm_sot'), true, true);
+  uiStore.setExpanded(buildExpandedNodeKey('node-main', 'si_mental_models', 'si_mm_inv'), true, true);
+  uiStore.setExpanded(buildExpandedNodeKey('node-main', 'si_mental_models', 'si_mm_dte'), true, true);
+  uiStore.setExpanded(buildExpandedNodeKey('node-main', todayDayId, 'j_pg'), true, true);
+  uiStore.setExpanded(buildExpandedNodeKey('node-main', todayDayId, 'j_deep'), true, true);
+  uiStore.setExpanded(buildExpandedNodeKey('node-main', 'j_deep_2', 'j_deep_2a'), true, true);
+  uiStore.setExpanded(buildExpandedNodeKey('node-main', todayDayId, 'j_leaders'), true, true);
+  uiStore.setExpanded(buildExpandedNodeKey('node-main', todayDayId, 'j_range'), true, true);
 
   uiStore.replaceCurrentNode(todayDayId);
 }

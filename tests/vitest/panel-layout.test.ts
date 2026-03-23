@@ -151,10 +151,11 @@ describe('DrawerLayout', () => {
         ?.getAttribute('data-hide-header'),
     ).toBe('true');
 
-    const backdrop = container.querySelector('[aria-label="Close chat drawer"]');
+    const appPanel = container.querySelector('[data-testid="app-panel"][data-panel-id="app:about"]');
     flushSync(() => {
-      backdrop?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      appPanel?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
     });
+    await tick();
 
     expect(useUIStore.getState().chatDrawerOpen).toBe(false);
   });

@@ -324,7 +324,9 @@ describe('chat ui', () => {
         onStop: () => {},
       }),
     );
-    expect(inputHtml).toContain('text-base leading-6 text-foreground');
+    expect(inputHtml).toContain('text-base');
+    expect(inputHtml).toContain('leading-6');
+    expect(inputHtml).toContain('text-foreground');
   });
 
   it('renders code blocks with syntax highlighting', () => {

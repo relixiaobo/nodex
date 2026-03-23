@@ -108,10 +108,9 @@ export function getFlattenedVisibleNodes(
   rootChildIds: string[],
   expandedNodes: Set<string>,
   rootParentId: string = '',
-  panelId: string = 'main',
+  panelId: string = 'node-main',
   getVisualChildIds?: (nodeId: string) => string[],
 ): Array<{ nodeId: string; depth: number; parentId: string }> {
-  void panelId;
   const result: Array<{ nodeId: string; depth: number; parentId: string }> = [];
 
   function traverse(childIds: string[], depth: number, currentParentId: string) {
@@ -122,7 +121,7 @@ export function getFlattenedVisibleNodes(
       result.push({ nodeId: childId, depth, parentId: currentParentId });
 
       if (
-        expandedNodes.has(buildExpandedNodeKey(currentParentId, childId)) &&
+        expandedNodes.has(buildExpandedNodeKey(panelId, currentParentId, childId)) &&
         node.children.length > 0
       ) {
         const nextChildIds = getVisualChildIds
@@ -176,9 +175,8 @@ export function getNextVisibleNode(
 export function getLastVisibleNode(
   parentId: string,
   expandedNodes: Set<string>,
-  panelId: string = 'main',
+  panelId: string = 'node-main',
 ): { nodeId: string; parentId: string } | null {
-  void panelId;
   const parentChildren = loroDoc.getChildren(parentId);
   if (!parentChildren.length) return null;
 
@@ -194,7 +192,7 @@ export function getLastVisibleNode(
   let currentParentId = parentId;
 
   while (true) {
-    const expandKey = buildExpandedNodeKey(currentParentId, currentId);
+    const expandKey = buildExpandedNodeKey(panelId, currentParentId, currentId);
     if (!expandedNodes.has(expandKey)) break;
 
     const childrenIds = loroDoc.getChildren(currentId);

@@ -8,8 +8,8 @@ describe('ui-store persistence helpers', () => {
     await useUIStore.persist.clearStorage();
   });
 
-  it('partialize keeps only persisted keys and normalizes expanded node keys', () => {
-    const expanded = new Set<string>(['main:a:b', 'a:c']);
+  it('partialize keeps only persisted keys and preserves scoped expanded node keys', () => {
+    const expanded = new Set<string>(['node-main:a:b', 'chat:a:c']);
     const usage = { cmd_1: { count: 3, lastUsedAt: 1000 } };
     const result = partializeUIStore({
       chatDrawerOpen: true,
@@ -27,7 +27,7 @@ describe('ui-store persistence helpers', () => {
     expect(result).toEqual({
       currentNodeId: 'note_1',
       currentChatSessionId: 'session_1',
-      expandedNodes: new Set(['a:b', 'a:c']),
+      expandedNodes: new Set(['node-main:a:b', 'chat:a:c']),
       viewMode: 'cards',
       paletteUsage: usage,
       lastVisitDate: '2026-03-21',
@@ -49,7 +49,7 @@ describe('ui-store persist migration', () => {
           { id: 'chat', nodeId: 'chat:session_old' },
         ],
         activePanelId: 'main',
-        expandedNodes: new Set(['main:proj_1:task_1', 'proj_1:task_2']),
+        expandedNodes: new Set(['node-main:proj_1:task_1', 'proj_1:task_2']),
         viewMode: 'list',
       },
       version: 5,
@@ -60,7 +60,7 @@ describe('ui-store persist migration', () => {
     const state = useUIStore.getState();
     expect(state.currentNodeId).toBe('note_1');
     expect(state.currentChatSessionId).toBe('session_old');
-    expect(state.expandedNodes).toEqual(new Set(['proj_1:task_1', 'proj_1:task_2']));
+    expect(state.expandedNodes).toEqual(new Set(['node-main:proj_1:task_1', 'node-main:proj_1:task_2']));
     expect(state.nodeHistory).toEqual([]);
     expect(state.nodeHistoryIndex).toBe(-1);
   });
@@ -73,7 +73,7 @@ describe('ui-store persist migration', () => {
           { id: 'chat', nodeId: 'chat:session_focus' },
         ],
         activePanelId: 'chat',
-        expandedNodes: new Set(['main:today:proj_1']),
+        expandedNodes: new Set(['node-main:today:proj_1']),
         viewMode: 'tiles',
       },
       version: 5,
@@ -84,7 +84,28 @@ describe('ui-store persist migration', () => {
     const state = useUIStore.getState();
     expect(state.currentNodeId).toBe('note_1');
     expect(state.currentChatSessionId).toBe('session_focus');
-    expect(state.expandedNodes).toEqual(new Set(['today:proj_1']));
+    expect(state.expandedNodes).toEqual(new Set(['node-main:today:proj_1']));
     expect(state.viewMode).toBe('tiles');
+  });
+
+  it('rehydrates legacy 2-part expanded keys into node-main scope', async () => {
+    await chromeLocalStorage?.setItem('nodex-ui', {
+      state: {
+        currentNodeId: 'note_1',
+        currentChatSessionId: null,
+        expandedNodes: ['proj_1:task_1', 'proj_1:task_2'],
+        viewMode: 'list',
+        paletteUsage: {},
+        lastVisitDate: null,
+      },
+      version: 7,
+    });
+
+    await useUIStore.persist.rehydrate();
+
+    expect(useUIStore.getState().expandedNodes).toEqual(new Set([
+      'node-main:proj_1:task_1',
+      'node-main:proj_1:task_2',
+    ]));
   });
 });

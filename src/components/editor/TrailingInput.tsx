@@ -55,9 +55,9 @@ interface TrailingInputProps {
     parentId: string;
     depth: number;
     autoFocus?: boolean;
-    /** Expand key for the parent node ("parentId:nodeId"). */
+    /** Expand key for the parent node ("panelId:parentId:nodeId"). */
     parentExpandKey: string;
-    /** Panel ID for scoped expand state (defaults to 'main') */
+    /** Panel ID for scoped expand state (defaults to 'node-main') */
     panelId?: string;
     /** Field data type (e.g., SYS_D.OPTIONS) — enables option autocomplete */
     fieldDataType?: string;
@@ -80,7 +80,7 @@ function getEditorText(view: EditorView): string {
     return view.state.doc.textContent;
 }
 
-export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, panelId = 'main', fieldDataType, attrDefId, onNavigateOut, isSearchContext }: TrailingInputProps) {
+export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, panelId = 'node-main', fieldDataType, attrDefId, onNavigateOut, isSearchContext }: TrailingInputProps) {
     const createChild = useNodeStore((s) => s.createChild);
     const createNodeInSearchContext = useNodeStore((s) => s.createNodeInSearchContext);
     const cycleNodeCheckbox = useNodeStore((s) => s.cycleNodeCheckbox);
@@ -268,7 +268,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, pan
 
                     const lastSiblingId = siblings[siblings.length - 1];
                     // Expand the last sibling (compound key: effectiveParentId is its parent context)
-                        const siblingEK = buildExpandedNodeKey(ref.effectiveParentId, lastSiblingId);
+                    const siblingEK = buildExpandedNodeKey(ref.panelId, ref.effectiveParentId, lastSiblingId);
                     ref.setExpanded(siblingEK, true, true);
                     // Track: new effectiveParentId is lastSiblingId, its expand key is siblingEK
                     ref.setEffectiveParentEK(siblingEK);
@@ -290,7 +290,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, pan
 
                     // Compute expand key for grandparent (best-effort via parent chain)
                     const ggpId = loroDoc.getParentId(grandparentId) ?? '';
-                    ref.setEffectiveParentEK(buildExpandedNodeKey(ggpId, grandparentId));
+                    ref.setEffectiveParentEK(buildExpandedNodeKey(ref.panelId, ggpId, grandparentId));
                     ref.setEffectiveParentId(grandparentId);
                     ref.setEffectiveDepth(ref.effectiveDepth - 1);
                     return true;

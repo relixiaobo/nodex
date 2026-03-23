@@ -230,8 +230,8 @@ export function OutlinerItem({
   );
   // Expansion is instance-scoped by design: the same target referenced from two places
   // can keep independent expanded/collapsed state, so the key stays on ref nodeId.
-  const expandKey = buildExpandedNodeKey(parentId, nodeId);
-  const isExpanded = useUIStore((s) => s.expandedNodes.has(buildExpandedNodeKey(parentId, nodeId)));
+  const expandKey = buildExpandedNodeKey(panelId, parentId, nodeId);
+  const isExpanded = useUIStore((s) => s.expandedNodes.has(buildExpandedNodeKey(panelId, parentId, nodeId)));
   const focusedNodeId = useUIStore((s) => s.focusedNodeId);
   const focusedParentId = useUIStore((s) => s.focusedParentId);
   const setFocusedNode = useUIStore((s) => s.setFocusedNode);
@@ -1155,7 +1155,7 @@ export function OutlinerItem({
   }, [nodeId, parentId, isReference, isPendingConversion, isOptionsValueNode, setFocusedNode]);
 
   const handleToggle = useCallback(() => {
-    const ek = buildExpandedNodeKey(parentId, nodeId);
+    const ek = buildExpandedNodeKey(panelId, parentId, nodeId);
     const currentHasChildren = (useNodeStore.getState().getNode(nodeId)?.children ?? []).length > 0;
     const currentlyExpanded = useUIStore.getState().expandedNodes.has(ek);
 
@@ -1180,7 +1180,7 @@ export function OutlinerItem({
       }
       clearStructuralToggleFocusSnapshot();
     });
-  }, [nodeId, parentId, toggleExpanded, setExpanded]);
+  }, [nodeId, panelId, parentId, toggleExpanded, setExpanded]);
 
   const handleDrillDown = useCallback(() => {
     navigateTo(panelNavigationNodeId);
@@ -1198,10 +1198,10 @@ export function OutlinerItem({
     if (currentChildIds.length === 0) return;
     const expanded = useUIStore.getState().expandedNodes;
     // Check if any child is expanded (compound key: nodeId is parent of children)
-    const anyChildExpanded = currentChildIds.some((cid) => expanded.has(buildExpandedNodeKey(nodeId, cid)));
+    const anyChildExpanded = currentChildIds.some((cid) => expanded.has(buildExpandedNodeKey(panelId, nodeId, cid)));
     const next = new Set(expanded);
     for (const cid of currentChildIds) {
-      const ck = buildExpandedNodeKey(nodeId, cid);
+      const ck = buildExpandedNodeKey(panelId, nodeId, cid);
       if (anyChildExpanded) {
         next.delete(ck);
       } else {
@@ -1224,7 +1224,7 @@ export function OutlinerItem({
       }
       clearStructuralToggleFocusSnapshot();
     });
-  }, [nodeId]);
+  }, [nodeId, panelId]);
 
   // ─── Keyboard shortcut handlers ───
 
@@ -1236,7 +1236,7 @@ export function OutlinerItem({
         return;
       }
 
-      const currentlyExpanded = useUIStore.getState().expandedNodes.has(buildExpandedNodeKey(parentId, nodeId));
+      const currentlyExpanded = useUIStore.getState().expandedNodes.has(buildExpandedNodeKey(panelId, parentId, nodeId));
       const currentHasChildren = (useNodeStore.getState().getNode(nodeId)?.children ?? []).length > 0;
 
       // Options field: register current node's name as auto-collected option
@@ -1265,7 +1265,7 @@ export function OutlinerItem({
         setFocusedNode(newNode.id, parentId);
       }
     },
-    [nodeId, parentId, fieldDataType, onNavigateOut, createSibling, createChild, setFocusedNode, isOptionsField, attrDefId, registerCollectedOption],
+    [nodeId, panelId, parentId, fieldDataType, onNavigateOut, createSibling, createChild, setFocusedNode, isOptionsField, attrDefId, registerCollectedOption],
   );
 
   const handlePasteMultiLine = useCallback(
@@ -1293,11 +1293,11 @@ export function OutlinerItem({
     if (index <= 0) return; // Can't indent first child
 
     const newParentId = parent.children[index - 1];
-    setExpanded(buildExpandedNodeKey(ownerId, newParentId), true, true);
+    setExpanded(buildExpandedNodeKey(panelId, ownerId, newParentId), true, true);
     indentNode(nodeId);
     // Update focusedParentId so the node keeps focus under its new parent
     setFocusedNode(nodeId, newParentId);
-  }, [nodeId, parentId, indentNode, setExpanded, setFocusedNode]);
+  }, [nodeId, panelId, parentId, indentNode, setExpanded, setFocusedNode]);
 
   const handleOutdent = useCallback(() => {
     // References cannot be outdented (would cause ownership conflicts)

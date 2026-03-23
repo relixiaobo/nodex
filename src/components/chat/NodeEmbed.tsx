@@ -28,7 +28,7 @@ export function NodeEmbed({ nodeId }: NodeEmbedProps) {
   // Auto-expand on mount so children are visible
   useEffect(() => {
     if (hasChildren) {
-      setExpanded(buildExpandedNodeKey(realParentId, nodeId), true, true);
+      setExpanded(buildExpandedNodeKey(CHAT_OUTLINER_PANEL_ID, realParentId, nodeId), true, true);
     }
   }, [nodeId, realParentId, hasChildren, setExpanded]);
 

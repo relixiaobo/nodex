@@ -332,7 +332,7 @@ export function ChatDrawer() {
       className={`absolute inset-0 z-30 flex items-end transition-opacity duration-250 ${chatDrawerOpen ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'}`}
       data-testid="chat-drawer"
     >
-      <button type="button" onClick={closeChatDrawer} className="absolute inset-0 bg-foreground/10 backdrop-blur-[1px]" aria-label="Close" />
+      <button type="button" onClick={closeChatDrawer} className="absolute inset-0" aria-label="Close" />
       <div
         ref={drawerRef}
         className={`relative z-10 flex min-h-0 w-full flex-col overflow-hidden rounded-t-[22px] border border-b-0 border-border bg-background shadow-[0_-18px_42px_rgba(15,23,42,0.14)] ${drawerTransition} ${chatDrawerOpen ? 'translate-y-0' : 'translate-y-full'}`}

@@ -269,33 +269,25 @@ export function ChatDrawer() {
         style={{ height: `${drag.height * 100}%` }}
         data-chat-drawer="true"
       >
+        {/* Drag handle — extends above the drawer via negative margin */}
+        <div
+          className="absolute -top-3 left-1/2 z-10 -translate-x-1/2 cursor-row-resize touch-none rounded-t-lg bg-surface px-5 pt-1.5 pb-1"
+          onPointerDown={drag.onPointerDown}
+          onPointerMove={drag.onPointerMove}
+          onPointerUp={drag.onPointerUp}
+        >
+          <div className="h-1 w-8 rounded-full bg-foreground/15" />
+        </div>
+
         {currentChatSessionId ? (
           <>
-            <div className="shrink-0 border-b border-border/60 bg-foreground/[0.02]">
-              <div
-                className="flex cursor-row-resize touch-none items-center justify-center pt-1.5 pb-0.5"
-                onPointerDown={drag.onPointerDown}
-                onPointerMove={drag.onPointerMove}
-                onPointerUp={drag.onPointerUp}
-              >
-                <div className="h-1 w-10 rounded-full bg-foreground/12" />
-              </div>
+            <div className="shrink-0 rounded-t-[22px] bg-surface pt-1">
               <DrawerHeader sessionId={currentChatSessionId} />
             </div>
             <ChatPanel sessionId={currentChatSessionId} hideHeader />
           </>
         ) : (
-          <>
-            <div
-              className="flex cursor-row-resize touch-none items-center justify-center pt-1.5 pb-0.5 border-b border-border/60 bg-foreground/[0.02]"
-              onPointerDown={drag.onPointerDown}
-              onPointerMove={drag.onPointerMove}
-              onPointerUp={drag.onPointerUp}
-            >
-              <div className="h-1 w-10 rounded-full bg-foreground/12" />
-            </div>
-            <div className="flex flex-1 items-center justify-center text-sm text-foreground-tertiary">Loading chat…</div>
-          </>
+          <div className="flex flex-1 items-center justify-center text-sm text-foreground-tertiary">Loading chat…</div>
         )}
       </div>
     </div>

@@ -16,11 +16,9 @@ const MAX_DRAWER_HEIGHT = 0.95;
 function SessionHistoryDropdown({
   currentSessionId,
   onClose,
-  onEditTitle,
 }: {
   currentSessionId: string;
   onClose: () => void;
-  onEditTitle: () => void;
 }) {
   const [sessions, setSessions] = useState<ChatSessionMeta[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,35 +59,20 @@ function SessionHistoryDropdown({
         sessions.map((s) => {
           const isCurrent = s.id === currentSessionId;
           return (
-            <div key={s.id} className="group/row flex items-center rounded-md transition-colors hover:bg-foreground/4">
-              <button
-                type="button"
-                onClick={() => {
-                  useUIStore.getState().openChatDrawer(s.id);
-                  onClose();
-                }}
-                className={`flex min-w-0 flex-1 items-center gap-2 px-2.5 py-1.5 text-left text-sm ${
-                  isCurrent ? 'font-medium text-foreground' : 'text-foreground-secondary'
-                }`}
-              >
-                <span className="min-w-0 flex-1 truncate">{s.title?.trim() || 'Chat'}</span>
-                <span className="shrink-0 text-xs text-foreground-tertiary">{formatTime(s.updatedAt)}</span>
-              </button>
-              {isCurrent && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onClose();
-                    onEditTitle();
-                  }}
-                  className="mr-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-foreground-tertiary opacity-0 transition-opacity hover:bg-foreground/4 hover:text-foreground group-hover/row:opacity-100"
-                  aria-label="Edit title"
-                >
-                  <Pencil size={11} strokeWidth={1.8} />
-                </button>
-              )}
-            </div>
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => {
+                useUIStore.getState().openChatDrawer(s.id);
+                onClose();
+              }}
+              className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm transition-colors hover:bg-foreground/4 ${
+                isCurrent ? 'font-medium text-foreground' : 'text-foreground-secondary'
+              }`}
+            >
+              <span className="min-w-0 flex-1 truncate">{s.title?.trim() || 'Chat'}</span>
+              <span className="shrink-0 text-xs text-foreground-tertiary">{formatTime(s.updatedAt)}</span>
+            </button>
           );
         })
       )}
@@ -105,23 +88,34 @@ function DrawerHeader({ sessionId }: { sessionId: string }) {
 
   return (
     <div className="relative shrink-0">
-      <div className="flex items-center gap-2 px-3 pb-2 pt-2">
+      <div className="group/header flex items-center gap-1 px-3 pb-2 pt-2">
         <div className="flex min-w-0 flex-1 items-center">
           {titleEdit.editing ? (
             <ChatTitleInput edit={titleEdit} />
           ) : (
-            <button
-              type="button"
-              onClick={() => setHistoryOpen((v) => !v)}
-              className="flex min-w-0 flex-1 items-center gap-1 rounded-md px-1 -ml-1 py-0.5 outline-none transition-colors hover:bg-foreground/4"
-            >
+            <>
               <span className="min-w-0 truncate text-[13px] font-medium text-foreground">
                 {titleEdit.displayTitle}
               </span>
-              <ChevronDown size={12} strokeWidth={1.8} className={`shrink-0 text-foreground-tertiary transition-transform ${historyOpen ? 'rotate-180' : ''}`} />
-            </button>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); titleEdit.startEdit(e); }}
+                className="ml-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-foreground-tertiary opacity-0 outline-none transition-opacity hover:bg-foreground/4 hover:text-foreground group-hover/header:opacity-100"
+                aria-label="Edit title"
+              >
+                <Pencil size={11} strokeWidth={1.8} />
+              </button>
+            </>
           )}
         </div>
+        <button
+          type="button"
+          onClick={() => setHistoryOpen((v) => !v)}
+          className={ICON_BUTTON_CLASS}
+          aria-label="Chat history"
+        >
+          <ChevronDown size={14} strokeWidth={1.8} className={`transition-transform ${historyOpen ? 'rotate-180' : ''}`} />
+        </button>
         <button
           type="button"
           onClick={() => void openNewChatDrawer()}
@@ -135,9 +129,6 @@ function DrawerHeader({ sessionId }: { sessionId: string }) {
         <SessionHistoryDropdown
           currentSessionId={sessionId}
           onClose={() => setHistoryOpen(false)}
-          onEditTitle={() => {
-            requestAnimationFrame(() => titleEdit.startEdit({ stopPropagation: () => {} } as React.MouseEvent<HTMLButtonElement>));
-          }}
         />
       )}
     </div>

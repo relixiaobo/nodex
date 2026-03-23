@@ -226,6 +226,9 @@ function DrawerContent({ sessionId, drag, drawerOpen }: {
     let timer: number | null = null;
 
     function onScroll(e: Event) {
+      // Ignore scroll events during drag resize
+      if (drag.isDragging) return;
+
       const target = e.target as HTMLElement;
       const scrollTop = target.scrollTop;
       const delta = scrollTop - lastScrollTop.current;
@@ -234,7 +237,6 @@ function DrawerContent({ sessionId, drag, drawerOpen }: {
         const shouldShow = delta < 0 || scrollTop < 10;
         lastScrollTop.current = scrollTop;
 
-        // Debounce hide to avoid flicker from layout shifts
         if (timer !== null) window.clearTimeout(timer);
         if (shouldShow) {
           setHeaderVisible(true);
@@ -350,7 +352,7 @@ export function ChatDrawer() {
         </div>
 
         {/* Card body — opaque bg, rounded top */}
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-t-[22px] border border-b-0 border-border bg-background shadow-[0_-18px_42px_rgba(15,23,42,0.14)]">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-t-[22px] border border-b-0 border-border bg-background pt-1 shadow-[0_-18px_42px_rgba(15,23,42,0.14)]">
         {currentChatSessionId ? (
           <DrawerContent
             sessionId={currentChatSessionId}

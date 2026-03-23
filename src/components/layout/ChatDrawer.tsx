@@ -219,53 +219,41 @@ function DrawerContent({ sessionId, drag, drawerOpen }: {
   // Show header when drawer opens
   useEffect(() => { if (drawerOpen) setHeaderVisible(true); }, [drawerOpen]);
 
-  // Track scroll direction inside ChatPanel (debounced to prevent flicker)
+  // Track scroll direction — no layout shift, so no debounce needed
   useEffect(() => {
     const el = contentRef.current;
     if (!el) return;
-    let timer: number | null = null;
 
     function onScroll(e: Event) {
-      // Ignore scroll events during drag resize
       if (drag.isDragging) return;
-
       const target = e.target as HTMLElement;
       const scrollTop = target.scrollTop;
       const delta = scrollTop - lastScrollTop.current;
-
-      if (Math.abs(delta) > 12) {
-        const shouldShow = delta < 0 || scrollTop < 10;
+      if (Math.abs(delta) > 8) {
+        setHeaderVisible(delta < 0 || scrollTop < 10);
         lastScrollTop.current = scrollTop;
-
-        if (timer !== null) window.clearTimeout(timer);
-        if (shouldShow) {
-          setHeaderVisible(true);
-        } else {
-          timer = window.setTimeout(() => setHeaderVisible(false), 150);
-        }
       }
     }
 
     el.addEventListener('scroll', onScroll, true);
-    return () => {
-      el.removeEventListener('scroll', onScroll, true);
-      if (timer !== null) window.clearTimeout(timer);
-    };
-  }, []);
+    return () => el.removeEventListener('scroll', onScroll, true);
+  }, [drag.isDragging]);
 
   return (
-    <>
-      {/* Title row — auto-hides on scroll, hover to reveal */}
+    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+      {/* Title — absolute overlay, no layout impact, slides up/down */}
       <div
-        className={`shrink-0 overflow-hidden transition-all duration-200 ease-out ${headerVisible ? 'max-h-12 opacity-100' : 'max-h-0 opacity-0'}`}
+        className={`absolute inset-x-0 top-0 z-10 bg-background transition-transform duration-200 ease-out ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}
         onPointerEnter={() => setHeaderVisible(true)}
       >
         <DrawerHeader sessionId={sessionId} />
       </div>
+
+      {/* Chat content — always fills the full height */}
       <div ref={contentRef} className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <ChatPanel sessionId={sessionId} hideHeader />
       </div>
-    </>
+    </div>
   );
 }
 

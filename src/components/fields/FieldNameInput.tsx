@@ -18,6 +18,7 @@ import { DESCRIPTION_SHORTCUT_KEYS, matchesShortcutEvent } from '../../lib/short
 interface FieldNameInputProps {
   fieldEntryId: string;
   nodeId: string;
+  panelId?: string;
   attrDefId: string;
   currentName: string;
   onEnterConfirm?: () => void;
@@ -31,6 +32,7 @@ interface FieldNameInputProps {
 export function FieldNameInput({
   fieldEntryId,
   nodeId,
+  panelId,
   attrDefId,
   currentName,
   onEnterConfirm,
@@ -175,7 +177,7 @@ export function FieldNameInput({
         confirmedRef.current = true;
         setEditingFieldName(null);
         // Select the field row (same pattern as content node Escape→selected)
-        setSelectedNode(fieldEntryId, nodeId);
+        setSelectedNode(fieldEntryId, nodeId, 'global', panelId ?? 'node-main');
       } else if (e.key === 'Backspace') {
         // Empty field name + Backspace → delete the entire field
         if (value === '') {

@@ -41,15 +41,17 @@ export function NodeEmbed({ nodeId }: NodeEmbedProps) {
   }
 
   return (
-    <div className="chat-node-embed my-1 rounded-md border border-border bg-background py-1">
-      <OutlinerItem
-        nodeId={nodeId}
-        depth={0}
-        rootChildIds={[nodeId]}
-        parentId={realParentId}
-        rootNodeId={realParentId}
-        panelId={CHAT_OUTLINER_PANEL_ID}
-      />
+    <div className="chat-node-embed my-1 rounded-md border border-border bg-background py-1" data-chat-embed>
+      <div className="max-h-[60vh] overflow-y-auto">
+        <OutlinerItem
+          nodeId={nodeId}
+          depth={0}
+          rootChildIds={[nodeId]}
+          parentId={realParentId}
+          rootNodeId={realParentId}
+          panelId={CHAT_OUTLINER_PANEL_ID}
+        />
+      </div>
       <div className="flex items-center justify-end border-t border-border px-2 py-1">
         <button
           type="button"

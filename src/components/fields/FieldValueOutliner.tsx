@@ -266,8 +266,8 @@ export function FieldValueOutliner({ fieldEntryId, fieldDataType, attrDefId, con
       ? (useNodeStore.getState().getNode(id)?.name ?? '').length
       : textOffset;
     useUIStore.getState().setFocusClickCoords({ nodeId: id, parentId, textOffset: offset });
-    setFocusedNode(id, parentId);
-  }, [setFocusedNode]);
+    setFocusedNode(id, parentId, panelId);
+  }, [panelId, setFocusedNode]);
 
   const handleTrailingNavigateOut = useCallback((direction: 'up' | 'down') => {
     navigateToSiblingRow({
@@ -479,6 +479,7 @@ export function FieldValueOutliner({ fieldEntryId, fieldDataType, attrDefId, con
               {...toFieldRowEntryProps(fieldMap.get(row.id)!)}
               rootChildIds={selectableChildIds}
               rootNodeId={fieldEntryId}
+              panelId={panelId}
               isLastInGroup={i === rows.length - 1 || rows[i + 1].type !== 'field'}
               onNavigateOut={(direction) => navigateToSiblingRow({
                 rows,

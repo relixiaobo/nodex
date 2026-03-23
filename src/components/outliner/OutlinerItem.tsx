@@ -146,6 +146,7 @@ function focusRowUndoTarget(row: HTMLElement | null): void {
 type StructuralToggleFocusSnapshot = {
   nodeId: string;
   parentId: string | null;
+  panelId: string | null;
   expiresAt: number;
 };
 
@@ -160,6 +161,7 @@ function captureStructuralToggleFocusSnapshot(): void {
   structuralToggleFocusSnapshot = {
     nodeId: state.focusedNodeId,
     parentId: state.focusedParentId ?? null,
+    panelId: state.focusedPanelId ?? null,
     expiresAt: Date.now() + 1000,
   };
 }
@@ -234,6 +236,7 @@ export function OutlinerItem({
   const isExpanded = useUIStore((s) => s.expandedNodes.has(buildExpandedNodeKey(panelId, parentId, nodeId)));
   const focusedNodeId = useUIStore((s) => s.focusedNodeId);
   const focusedParentId = useUIStore((s) => s.focusedParentId);
+  const focusedPanelId = useUIStore((s) => s.focusedPanelId);
   const setFocusedNode = useUIStore((s) => s.setFocusedNode);
   const selectionSource = useUIStore((s) => s.selectionSource);
   const setSelectedNode = useUIStore((s) => s.setSelectedNode);
@@ -241,7 +244,7 @@ export function OutlinerItem({
   const clearSelection = useUIStore((s) => s.clearSelection);
   // Unified selection state from OutlinerRow
   const { isSelected: isRowSelected, isMultiSelected, isSelectionAnchor } =
-    useRowSelectionState(nodeId, parentId);
+    useRowSelectionState(nodeId, parentId, panelId);
   const clearFocus = useUIStore((s) => s.clearFocus);
   const toggleExpanded = useUIStore((s) => s.toggleExpanded);
   const setExpanded = useUIStore((s) => s.setExpanded);
@@ -445,6 +448,7 @@ export function OutlinerItem({
     [visibleChildren, revealedFieldIds],
   );
   const isFocused = focusedNodeId === nodeId &&
+    focusedPanelId === panelId &&
     (focusedParentId === null || focusedParentId === parentId);
   const hasTags = tagIds.length > 0;
   const hasFields = fields.length > 0;
@@ -561,7 +565,7 @@ export function OutlinerItem({
       (cid) => !getNode(cid)?.type,
     );
     if (topLevelIds.length > 0) {
-      setSelectedNodes(new Set(topLevelIds), topLevelIds[0]);
+      setSelectedNodes(new Set(topLevelIds), topLevelIds[0], panelId);
     }
   }, [rootNodeId, clearFocus, setSelectedNodes]);
 
@@ -583,7 +587,7 @@ export function OutlinerItem({
     const ui = useUIStore.getState();
     if (!ui.selectedNodeIds.has(nodeId)) {
       ui.clearFocus();
-      ui.setSelectedNodes(new Set([nodeId]), nodeId);
+      ui.setSelectedNodes(new Set([nodeId]), nodeId, panelId);
     }
     setContextMenu({ x: e.clientX, y: e.clientY });
   }, [nodeId]);
@@ -665,7 +669,7 @@ export function OutlinerItem({
       }
       // Re-enter node editor after React re-render.
       requestAnimationFrame(() => {
-        setFocusedNode(nodeId, parentId);
+        setFocusedNode(nodeId, parentId, panelId);
       });
     }
   }, [description, commitDescriptionDraft, nodeId, parentId, setFocusedNode]);
@@ -814,7 +818,7 @@ export function OutlinerItem({
         parentId,
         textOffset: 1,
       });
-      setFocusedNode(tempNodeId, parentId);
+      setFocusedNode(tempNodeId, parentId, panelId);
       return true;
     }
     if (refAction === 'convert_arrow_right') {
@@ -834,7 +838,7 @@ export function OutlinerItem({
         parentId,
         textOffset: 1,
       });
-      setTimeout(() => setFocusedNode(tempNodeId, parentId), 0);
+      setTimeout(() => setFocusedNode(tempNodeId, parentId, panelId), 0);
       return true;
     }
     if (refAction === 'options_down' && allFieldOptions.length > 0) {
@@ -941,6 +945,7 @@ export function OutlinerItem({
     if (
       structuralFocusSnapshot &&
       structuralFocusSnapshot.nodeId === nodeId &&
+      structuralFocusSnapshot.panelId === panelId &&
       (structuralFocusSnapshot.parentId === null || structuralFocusSnapshot.parentId === parentId)
     ) {
       return;
@@ -954,6 +959,7 @@ export function OutlinerItem({
       // old editor unmounts → onBlur fires → would wrongly reset to null.
       const state = useUIStore.getState();
       if (state.focusedNodeId === nodeId &&
+        state.focusedPanelId === panelId &&
         (state.focusedParentId === null || state.focusedParentId === parentId)) {
         setFocusedNode(null);
       }
@@ -1128,17 +1134,17 @@ export function OutlinerItem({
     // - while multi-select is active: single click exits selection mode and enters edit
     if (isReferenceLikeRow && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
       if (hasMultiSelection) {
-        setFocusedNode(nodeId, parentId);
+        setFocusedNode(nodeId, parentId, panelId);
         return;
       }
-      setSelectedNode(nodeId, parentId, 'ref-click');
+      setSelectedNode(nodeId, parentId, 'ref-click', panelId);
       return;
     }
     // Non-reference: enter edit mode (text offset already recorded in mousedown)
     if (!isReferenceLikeRow) {
-      setFocusedNode(nodeId, parentId);
+      setFocusedNode(nodeId, parentId, panelId);
     }
-  }, [isLoadingNode, nodeId, parentId, isReferenceLikeRow, isReference, setSelectedNode, setFocusedNode, navigateTo]);
+  }, [isLoadingNode, nodeId, parentId, panelId, isReferenceLikeRow, isReference, setSelectedNode, setFocusedNode, navigateTo]);
 
   const handleContentDoubleClick = useCallback((e: React.MouseEvent) => {
     // Double click on reference node → enter edit mode
@@ -1150,9 +1156,9 @@ export function OutlinerItem({
           ? { nodeId, parentId, textOffset }
           : null,
       );
-      setFocusedNode(nodeId, parentId);
+      setFocusedNode(nodeId, parentId, panelId);
     }
-  }, [nodeId, parentId, isReference, isPendingConversion, isOptionsValueNode, setFocusedNode]);
+  }, [nodeId, parentId, panelId, isReference, isPendingConversion, isOptionsValueNode, setFocusedNode]);
 
   const handleToggle = useCallback(() => {
     const ek = buildExpandedNodeKey(panelId, parentId, nodeId);
@@ -1167,7 +1173,7 @@ export function OutlinerItem({
     }
     const structuralFocusSnapshot = peekStructuralToggleFocusSnapshot();
     if (structuralFocusSnapshot) {
-      useUIStore.getState().setFocusedNode(structuralFocusSnapshot.nodeId, structuralFocusSnapshot.parentId);
+      useUIStore.getState().setFocusedNode(structuralFocusSnapshot.nodeId, structuralFocusSnapshot.parentId, structuralFocusSnapshot.panelId);
     }
     // Prefer restoring the previously focused editor (even if it is a different row).
     if (!structuralFocusSnapshot || !focusEditorForNodeId(structuralFocusSnapshot.nodeId)) {
@@ -1212,7 +1218,7 @@ export function OutlinerItem({
     useUIStore.setState({ expandedNodes: next });
     const structuralFocusSnapshot = peekStructuralToggleFocusSnapshot();
     if (structuralFocusSnapshot) {
-      useUIStore.getState().setFocusedNode(structuralFocusSnapshot.nodeId, structuralFocusSnapshot.parentId);
+      useUIStore.getState().setFocusedNode(structuralFocusSnapshot.nodeId, structuralFocusSnapshot.parentId, structuralFocusSnapshot.panelId);
     }
     if (!structuralFocusSnapshot || !focusEditorForNodeId(structuralFocusSnapshot.nodeId)) {
       focusRowUndoTarget(rowRef.current);
@@ -1254,7 +1260,7 @@ export function OutlinerItem({
           marks: afterContent?.marks,
           inlineRefs: afterContent?.inlineRefs,
         });
-        setFocusedNode(newNode.id, nodeId);
+        setFocusedNode(newNode.id, nodeId, panelId);
       } else {
         // Collapsed or leaf → create sibling after this node
         const newNode = createSibling(nodeId, {
@@ -1262,7 +1268,7 @@ export function OutlinerItem({
           marks: afterContent?.marks,
           inlineRefs: afterContent?.inlineRefs,
         });
-        setFocusedNode(newNode.id, parentId);
+        setFocusedNode(newNode.id, parentId, panelId);
       }
     },
     [nodeId, panelId, parentId, fieldDataType, onNavigateOut, createSibling, createChild, setFocusedNode, isOptionsField, attrDefId, registerCollectedOption],
@@ -1271,9 +1277,9 @@ export function OutlinerItem({
   const handlePasteMultiLine = useCallback(
     (nodes: ParsedPasteNode[]) => {
       const lastId = createSiblingNodesFromPaste(nodeId, nodes);
-      if (lastId) setFocusedNode(lastId, parentId);
+      if (lastId) setFocusedNode(lastId, parentId, panelId);
     },
-    [nodeId, parentId, createSiblingNodesFromPaste, setFocusedNode],
+    [nodeId, parentId, panelId, createSiblingNodesFromPaste, setFocusedNode],
   );
 
   const handleIndent = useCallback(() => {
@@ -1296,7 +1302,7 @@ export function OutlinerItem({
     setExpanded(buildExpandedNodeKey(panelId, ownerId, newParentId), true, true);
     indentNode(nodeId);
     // Update focusedParentId so the node keeps focus under its new parent
-    setFocusedNode(nodeId, newParentId);
+    setFocusedNode(nodeId, newParentId, panelId);
   }, [nodeId, panelId, parentId, indentNode, setExpanded, setFocusedNode]);
 
   const handleOutdent = useCallback(() => {
@@ -1306,9 +1312,9 @@ export function OutlinerItem({
     const grandparentId = loroDoc.getParentId(parentId);
     outdentNode(nodeId);
     if (grandparentId) {
-      setFocusedNode(nodeId, grandparentId);
+      setFocusedNode(nodeId, grandparentId, panelId);
     }
-  }, [nodeId, parentId, outdentNode, setFocusedNode]);
+  }, [nodeId, parentId, panelId, outdentNode, setFocusedNode]);
 
   const handleDelete = useCallback((): boolean => {
     // Read current name from store — the closure's `node` may be stale
@@ -1345,7 +1351,7 @@ export function OutlinerItem({
         parentId: prev.parentId,
         textOffset: getNodeTextLengthById(prev.nodeId),
       });
-      setFocusedNode(prev.nodeId, prev.parentId);
+      setFocusedNode(prev.nodeId, prev.parentId, panelId);
     } else {
       setFocusedNode(null);
     }
@@ -1359,6 +1365,7 @@ export function OutlinerItem({
     hardDeleteNode,
     removeReference,
     setFocusedNode,
+    panelId,
     hasChildren,
     triggerDeleteBlockedPulse,
   ]);
@@ -1382,7 +1389,7 @@ export function OutlinerItem({
           parentId: prev.parentId,
           textOffset: getNodeTextLengthById(prev.nodeId),
         });
-        setFocusedNode(prev.nodeId, prev.parentId);
+        setFocusedNode(prev.nodeId, prev.parentId, panelId);
         return true;
       }
       if (prevNode?.type === 'fieldEntry') {
@@ -1432,7 +1439,7 @@ export function OutlinerItem({
       parentId: prev.parentId,
       textOffset: joinOffset,
     });
-    setFocusedNode(prev.nodeId, prev.parentId);
+    setFocusedNode(prev.nodeId, prev.parentId, panelId);
     return true;
   }, [
     rootChildIds,
@@ -1440,6 +1447,7 @@ export function OutlinerItem({
     nodeId,
     parentId,
     isReferenceLikeRow,
+    panelId,
     clearFocus,
     setEditingFieldName,
     updateNodeContent,
@@ -1469,7 +1477,7 @@ export function OutlinerItem({
 
     clearFocus();
     if (newRefId) {
-      setSelectedNode(newRefId, parentId, 'ref-click');
+      setSelectedNode(newRefId, parentId, 'ref-click', panelId);
       return true;
     }
     return false;
@@ -1480,6 +1488,7 @@ export function OutlinerItem({
     nodeId,
     revertRefConversion,
     setPendingRefConversion,
+    panelId,
     clearFocus,
     setSelectedNode,
   ]);
@@ -1503,7 +1512,7 @@ export function OutlinerItem({
         parentId: prev.parentId,
         textOffset: getNodeTextLengthById(prev.nodeId),
       });
-      setFocusedNode(prev.nodeId, prev.parentId);
+      setFocusedNode(prev.nodeId, prev.parentId, panelId);
     } else if (onNavigateOut) {
       onNavigateOut('up');
     }
@@ -1519,7 +1528,7 @@ export function OutlinerItem({
           setEditingFieldName(firstRenderableChild.id);
           return;
         }
-        setFocusedNode(firstRenderableChild.id, nodeId);
+        setFocusedNode(firstRenderableChild.id, nodeId, panelId);
         return;
       }
       if (showTrailingInputRow && focusTrailingInputForParent(nodeId)) {
@@ -1546,7 +1555,7 @@ export function OutlinerItem({
     const flatList = getFlattenedVisibleNodes(rootChildIds, expandedNodes, rootNodeId, panelId);
     const next = getNextVisibleNode(nodeId, parentId, flatList);
     if (next) {
-      setFocusedNode(next.nodeId, next.parentId);
+      setFocusedNode(next.nodeId, next.parentId, panelId);
       return;
     }
 
@@ -1649,7 +1658,7 @@ export function OutlinerItem({
         rootNodeId,
         panelId,
         isEditing: isFocused,
-        enterEdit: () => { if (!isLoadingNode) setFocusedNode(nodeId, parentId); },
+        enterEdit: () => { if (!isLoadingNode) setFocusedNode(nodeId, parentId, panelId); },
         exitEdit: () => clearFocus(),
         rowKind: 'content',
         onSelectionKeydown: handleReferenceSelectionKeydown,
@@ -1755,7 +1764,7 @@ export function OutlinerItem({
                 }}
                 onClick={!isFocused ? (e: React.MouseEvent) => {
                   if (dragState.justDragged) return;
-                  setFocusedNode(nodeId, parentId);
+                  setFocusedNode(nodeId, parentId, panelId);
                 } : undefined}
               >
                 <CodeBlockEditor
@@ -2013,7 +2022,7 @@ export function OutlinerItem({
                         parentId,
                         textOffset: getNodeTextLengthById(nodeId),
                       });
-                      setFocusedNode(nodeId, parentId);
+                      setFocusedNode(nodeId, parentId, panelId);
                     } else {
                       // Escape down → focus next sibling item in this parent.
                       let found = false;
@@ -2032,7 +2041,7 @@ export function OutlinerItem({
                             parentId: effectiveNodeId,
                             textOffset: 0,
                           });
-                          setFocusedNode(nextItem.id, effectiveNodeId);
+                          setFocusedNode(nextItem.id, effectiveNodeId, panelId);
                           found = true;
                           break;
                         }
@@ -2049,7 +2058,7 @@ export function OutlinerItem({
                             parentId: nx.parentId,
                             textOffset: 0,
                           });
-                          setFocusedNode(nx.nodeId, nx.parentId);
+                          setFocusedNode(nx.nodeId, nx.parentId, panelId);
                           return;
                         }
                         if (focusTrailingInputForParent(rootNodeId)) {
@@ -2117,7 +2126,7 @@ export function OutlinerItem({
                       parentId: lastNode.parentId,
                       textOffset: getNodeTextLengthById(lastNode.nodeId),
                     });
-                    setFocusedNode(lastNode.nodeId, lastNode.parentId);
+                    setFocusedNode(lastNode.nodeId, lastNode.parentId, panelId);
                     return;
                   }
 
@@ -2127,7 +2136,7 @@ export function OutlinerItem({
                     parentId,
                     textOffset: getNodeTextLengthById(nodeId),
                   });
-                  setFocusedNode(nodeId, parentId);
+                  setFocusedNode(nodeId, parentId, panelId);
                   return;
                 }
                 const fl = getFlattenedVisibleNodes(
@@ -2143,7 +2152,7 @@ export function OutlinerItem({
                   parentId: nx.parentId,
                   textOffset: 0,
                 });
-                setFocusedNode(nx.nodeId, nx.parentId);
+                setFocusedNode(nx.nodeId, nx.parentId, panelId);
               }}
             />
           )}

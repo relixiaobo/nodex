@@ -436,7 +436,7 @@ export function useEditorTriggers(config: EditorTriggerConfig): EditorTriggerSta
             parentId,
             textOffset: 1,
           });
-          setTimeout(() => setFocusedNode(tempNodeId, parentId), 0);
+          setTimeout(() => setFocusedNode(tempNodeId, parentId, panelId), 0);
           onAfterTreeReferenceCreated?.({ tempNodeId, refNodeId, parentId });
         }
       } else {

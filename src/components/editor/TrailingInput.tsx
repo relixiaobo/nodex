@@ -181,7 +181,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, pan
             parentId: ref.effectiveParentId,
             textOffset: rawText.length,
         });
-        ref.setFocusedNode(newNode.id, ref.effectiveParentId);
+        ref.setFocusedNode(newNode.id, ref.effectiveParentId, ref.panelId);
         queueMicrotask(() => { committingRef.current = false; });
     }, []);
 
@@ -240,7 +240,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, pan
                             parentId: targetParentId,
                             textOffset: 0,
                         });
-                        ref.setFocusedNode(newNode.id, targetParentId);
+                        ref.setFocusedNode(newNode.id, targetParentId, ref.panelId);
                         queueMicrotask(() => { committingRef.current = false; });
                         return true;
                     }
@@ -254,7 +254,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, pan
                         parentId: ref.effectiveParentId,
                         textOffset: 0,
                     });
-                    ref.setFocusedNode(newEmptyNode.id, ref.effectiveParentId);
+                    ref.setFocusedNode(newEmptyNode.id, ref.effectiveParentId, ref.panelId);
                     queueMicrotask(() => { committingRef.current = false; });
                     return true;
                 },
@@ -324,7 +324,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, pan
                         const expandKey = ref.effectiveParentEK;
                         if (expandKey) ref.setExpanded(expandKey, false, true);
                         const gpId = loroDoc.getParentId(ref.effectiveParentId);
-                        if (gpId) ref.setFocusedNode(ref.effectiveParentId, gpId);
+                        if (gpId) ref.setFocusedNode(ref.effectiveParentId, gpId, ref.panelId);
                         return true;
                     }
 
@@ -335,7 +335,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, pan
                             parentId: target.parentId,
                             textOffset: getNodeTextLengthById(target.nodeId),
                         });
-                        ref.setFocusedNode(target.nodeId, target.parentId);
+                        ref.setFocusedNode(target.nodeId, target.parentId, ref.panelId);
                     }
                     return true;
                 },
@@ -375,7 +375,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, pan
                     }
                     // Try to focus last visible node above this TrailingInput
                     if (intent === 'focus_last_visible' && target) {
-                        ref.setFocusedNode(target.nodeId, target.parentId);
+                        ref.setFocusedNode(target.nodeId, target.parentId, ref.panelId);
                         return true;
                     }
                     // No nodes above — escape to parent context
@@ -405,7 +405,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, pan
                         parentId: ref.effectiveParentId,
                         textOffset: rawText.length,
                     });
-                    ref.setFocusedNode(newNode.id, ref.effectiveParentId);
+                    ref.setFocusedNode(newNode.id, ref.effectiveParentId, ref.panelId);
                     queueMicrotask(() => { committingRef.current = false; });
                     return true;
                 },
@@ -487,7 +487,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, pan
                         parentId: ref.effectiveParentId,
                         textOffset: action.textOffset,
                     });
-                    ref.setFocusedNode(triggerNode.id, ref.effectiveParentId);
+                    ref.setFocusedNode(triggerNode.id, ref.effectiveParentId, ref.panelId);
 
                     queueMicrotask(() => { committingRef.current = false; });
                     return;
@@ -565,7 +565,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, pan
                         parentId: ref.effectiveParentId,
                         textOffset: nodes[nodes.length - 1].name.length,
                     });
-                    ref.setFocusedNode(lastId, ref.effectiveParentId);
+                    ref.setFocusedNode(lastId, ref.effectiveParentId, ref.panelId);
                     queueMicrotask(() => { committingRef.current = false; });
                     return true;
                 },
@@ -615,7 +615,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, pan
                                 parentId: ref.effectiveParentId,
                             });
 
-                            ref.setFocusedNode(newEmptyNode.id, ref.effectiveParentId);
+                            ref.setFocusedNode(newEmptyNode.id, ref.effectiveParentId, ref.panelId);
                             queueMicrotask(() => { committingRef.current = false; });
                             return true;
                         }

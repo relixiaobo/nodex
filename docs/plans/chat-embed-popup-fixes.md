@@ -1,127 +1,214 @@
-# Chat Embed Popup Fixes
+# Chat Embed 交互修复
 
-> NodeEmbed 内嵌大纲的弹窗交互修复 + 剩余 absolute 下拉迁移
+> 局部闭环修复：让 chat embed 中的节点支持完整 outliner 交互，不引入新抽象层。
 
 ## 问题
 
-NodeEmbed 在 ChatDrawer 内渲染完整 OutlinerItem，用户可以展开、编辑、操作字段。但 ChatDrawer 有多层 `overflow-hidden`/`overflow-clip` 容器：
+ChatDrawer 内嵌 OutlinerItem 已能复用渲染和数据，但交互层有 5 个具体缺口：
 
+1. NodeEmbed 无高度限制 — 深层展开撑爆消息
+2. SessionHistoryDropdown / model menu 被 overflow-clip 裁剪
+3. Click-outside 误关 ChatDrawer — 点击 portal dropdown 内部导致 drawer 关闭
+4. Escape 优先级 — DropdownPanel 的 Escape 没有 stopPropagation，同时关闭 dropdown 和 drawer
+5. 焦点串扰 — `setFocusedNode` 不含 panelId，chat embed 操作影响主 outliner 焦点
+
+## 审计结论
+
+字段系统（NodePicker、DatePicker、OptionsPicker）和编辑器触发器（TagSelector、ReferenceSelector、SlashCommandMenu）**已全部 portal 化**，在 chat embed 中正常工作。不需要迁移。
+
+仅 3 个非 portal 下拉（SessionHistoryDropdown、ChatInput model menu、ToolbarUserMenu）中，前两个在 ChatDrawer overflow 链中需要迁移，第三个在 TopBar 中不受影响。
+
+## Exact Behavior
+
+### B1: NodeEmbed 高度限制
+
+**GIVEN** ChatDrawer 中渲染了 NodeEmbed
+**WHEN** 用户展开多层子节点
+**THEN** NodeEmbed 容器不超过 60vh，出现垂直滚动条，不撑开消息
+
+### B2: Overlay 不被裁剪
+
+**GIVEN** 用户在 ChatDrawer 中打开 session history 或 model menu
+**WHEN** 浮层渲染
+**THEN** 通过 DropdownPanel（portal + fixed）渲染，不被 overflow 链裁剪
+
+### B3: Click-outside 边界
+
+**GIVEN** ChatDrawer 打开，用户操作触发了 portal dropdown
+**WHEN** 用户点击 portal dropdown 内部
+**THEN** ChatDrawer 不关闭
+
+### B4: Escape 优先级
+
+**GIVEN** ChatDrawer 内有 overlay 打开
+**WHEN** 用户按 Escape
+**THEN** 先关闭 overlay（stopPropagation 阻止事件冒泡）；overlay 全关后再允许 Escape 关闭 drawer
+
+### B5: 焦点隔离
+
+**GIVEN** 同一个节点出现在主 outliner 和 chat embed 中
+**WHEN** 用户在 chat embed 中点击编辑该节点
+**THEN** 仅 chat embed 侧的节点进入编辑态，主 outliner 侧不受影响
+
+### B6: 数据共通（已实现，不改）
+
+**GIVEN** 同一节点同时出现在两侧
+**WHEN** 用户在任一侧编辑
+**THEN** 两侧看到同一份数据更新
+
+## 文件清单
+
+### Group 1: 可见 bug 修复
+
+| 文件 | 改动 |
+|------|------|
+| `src/components/chat/NodeEmbed.tsx` | 外层容器添加 `max-h-[60vh] overflow-y-auto` |
+| `src/components/layout/ChatDrawer.tsx` | SessionHistoryDropdown 迁移到 DropdownPanel；click-outside handler 排除 `[data-dropdown-panel]` |
+| `src/components/chat/ChatInput.tsx` | model menu 迁移到 DropdownPanel，移除 ad-hoc portal |
+| `src/components/ui/DropdownPanel.tsx` | Escape handler 添加 `e.stopPropagation()`（对齐 PopoverShell） |
+
+### Group 2: 焦点隔离
+
+| 文件 | 改动 |
+|------|------|
+| `src/stores/ui-store.ts` | 新增 `focusedPanelId`；`setFocusedNode` 签名加 `panelId` 参数；`isFocused` 相关的 clear 逻辑同步更新 |
+| `src/components/outliner/OutlinerItem.tsx` | `isFocused` 检查加 `focusedPanelId === panelId`；所有 `setFocusedNode` 调用传入 `panelId` |
+| `src/components/outliner/OutlinerRow.tsx` | 所有 `setFocusedNode` 调用传入 `panelId` |
+| `src/components/outliner/OutlinerView.tsx` | 所有 `setFocusedNode` 调用传入 `panelId` |
+| `src/components/editor/TrailingInput.tsx` | 所有 `setFocusedNode` 调用传入 `panelId` |
+| `src/components/fields/FieldRow.tsx` | 所有 `setFocusedNode` 调用传入 `panelId` |
+| `src/components/fields/FieldValueOutliner.tsx` | 所有 `setFocusedNode` 调用传入 `panelId` |
+| `src/components/fields/ConfigOutliner.tsx` | 所有 `setFocusedNode` 调用传入 `panelId` |
+
+## 实现指引
+
+### NodeEmbed max-height
+
+```tsx
+// NodeEmbed.tsx — 外层容器
+<div className="chat-node-embed my-1 max-h-[60vh] overflow-y-auto rounded-md border border-border bg-background py-1">
 ```
-ChatDrawer (absolute, inset-0)
-  └─ Card body (overflow-clip, rounded-t-[22px])
-      └─ DrawerContent (overflow-hidden)
-          └─ contentRef (overflow-hidden)
-              └─ ChatPanel (overflow-hidden)
-                  └─ scrollRef (overflow-y-auto)
-                      └─ NodeEmbed
-                          └─ OutlinerItem (with fields, editors, pickers)
+
+### SessionHistoryDropdown → DropdownPanel
+
+当前 `SessionHistoryDropdown` 用 `absolute top-full` 渲染在 ChatDrawer header 内，被 overflow-clip 裁剪。改用 `<DropdownPanel anchorRef={titleBtnRef} onClose={...}>` 包裹现有内容。DropdownPanel 已内置 portal + fixed 定位 + Escape + click-outside + scroll 重定位。
+
+### ChatInput model menu → DropdownPanel
+
+当前 model menu 用 ad-hoc `createPortal` + 手动定位。改用 `<DropdownPanel anchorRef={modelBtnRef} onClose={...}>`，移除 `modelMenuPortalRef` 和手动定位逻辑。
+
+### DropdownPanel Escape stopPropagation
+
+```ts
+// DropdownPanel.tsx — handleKey
+const handleKey = (e: KeyboardEvent) => {
+  if (e.key === 'Escape') {
+    e.stopPropagation(); // ← 加这一行，对齐 PopoverShell 的行为
+    onClose();
+  }
+};
 ```
 
-两类问题：
+### ChatDrawer click-outside 排除 portal
 
-1. **NodeEmbed 无高度限制** — 深层节点展开后撑开整个聊天消息，推动其他内容
-2. **少数下拉仍用 `absolute` 定位** — 被 overflow-clip 裁剪
+```ts
+// ChatDrawer.tsx — pointerdown handler
+if (target.closest('[data-dropdown-panel]')) return; // ← DropdownPanel portal
+if (target.closest('.shadow-paper')) return;         // ← 现有规则
+```
 
-## 现状审计
+### 焦点隔离
 
-### 已安全（portal + fixed）
+**ui-store.ts**:
 
-| 组件 | 机制 | 备注 |
-|------|------|------|
-| NodePicker (OptionsPicker) | `createPortal` + fixed | 字段选项 |
-| FieldValueOutliner (DatePicker) | `createPortal` + fixed | 日期字段 |
-| OutlinerItem options dropdown | `createPortal` + fixed | inline options |
-| TrailingInput options dropdown | `createPortal` + fixed | trailing options |
-| TagSelector | `createPortal` + fixed | # 触发 |
-| ReferenceSelector | `createPortal` + fixed | @ 触发 |
-| SlashCommandMenu | `createPortal` + fixed | / 触发 |
-| FloatingToolbar | `createPortal` + fixed | 选中文本工具栏 |
-| NodeContextMenu | `createPortal` + fixed | 右键菜单 |
-| NodePopover | PopoverShell (portal) | chat 内 ref 浮窗 |
-| DropdownPanel | `createPortal` + fixed | 通用下拉（可复用） |
-| Tooltip | Radix Portal | hover 提示 |
+```ts
+// 新增 focusedPanelId
+focusedPanelId: null as string | null,
 
-> **结论**：字段系统（options picker、date picker、node picker）和编辑器触发器全部已 portal 化。ChatDrawer 内嵌大纲的字段弹窗本身不会被裁剪。
+// setFocusedNode 签名扩展
+setFocusedNode: (nodeId: string | null, parentId?: string | null, panelId?: string | null) => void;
 
-### 需迁移（absolute 定位）
+// 实现中存储 panelId
+setFocusedNode: (nodeId, parentId, panelId) => {
+  if (nodeId) {
+    set({
+      focusedNodeId: nodeId,
+      focusedParentId: parentId ?? null,
+      focusedPanelId: panelId ?? null,
+      // ... 其余不变
+    });
+    return;
+  }
+  set({
+    focusedNodeId: null,
+    focusedParentId: null,
+    focusedPanelId: null,
+    // ... 其余不变
+  });
+},
+```
 
-| 组件 | 当前定位 | 位置 | 风险 |
-|------|---------|------|------|
-| SessionHistoryDropdown | `absolute top-full z-50` | ChatDrawer 标题栏内 | **高** — 在 overflow-clip 链中 |
-| ToolbarUserMenu | `absolute right-0 top-full z-50` | TopBar | 低 — TopBar 无 overflow-hidden |
-| Breadcrumb ellipsis | `absolute top-full left-0 z-50` | Panel header | 低 — header 无 overflow-hidden |
+**OutlinerItem.tsx**:
 
-### NodeEmbed 容器问题
+```ts
+// 新增 selector
+const focusedPanelId = useUIStore((s) => s.focusedPanelId);
 
-NodeEmbed 当前无 `max-height`。展开多层子节点会撑开整个消息气泡。需要：
-- 添加 `max-h-[60vh] overflow-y-auto` 到 NodeEmbed 容器
-- 确保 scrollable 容器不影响 portal dropdown 的定位（`closest('.overflow-y-auto')` 可能找到 NodeEmbed 而非 scrollRef）
+// isFocused 检查加 panelId
+const isFocused = focusedNodeId === nodeId &&
+    (focusedParentId === null || focusedParentId === parentId) &&
+    (focusedPanelId === null || focusedPanelId === panelId);
 
-### ChatDrawer click-outside 交互
+// 所有 setFocusedNode 调用加 panelId（约 40 处，机械改动）
+setFocusedNode(nodeId, parentId, panelId);
+```
 
-ChatDrawer 的关闭逻辑（`pointerdown` on document）需要排除 portal 内容：
-- 当前已排除 `.shadow-paper` class — 大多数 portal dropdown 有这个 class
-- 需确认 DropdownPanel（`data-dropdown-panel`）、field overlay portal 等都被排除
+**其他文件**（OutlinerRow、OutlinerView、TrailingInput、FieldRow、FieldValueOutliner、ConfigOutliner）：所有 `setFocusedNode` 调用传入 panelId。这些组件都已有 panelId prop。
 
-## 修改清单
+## 不做的事
 
-### Phase 1: NodeEmbed 容器 + click-outside 加固
+- 不引入 OutlinerSurfaceProvider / FloatingLayer 新抽象
+- 不迁移已正常工作的 portal overlay（TagSelector、NodePicker 等）
+- 不改节点数据模型
+- 不为未来可能的问题预支复杂度
 
-**文件：`src/components/chat/NodeEmbed.tsx`**
+## Checklist
 
-1. 外层容器添加 `max-h-[60vh] overflow-y-auto`
-2. 添加 `data-chat-embed` 属性供 CSS / event delegation 使用
+### Phase 1: 可见 bug
+- [ ] NodeEmbed.tsx: 添加 `max-h-[60vh] overflow-y-auto`
+- [ ] ChatDrawer.tsx: SessionHistoryDropdown 改用 DropdownPanel
+- [ ] ChatDrawer.tsx: click-outside handler 排除 `[data-dropdown-panel]`
+- [ ] ChatInput.tsx: model menu 改用 DropdownPanel
+- [ ] DropdownPanel.tsx: Escape handler 添加 `e.stopPropagation()`
 
-**文件：`src/components/layout/ChatDrawer.tsx`**
+### Phase 2: 焦点隔离
+- [ ] ui-store.ts: 新增 `focusedPanelId`，扩展 `setFocusedNode` 签名
+- [ ] OutlinerItem.tsx: `isFocused` 检查加 panelId，所有 `setFocusedNode` 调用传 panelId
+- [ ] OutlinerRow.tsx: 所有 `setFocusedNode` 调用传 panelId
+- [ ] OutlinerView.tsx: 所有 `setFocusedNode` 调用传 panelId
+- [ ] TrailingInput.tsx: 所有 `setFocusedNode` 调用传 panelId
+- [ ] FieldRow.tsx: 所有 `setFocusedNode` 调用传 panelId
+- [ ] FieldValueOutliner.tsx: 所有 `setFocusedNode` 调用传 panelId
+- [ ] ConfigOutliner.tsx: 所有 `setFocusedNode` 调用传 panelId
 
-3. click-outside handler 增加排除条件：
-   - `target.closest('[data-dropdown-panel]')` — DropdownPanel portal
-   - `target.closest('[style*="position: fixed"]')` 或更精确的 `target.closest('.shadow-paper, [data-dropdown-panel]')`
-   - 建议统一方案：所有 portal dropdown 添加 `data-portal-dropdown` 属性，click-outside 统一排除
+### Phase 3: 验证
+- [ ] `npm run verify` 全部通过
+- [ ] 更新 vitest 测试（test-sync 要求）
 
-### Phase 2: SessionHistoryDropdown portal 迁移
+## Test Plan
 
-**文件：`src/components/layout/ChatDrawer.tsx` (SessionHistoryDropdown)**
-
-4. 用 `DropdownPanel` 替换 `absolute` 定位的内联 div：
-   - 添加 `anchorRef` 指向标题按钮
-   - 用 `<DropdownPanel anchorRef={anchorRef} onClose={...}>` 包裹内容
-   - 移除 inline `absolute` 样式
-   - 保留现有的 session 列表 + rename 功能
-
-### Phase 3: ChatInput model menu 统一
-
-**文件：`src/components/chat/ChatInput.tsx`**
-
-5. 当前 model menu 用 ad-hoc `createPortal`，迁移到 `DropdownPanel`：
-   - 用 `anchorRef` 指向 model 按钮
-   - 用 `<DropdownPanel>` 替换 ad-hoc portal div
-   - 移除手动定位逻辑和 `modelMenuPortalRef`
-
-### Phase 4: 统一 portal 标记（可选）
-
-6. 所有 portal-based dropdown 统一添加 `data-portal-dropdown` 属性
-7. ChatDrawer / ChatInput 等组件的 click-outside handler 统一用 `target.closest('[data-portal-dropdown]')` 排除
-
-## 不需要改的
-
-- **ToolbarUserMenu** — TopBar 无 overflow-hidden，不会被裁剪。保持 absolute
-- **Breadcrumb ellipsis** — Panel header 无 overflow-hidden。保持 absolute
-- **字段系统 portal** — 已全部 portal 化，无需改动
-- **编辑器触发器** — TagSelector/ReferenceSelector/SlashCommand 已 portal 化
-
-## 测试要点
-
-1. **NodeEmbed 高度限制**：展开深层节点，确认出现滚动条而非撑开消息
-2. **SessionHistoryDropdown**：在 ChatDrawer 中点击标题，下拉正常显示且不被裁剪
-3. **ChatInput model menu**：在 ChatDrawer 中切换模型，菜单正常显示
-4. **Click-outside**：点击 portal dropdown 内部不关闭 ChatDrawer
-5. **Escape 优先级**：在 portal dropdown 打开时按 Escape 先关闭 dropdown，不关闭 ChatDrawer
-6. **字段操作**：在 NodeEmbed 中操作 options/date/reference 字段，弹窗正常显示和交互
-7. **回归**：主 outliner 中所有 field picker / context menu / editor trigger 正常
+1. NodeEmbed 展开深层节点 → 出现滚动条，不撑开消息
+2. SessionHistoryDropdown → 正常显示，不被裁剪
+3. Model menu → 正常显示和选择
+4. 点击 portal dropdown 内部 → ChatDrawer 不关闭
+5. Escape 先关 dropdown 再关 drawer（不同时关闭）
+6. 在 chat embed 中点击编辑节点 → 主 outliner 中同一节点不进入编辑态
+7. 在 NodeEmbed 中操作 options/date/reference 字段 → 弹窗正常
+8. 主 outliner 中所有 field picker / context menu / editor trigger / focus 正常
 
 ## 注意事项
 
 - DropdownPanel 已内置 Escape + click-outside + scroll 重定位，不需要重复实现
-- `FIELD_OVERLAY_Z_INDEX` = 1200 > DropdownPanel 的 z-50，field picker 会盖住 DropdownPanel — 这是正确的层级
-- NodeEmbed 添加 `overflow-y-auto` 后，NodePicker 的 `closest('.overflow-y-auto')` 可能找到 NodeEmbed 容器而非 ChatPanel scrollRef — 需要验证定位是否仍然正确（应该没问题，因为 dropdown 用 `getBoundingClientRect` 计算 fixed 坐标）
+- `FIELD_OVERLAY_Z_INDEX` = 1200 > DropdownPanel z-50，field picker 会盖住 DropdownPanel — 正确层级
+- `focusedPanelId` 默认 null 表示"兼容旧行为"，不需要一次性改完所有调用点也能安全回退
+- Group 2 的 `setFocusedNode` 改动量大（~50 处）但纯机械：每处加 `, panelId` 参数

@@ -6,6 +6,7 @@ import { regenerateChatTitle } from '../../lib/ai-service.js';
 import { useUIStore } from '../../stores/ui-store.js';
 import { ChatTitleInput, useChatTitleEdit } from '../chat/ChatPanelHeader.js';
 import { ChatPanel } from '../chat/ChatPanel.js';
+import { DropdownPanel } from '../ui/DropdownPanel.js';
 
 const ICON_BTN = 'flex h-7 w-7 items-center justify-center rounded-full text-foreground-tertiary outline-none transition-colors hover:bg-foreground/4 hover:text-foreground';
 const SMALL_BTN = 'flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-foreground-tertiary outline-none transition-colors hover:bg-foreground/4 hover:text-foreground';
@@ -64,17 +65,16 @@ function InlineRowEditor({ sessionId, initialTitle, onDone }: { sessionId: strin
 
 function SessionHistoryDropdown({
   currentSessionId,
-  headerRef,
+  anchorRef,
   onClose,
 }: {
   currentSessionId: string;
-  headerRef: React.RefObject<HTMLDivElement | null>;
+  anchorRef: React.RefObject<HTMLElement | null>;
   onClose: () => void;
 }) {
   const [sessions, setSessions] = useState<ChatSessionMeta[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const ref = useRef<HTMLDivElement>(null);
 
   function loadSessions() {
     void listChatSessionMetasPage({ limit: HISTORY_LIMIT, offset: 0 }).then(({ items }) => {
@@ -84,16 +84,6 @@ function SessionHistoryDropdown({
   }
 
   useEffect(loadSessions, []);
-
-  useEffect(() => {
-    function onPointerDown(e: PointerEvent) {
-      if (ref.current?.contains(e.target as Node)) return;
-      if (headerRef.current?.contains(e.target as Node)) return;
-      onClose();
-    }
-    document.addEventListener('pointerdown', onPointerDown, true);
-    return () => document.removeEventListener('pointerdown', onPointerDown, true);
-  }, [onClose, headerRef]);
 
   function formatTime(ts: number): string {
     const d = new Date(ts);
@@ -105,7 +95,7 @@ function SessionHistoryDropdown({
   }
 
   return (
-    <div ref={ref} className="absolute left-0 right-0 top-full z-50 mx-3 max-h-[50vh] overflow-y-auto rounded-lg bg-background p-1 shadow-paper">
+    <DropdownPanel anchorRef={anchorRef} onClose={onClose} width={320}>
       {loading ? (
         <div className="px-3 py-2 text-sm text-foreground-tertiary">Loading…</div>
       ) : sessions.length === 0 ? (
@@ -157,7 +147,7 @@ function SessionHistoryDropdown({
           );
         })
       )}
-    </div>
+    </DropdownPanel>
   );
 }
 
@@ -166,10 +156,10 @@ function SessionHistoryDropdown({
 function DrawerHeader({ sessionId }: { sessionId: string }) {
   const titleEdit = useChatTitleEdit(sessionId);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const headerRef = useRef<HTMLDivElement>(null);
+  const titleButtonRef = useRef<HTMLButtonElement>(null);
 
   return (
-    <div ref={headerRef} className="relative">
+    <div className="relative">
       <div className="flex items-center pb-1 pl-4 pr-3">
         {titleEdit.editing ? (
           <div className="min-w-0 flex-1">
@@ -178,6 +168,7 @@ function DrawerHeader({ sessionId }: { sessionId: string }) {
         ) : (
           <>
             <button
+              ref={titleButtonRef}
               type="button"
               onClick={() => setHistoryOpen((v) => !v)}
               className="flex min-w-0 max-w-[70%] items-center gap-1 rounded-lg px-1.5 -ml-1.5 py-1 outline-none transition-colors hover:bg-foreground/4"
@@ -197,7 +188,7 @@ function DrawerHeader({ sessionId }: { sessionId: string }) {
       {historyOpen && (
         <SessionHistoryDropdown
           currentSessionId={sessionId}
-          headerRef={headerRef}
+          anchorRef={titleButtonRef}
           onClose={() => setHistoryOpen(false)}
         />
       )}
@@ -301,7 +292,10 @@ export function ChatDrawer() {
 
   useEffect(() => {
     if (!chatDrawerOpen) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') closeChatDrawer(); };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented) return;
+      if (e.key === 'Escape') closeChatDrawer();
+    };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [chatDrawerOpen, closeChatDrawer]);
@@ -313,7 +307,7 @@ export function ChatDrawer() {
       if (drawerRef.current?.contains(e.target as Node)) return;
       // Don't close if clicking a portal popup (model menu, dropdowns)
       const target = e.target as HTMLElement;
-      if (target.closest('.shadow-paper, [data-chat-drawer]')) return;
+      if (target.closest('.shadow-paper, [data-dropdown-panel], [data-chat-drawer]')) return;
       closeChatDrawer();
     }
     document.addEventListener('pointerdown', onPointerDown, true);

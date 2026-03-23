@@ -175,8 +175,9 @@ export function useDragSelect({ containerRef, rootChildIds, rootNodeId, panelId 
 
         // Select start node as anchor + clear focus (unmount any editor).
         // setSelectedNodes clears focusedNodeId/focusedParentId.
+        const { panelId: pId } = contextRef.current;
         const setSelectedNodes = useUIStore.getState().setSelectedNodes;
-        setSelectedNodes(new Set([s.startNodeId]), s.startNodeId);
+        setSelectedNodes(new Set([s.startNodeId]), s.startNodeId, pId);
       }
 
       // During active drag: prevent text selection + update range
@@ -201,7 +202,7 @@ export function useDragSelect({ containerRef, rootChildIds, rootNodeId, panelId 
       // (fields first, then content) may differ from data order in the flat list,
       // causing the anchor to fall outside the computed range.
       range.add(s.startNodeId!);
-      useUIStore.getState().setSelectedNodes(range, s.startNodeId);
+      useUIStore.getState().setSelectedNodes(range, s.startNodeId, pId);
     };
 
     const onDocMouseUp = () => {

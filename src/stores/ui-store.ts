@@ -50,19 +50,21 @@ interface UIStore {
   // Focus
   focusedNodeId: string | null;
   focusedParentId: string | null;
-  setFocusedNode(nodeId: string | null, parentId?: string | null): void;
+  focusedPanelId: string | null;
+  setFocusedNode(nodeId: string | null, parentId?: string | null, panelId?: string | null): void;
   clearFocus(): void;
 
   // Selection
   selectedNodeId: string | null;
   selectedParentId: string | null;
+  selectedPanelId: string | null;
   selectionSource: 'global' | 'ref-click' | null;
-  setSelectedNode(nodeId: string | null, parentId?: string | null, source?: 'global' | 'ref-click'): void;
+  setSelectedNode(nodeId: string | null, parentId?: string | null, source?: 'global' | 'ref-click', panelId?: string | null): void;
 
   // Multi-selection
   selectedNodeIds: Set<string>;
   selectionAnchorId: string | null;
-  setSelectedNodes(nodeIds: Set<string>, anchorId?: string | null): void;
+  setSelectedNodes(nodeIds: Set<string>, anchorId?: string | null, panelId?: string | null): void;
   clearSelection(): void;
 
   // Search
@@ -241,8 +243,10 @@ function clearedFocus() {
   return {
     focusedNodeId: null as string | null,
     focusedParentId: null as string | null,
+    focusedPanelId: null as string | null,
     selectedNodeId: null as string | null,
     selectedParentId: null as string | null,
+    selectedPanelId: null as string | null,
     selectionSource: null as 'global' | 'ref-click' | null,
     selectedNodeIds: new Set<string>(),
     selectionAnchorId: null as string | null,
@@ -373,13 +377,17 @@ export const useUIStore = create<UIStore>()(
 
       focusedNodeId: null,
       focusedParentId: null,
-      setFocusedNode: (nodeId, parentId) => {
+      focusedPanelId: null,
+      setFocusedNode: (nodeId, parentId, panelId) => {
         if (nodeId) {
+          const resolvedPanelId = panelId ?? MAIN_OUTLINER_PANEL_ID;
           set({
             focusedNodeId: nodeId,
             focusedParentId: parentId ?? null,
+            focusedPanelId: resolvedPanelId,
             selectedNodeId: nodeId,
             selectedParentId: parentId ?? null,
+            selectedPanelId: resolvedPanelId,
             selectionSource: 'global',
             selectedNodeIds: new Set([nodeId]),
             selectionAnchorId: nodeId,
@@ -389,8 +397,10 @@ export const useUIStore = create<UIStore>()(
         set({
           focusedNodeId: null,
           focusedParentId: null,
+          focusedPanelId: null,
           selectedNodeId: null,
           selectedParentId: null,
+          selectedPanelId: null,
           selectionSource: null,
           selectedNodeIds: new Set(),
           selectionAnchorId: null,
@@ -399,35 +409,42 @@ export const useUIStore = create<UIStore>()(
       clearFocus: () => set({
         focusedNodeId: null,
         focusedParentId: null,
+        focusedPanelId: null,
       }),
 
       selectedNodeId: null,
       selectedParentId: null,
+      selectedPanelId: null,
       selectionSource: null,
-      setSelectedNode: (nodeId, parentId, source = 'global') => set({
+      setSelectedNode: (nodeId, parentId, source = 'global', panelId) => set({
         selectedNodeId: nodeId,
         selectedParentId: parentId ?? null,
+        selectedPanelId: nodeId ? (panelId ?? MAIN_OUTLINER_PANEL_ID) : null,
         selectionSource: nodeId ? source : null,
         selectedNodeIds: nodeId ? new Set([nodeId]) : new Set(),
         selectionAnchorId: nodeId,
         focusedNodeId: null,
         focusedParentId: null,
+        focusedPanelId: null,
       }),
 
       selectedNodeIds: new Set<string>(),
       selectionAnchorId: null,
-      setSelectedNodes: (nodeIds, anchorId) => set({
+      setSelectedNodes: (nodeIds, anchorId, panelId) => set({
         selectedNodeIds: nodeIds,
         selectionAnchorId: anchorId ?? null,
         selectedNodeId: nodeIds.size === 1 ? [...nodeIds][0] : null,
         selectedParentId: null,
+        selectedPanelId: nodeIds.size > 0 ? (panelId ?? MAIN_OUTLINER_PANEL_ID) : null,
         selectionSource: nodeIds.size > 0 ? 'global' : null,
         focusedNodeId: null,
         focusedParentId: null,
+        focusedPanelId: null,
       }),
       clearSelection: () => set({
         selectedNodeId: null,
         selectedParentId: null,
+        selectedPanelId: null,
         selectionSource: null,
         selectedNodeIds: new Set(),
         selectionAnchorId: null,

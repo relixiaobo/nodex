@@ -1,21 +1,34 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronDown, Pencil, Plus } from '../../lib/icons.js';
+import { ChevronDown, Pencil, Plus, RefreshCw } from '../../lib/icons.js';
 import { openNewChatDrawer } from '../../lib/chat-panel-actions.js';
 import { listChatSessionMetasPage, type ChatSessionMeta } from '../../lib/ai-persistence.js';
+import { regenerateChatTitle } from '../../lib/ai-service.js';
 import { useUIStore } from '../../stores/ui-store.js';
 import { ChatTitleInput, useChatTitleEdit } from '../chat/ChatPanelHeader.js';
 import { ChatPanel } from '../chat/ChatPanel.js';
 
 const ICON_BTN = 'flex h-7 w-7 items-center justify-center rounded-full text-foreground-tertiary outline-none transition-colors hover:bg-foreground/4 hover:text-foreground';
+const ROW_ACTION = 'flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-foreground-tertiary opacity-0 outline-none transition-opacity hover:bg-foreground/4 hover:text-foreground group-hover/row:opacity-100';
 const HISTORY_LIMIT = 20;
 const MIN_HEIGHT = 0.3;
 const MAX_HEIGHT = 0.95;
 
 // ── Session history dropdown ──
 
-function SessionHistoryDropdown({ currentSessionId, onClose, headerRef }: { currentSessionId: string; onClose: () => void; headerRef: React.RefObject<HTMLDivElement | null> }) {
+function SessionHistoryDropdown({
+  currentSessionId,
+  headerRef,
+  onClose,
+  onEditTitle,
+}: {
+  currentSessionId: string;
+  headerRef: React.RefObject<HTMLDivElement | null>;
+  onClose: () => void;
+  onEditTitle: () => void;
+}) {
   const [sessions, setSessions] = useState<ChatSessionMeta[]>([]);
   const [loading, setLoading] = useState(true);
+  const [regenerating, setRegenerating] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -27,7 +40,6 @@ function SessionHistoryDropdown({ currentSessionId, onClose, headerRef }: { curr
 
   useEffect(() => {
     function onPointerDown(e: PointerEvent) {
-      // Ignore clicks inside dropdown or header (header has its own toggle)
       if (ref.current?.contains(e.target as Node)) return;
       if (headerRef.current?.contains(e.target as Node)) return;
       onClose();
@@ -45,6 +57,15 @@ function SessionHistoryDropdown({ currentSessionId, onClose, headerRef }: { curr
     return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   }
 
+  async function handleRegenerate(sessionId: string) {
+    setRegenerating(true);
+    await regenerateChatTitle(sessionId);
+    // Refresh the list to show updated title
+    const { items } = await listChatSessionMetasPage({ limit: HISTORY_LIMIT, offset: 0 });
+    setSessions(items);
+    setRegenerating(false);
+  }
+
   return (
     <div ref={ref} className="absolute left-0 right-0 top-full z-50 mx-3 max-h-[50vh] overflow-y-auto rounded-lg bg-background p-1 shadow-paper">
       {loading ? (
@@ -52,19 +73,49 @@ function SessionHistoryDropdown({ currentSessionId, onClose, headerRef }: { curr
       ) : sessions.length === 0 ? (
         <div className="px-3 py-2 text-sm text-foreground-tertiary">No conversations yet</div>
       ) : (
-        sessions.map((s) => (
-          <button
-            key={s.id}
-            type="button"
-            onClick={() => { useUIStore.getState().openChatDrawer(s.id); onClose(); }}
-            className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm transition-colors ${
-              s.id === currentSessionId ? 'bg-foreground/[0.06] font-medium text-foreground' : 'text-foreground-secondary hover:bg-foreground/4'
-            }`}
-          >
-            <span className="min-w-0 flex-1 truncate">{s.title?.trim() || 'Chat'}</span>
-            <span className="shrink-0 text-xs text-foreground-tertiary">{formatTime(s.updatedAt)}</span>
-          </button>
-        ))
+        sessions.map((s) => {
+          const isCurrent = s.id === currentSessionId;
+          return (
+            <div
+              key={s.id}
+              className={`group/row flex items-center rounded-md transition-colors ${
+                isCurrent ? 'bg-foreground/[0.06]' : 'hover:bg-foreground/4'
+              }`}
+            >
+              <button
+                type="button"
+                onClick={() => { useUIStore.getState().openChatDrawer(s.id); onClose(); }}
+                className={`flex min-w-0 flex-1 items-center gap-2 px-2.5 py-1.5 text-left text-sm ${
+                  isCurrent ? 'font-medium text-foreground' : 'text-foreground-secondary'
+                }`}
+              >
+                <span className="min-w-0 flex-1 truncate">{s.title?.trim() || 'Chat'}</span>
+                <span className="shrink-0 text-xs text-foreground-tertiary">{formatTime(s.updatedAt)}</span>
+              </button>
+              {isCurrent && (
+                <div className="flex shrink-0 items-center gap-0.5 mr-1">
+                  <button
+                    type="button"
+                    onClick={() => { onClose(); onEditTitle(); }}
+                    className={ROW_ACTION}
+                    aria-label="Edit title"
+                  >
+                    <Pencil size={11} strokeWidth={1.8} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleRegenerate(s.id)}
+                    disabled={regenerating}
+                    className={`${ROW_ACTION} ${regenerating ? '!opacity-100 animate-spin' : ''}`}
+                    aria-label="AI rename"
+                  >
+                    <RefreshCw size={11} strokeWidth={1.8} />
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })
       )}
     </div>
   );
@@ -89,18 +140,10 @@ function DrawerHeader({ sessionId }: { sessionId: string }) {
             <button
               type="button"
               onClick={() => setHistoryOpen((v) => !v)}
-              className="group/title flex min-w-0 max-w-[70%] items-center gap-1 rounded-lg px-1.5 -ml-1.5 py-1 outline-none transition-colors hover:bg-foreground/4"
+              className="flex min-w-0 max-w-[70%] items-center gap-1 rounded-lg px-1.5 -ml-1.5 py-1 outline-none transition-colors hover:bg-foreground/4"
             >
               <span className="min-w-0 truncate text-[13px] font-medium text-foreground">
                 {titleEdit.displayTitle}
-              </span>
-              <span
-                role="button"
-                tabIndex={-1}
-                onClick={(e) => { e.stopPropagation(); titleEdit.startEdit(e as never); }}
-                className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-foreground-tertiary opacity-0 transition-opacity hover:bg-foreground/8 hover:text-foreground group-hover/title:opacity-100"
-              >
-                <Pencil size={10} strokeWidth={1.8} />
               </span>
               <ChevronDown size={12} strokeWidth={1.8} className={`shrink-0 text-foreground-tertiary transition-transform ${historyOpen ? 'rotate-180' : ''}`} />
             </button>
@@ -112,7 +155,14 @@ function DrawerHeader({ sessionId }: { sessionId: string }) {
         </button>
       </div>
       {historyOpen && (
-        <SessionHistoryDropdown currentSessionId={sessionId} onClose={() => setHistoryOpen(false)} headerRef={headerRef} />
+        <SessionHistoryDropdown
+          currentSessionId={sessionId}
+          headerRef={headerRef}
+          onClose={() => setHistoryOpen(false)}
+          onEditTitle={() => {
+            requestAnimationFrame(() => titleEdit.startEdit({ stopPropagation: () => {} } as React.MouseEvent<HTMLButtonElement>));
+          }}
+        />
       )}
     </div>
   );
@@ -166,7 +216,6 @@ export function ChatDrawer() {
 
   if (!hasOpened) return null;
 
-  // Disable transition during drag to avoid lag
   const drawerTransition = drag.isDragging ? '' : 'transition-transform duration-300 ease-out';
 
   return (

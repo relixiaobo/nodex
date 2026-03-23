@@ -35,7 +35,7 @@ interface UseDragDropRowResult {
 export function useDragDropRow({
   nodeId,
   parentId,
-  panelId = 'main',
+  panelId = 'node-main',
   rowRef,
   targetHasChildren = false,
   targetIsExpanded = false,
@@ -99,7 +99,7 @@ export function useDragDropRow({
       dragNodeId: activeDragId,
       targetNodeId: nodeId,
       targetParentId: liveParentId,
-      targetParentKey: buildExpandedNodeKey(liveParentId, nodeId),
+      targetParentKey: buildExpandedNodeKey(panelId, liveParentId, nodeId),
       siblingIndex,
       dropPosition: currentDropPosition,
       targetHasChildren,

@@ -149,7 +149,7 @@ function PasswordFieldEditor({ fieldEntryId, selectableChildIds }: { fieldEntryI
   );
 }
 
-export function FieldValueOutliner({ fieldEntryId, fieldDataType, attrDefId, configNodeId, onNavigateOut, panelId = 'main' }: FieldValueOutlinerProps) {
+export function FieldValueOutliner({ fieldEntryId, fieldDataType, attrDefId, configNodeId, onNavigateOut, panelId = 'node-main' }: FieldValueOutlinerProps) {
   useChildren(fieldEntryId);
 
   // Values are fieldEntry.children (no key prefix in new model)
@@ -223,7 +223,7 @@ export function FieldValueOutliner({ fieldEntryId, fieldDataType, attrDefId, con
   const [isDragOver, setIsDragOver] = useState(false);
 
   // Drag select: document-level mouse tracking for multi-node selection
-  useDragSelect({ containerRef, rootChildIds: selectableChildIds, rootNodeId: fieldEntryId });
+  useDragSelect({ containerRef, rootChildIds: selectableChildIds, rootNodeId: fieldEntryId, panelId });
 
   const handleContainerDragOver = useCallback((e: React.DragEvent) => {
     if (!canCreateValueChildren) return;
@@ -510,7 +510,7 @@ export function FieldValueOutliner({ fieldEntryId, fieldDataType, attrDefId, con
         <TrailingInput
           parentId={fieldEntryId}
           depth={0}
-          parentExpandKey={buildExpandedNodeKey(loroDoc.getParentId(fieldEntryId) ?? '', fieldEntryId)}
+          parentExpandKey={buildExpandedNodeKey(panelId, loroDoc.getParentId(fieldEntryId) ?? '', fieldEntryId)}
           fieldDataType={fieldDataType}
           attrDefId={attrDefId}
           panelId={panelId}

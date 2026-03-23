@@ -15,7 +15,7 @@ interface FieldListProps {
   panelId?: string;
 }
 
-export function FieldList({ nodeId, panelId = 'main' }: FieldListProps) {
+export function FieldList({ nodeId, panelId = 'node-main' }: FieldListProps) {
   const allFields = useNodeFields(nodeId);
   const isDefinitionNode = useNodeStore(
     (s) => {

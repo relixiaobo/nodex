@@ -142,7 +142,7 @@ export function useEditorTriggers(config: EditorTriggerConfig): EditorTriggerSta
     tagIds,
     isActive,
     disabled = false,
-    panelId = 'main',
+    panelId = 'node-main',
     enableSlash = true,
     enableFieldTrigger = true,
     enableTreeReference = true,
@@ -429,7 +429,7 @@ export function useEditorTriggers(config: EditorTriggerConfig): EditorTriggerSta
           const tempNodeId = startRefConversion(newRefId, parentId, insertPos);
           setPendingRefConversion({ tempNodeId, refNodeId, parentId });
           const gpId = loroDoc.getParentId(parentId);
-          if (gpId) setExpanded(buildExpandedNodeKey(gpId, parentId), true, true);
+          if (gpId) setExpanded(buildExpandedNodeKey(panelId, gpId, parentId), true, true);
           useUIStore.getState().setPendingInputChar(null);
           useUIStore.getState().setFocusClickCoords({
             nodeId: tempNodeId,

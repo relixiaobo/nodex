@@ -11,6 +11,7 @@ import {
   getPreviousVisibleNode,
   isOnlyInlineRef,
 } from '../../src/lib/tree-utils.js';
+import { buildExpandedNodeKey } from '../../src/lib/expanded-node-key.js';
 import { resetLoroDoc, initLoroDocForTest, createNode, setNodeDataBatch } from '../../src/lib/loro-doc.js';
 import { SYSTEM_NODE_IDS } from '../../src/types/index.js';
 
@@ -60,7 +61,11 @@ describe('tree-utils', () => {
     createNode('a1_ref', 'r');
     setNodeDataBatch('a1_ref', { name: 'a1_ref' });
 
-    const expanded = new Set<string>(['root:a', 'a:a1', 'root:r']);
+    const expanded = new Set<string>([
+      buildExpandedNodeKey('node-main', 'root', 'a'),
+      buildExpandedNodeKey('node-main', 'a', 'a1'),
+      buildExpandedNodeKey('node-main', 'root', 'r'),
+    ]);
 
     const flat = getFlattenedVisibleNodes(['a', 'r'], expanded, 'root');
     expect(flat.map((x) => `${x.parentId}/${x.nodeId}`)).toEqual([
@@ -84,14 +89,14 @@ describe('tree-utils', () => {
     createNode('c2', 'a');
     createNode('c3', 'a');
 
-    const expanded = new Set<string>(['root:a']);
+    const expanded = new Set<string>([buildExpandedNodeKey('node-main', 'root', 'a')]);
 
     // Without callback: data order
     const flatDefault = getFlattenedVisibleNodes(['a'], expanded, 'root');
     expect(flatDefault.map((x) => x.nodeId)).toEqual(['a', 'c1', 'c2', 'c3']);
 
     // With callback: reversed visual order for node 'a'
-    const flatCustom = getFlattenedVisibleNodes(['a'], expanded, 'root', 'main', (nodeId) => {
+    const flatCustom = getFlattenedVisibleNodes(['a'], expanded, 'root', 'node-main', (nodeId) => {
       if (nodeId === 'a') return ['c3', 'c1', 'c2']; // custom order
       return []; // fallback
     });
@@ -109,7 +114,7 @@ describe('tree-utils', () => {
 
     // getLastVisibleNode skips structural nodes (fieldEntry)
     // with c2 expanded:
-    const result = getLastVisibleNode('p', new Set(['p:c2']));
+    const result = getLastVisibleNode('p', new Set([buildExpandedNodeKey('node-main', 'p', 'c2')]));
     expect(result).toEqual({ nodeId: 'c2a', parentId: 'c2' });
 
     // without expansion:

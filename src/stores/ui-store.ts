@@ -14,13 +14,12 @@ import { persist } from 'zustand/middleware';
 import { chromeLocalStorage } from '../lib/chrome-storage';
 import { commitUIMarker, registerUndoUICallbacks } from '../lib/loro-doc.js';
 import {
-  buildExpandedNodeKey,
   expandedNodeSetsEqual,
-  normalizeExpandedNodeKey,
-  normalizeExpandedNodeSet,
 } from '../lib/expanded-node-key.js';
 import { chatPanelSessionId, isAppPanel, isChatPanel } from '../types/index.js';
 import { useNodeStore } from './node-store.js';
+
+const MAIN_OUTLINER_PANEL_ID = 'node-main';
 
 interface PendingChatPrompt {
   sessionId: string;
@@ -43,7 +42,7 @@ interface UIStore {
 
   navigateTo(nodeId: string): void;
 
-  // Expand/collapse (keys are compound: "parentId:nodeId")
+  // Expand/collapse (keys are compound: "panelId:parentId:nodeId")
   expandedNodes: Set<string>;
   toggleExpanded(expandKey: string): void;
   setExpanded(expandKey: string, expanded: boolean, skipUndo?: boolean): void;
@@ -159,7 +158,7 @@ export function partializeUIStore(state: UIStore): PersistedUIStoreState {
   return {
     currentNodeId: state.currentNodeId,
     currentChatSessionId: state.currentChatSessionId,
-    expandedNodes: normalizeExpandedNodeSet(state.expandedNodes),
+    expandedNodes: new Set(state.expandedNodes),
     viewMode: state.viewMode,
     paletteUsage: state.paletteUsage,
     lastVisitDate: state.lastVisitDate,
@@ -250,19 +249,29 @@ function clearedFocus() {
   };
 }
 
-function normalizeExpandedNodesState(expandedNodes: Set<string> | string[] | undefined): Set<string> {
+function readExpandedNodeSet(expandedNodes: Set<string> | string[] | undefined): Set<string> {
   if (!expandedNodes) return new Set<string>();
-  return normalizeExpandedNodeSet(expandedNodes);
+  return expandedNodes instanceof Set ? new Set(expandedNodes) : new Set(expandedNodes);
+}
+
+function migrateExpandedNodeSet(expandedNodes: Set<string> | string[] | undefined): Set<string> {
+  const next = new Set<string>();
+  for (const key of readExpandedNodeSet(expandedNodes)) {
+    if (key.split(':').length === 2) {
+      next.add(`${MAIN_OUTLINER_PANEL_ID}:${key}`);
+      continue;
+    }
+    next.add(key);
+  }
+  return next;
 }
 
 function coerceExpandedNodeKey(expandKey: string): string {
-  const normalizedKey = normalizeExpandedNodeKey(expandKey);
-  const parts = normalizedKey.split(':');
-  return buildExpandedNodeKey(parts[0] ?? '', parts.slice(1).join(':'));
+  return expandKey;
 }
 
 function migrateExpandedNodes(state: Record<string, unknown>) {
-  const normalized = normalizeExpandedNodesState(
+  const normalized = readExpandedNodeSet(
     state.expandedNodes as Set<string> | string[] | undefined,
   );
   state.expandedNodes = normalized;
@@ -551,8 +560,8 @@ export const useUIStore = create<UIStore>()(
           : Array.isArray(rawExpandedNodes)
             ? new Set(rawExpandedNodes as string[])
             : new Set<string>();
-        const expandedNodes = normalizeExpandedNodesState(rawExpandedNodes);
-        if (!expandedNodeSetsEqual(expandedNodes, rawSet)) {
+        const expandedNodes = migrateExpandedNodeSet(rawExpandedNodes);
+        if (!(rawExpandedNodes instanceof Set) || !expandedNodeSetsEqual(expandedNodes, rawSet)) {
           useUIStore.setState({ expandedNodes });
         }
       },
@@ -581,13 +590,13 @@ registerUndoUICallbacks({
     const s = useUIStore.getState();
     return {
       v: 3,
-      expandedNodes: [...normalizeExpandedNodeSet(s.expandedNodes)],
+      expandedNodes: [...s.expandedNodes],
     } satisfies UndoUISnapshotV3;
   },
   restore: (meta) => {
     if (isUndoUISnapshotV3(meta)) {
       useUIStore.setState({
-        expandedNodes: normalizeExpandedNodeSet(meta.expandedNodes),
+        expandedNodes: new Set(meta.expandedNodes),
       });
       return;
     }
@@ -596,7 +605,7 @@ registerUndoUICallbacks({
       const legacy = meta as UndoUISnapshotLegacy;
       if (Array.isArray(legacy.expandedNodes)) {
         useUIStore.setState({
-          expandedNodes: normalizeExpandedNodeSet(legacy.expandedNodes),
+          expandedNodes: new Set(legacy.expandedNodes),
         });
       }
     }

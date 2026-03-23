@@ -60,7 +60,7 @@ interface NodeHeaderProps {
   onTitleRef?: (el: HTMLElement | null) => void;
 }
 
-export function NodeHeader({ nodeId, panelId = 'main', onTitleRef }: NodeHeaderProps) {
+export function NodeHeader({ nodeId, panelId = 'node-main', onTitleRef }: NodeHeaderProps) {
   const node = useNode(nodeId);
   const updateNodeContent = useNodeStore((s) => s.updateNodeContent);
 

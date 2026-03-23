@@ -253,27 +253,23 @@ function DrawerContent({ sessionId, drag, drawerOpen }: {
 
   return (
     <>
+      {/* Drag handle — always visible */}
       <div
-        className={`shrink-0 rounded-t-[22px] transition-all duration-200 ease-out ${headerVisible ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0 pointer-events-none'}`}
+        className="group/handle flex shrink-0 cursor-row-resize touch-none items-center justify-center rounded-t-[22px] py-1.5"
+        onPointerDown={drag.onPointerDown}
+        onPointerMove={drag.onPointerMove}
+        onPointerUp={drag.onPointerUp}
+      >
+        <div className="h-1 w-8 rounded-full bg-foreground/15 transition-colors group-hover/handle:bg-foreground/40" />
+      </div>
+
+      {/* Title row — auto-hides on scroll, hover to reveal */}
+      <div
+        className={`shrink-0 overflow-hidden transition-all duration-200 ease-out ${headerVisible ? 'max-h-12 opacity-100' : 'max-h-0 opacity-0'}`}
         onPointerEnter={() => setHeaderVisible(true)}
       >
-        <div
-          className="group/handle flex cursor-row-resize touch-none items-center justify-center py-1.5"
-          onPointerDown={drag.onPointerDown}
-          onPointerMove={drag.onPointerMove}
-          onPointerUp={drag.onPointerUp}
-        >
-          <div className="h-1 w-8 rounded-full bg-foreground/15 transition-colors group-hover/handle:bg-foreground/40" />
-        </div>
         <DrawerHeader sessionId={sessionId} />
       </div>
-      {/* Hover zone at top to reveal header when hidden */}
-      {!headerVisible && (
-        <div
-          className="absolute top-0 left-0 right-0 z-10 h-3 cursor-pointer"
-          onPointerEnter={() => setHeaderVisible(true)}
-        />
-      )}
       <div ref={contentRef} className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <ChatPanel sessionId={sessionId} hideHeader />
       </div>

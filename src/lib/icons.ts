@@ -25,6 +25,7 @@ export {
   X,
   Check,
   GripVertical,
+  Home,
 } from 'lucide-react';
 
 // ─── Data & Content ─────────────────────────────────────────────────────────

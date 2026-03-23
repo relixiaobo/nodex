@@ -17,7 +17,7 @@
  * [...] expands in-place (no navigation). Resets when nodeId changes.
  */
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { MoreHorizontal } from '../../lib/icons.js';
+import { Home, MoreHorizontal } from '../../lib/icons.js';
 import { useUIStore } from '../../stores/ui-store';
 import { useNodeStore } from '../../stores/node-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
@@ -152,7 +152,7 @@ export function Breadcrumb({ nodeId, showCurrentName, active = true }: Breadcrum
   const showAvatar = !!wsId && !(containerNarrow && needsFolding);
 
   return (
-    <div ref={containerRef} className="flex flex-1 min-w-0 items-center gap-1 pl-3 pr-3 mt-1 h-8 text-[13px] text-foreground-tertiary">
+    <div ref={containerRef} className="flex flex-1 min-w-0 items-center gap-1 pl-1 pr-1 h-8 text-[13px] text-foreground-tertiary">
 
       {/* Root view: only show toolbar (sidebar toggle + search), no breadcrumb content */}
       {!isRootView && (
@@ -163,13 +163,9 @@ export function Breadcrumb({ nodeId, showCurrentName, active = true }: Breadcrum
             <Tooltip label={t('breadcrumb.goToWorkspaceRoot')}>
               <button
                 onClick={handleNavigateToWorkspaceRoot}
-                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${
-                  active
-                    ? 'bg-primary/15 text-primary hover:bg-primary/20'
-                    : 'bg-foreground/8 text-foreground-tertiary hover:bg-foreground/12'
-                }`}
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground"
               >
-                {wsInitial}
+                <Home size={14} strokeWidth={1.7} />
               </button>
             </Tooltip>
           )}
@@ -200,12 +196,8 @@ export function Breadcrumb({ nodeId, showCurrentName, active = true }: Breadcrum
                             handleNavigateToWorkspaceRoot();
                           }}
                         >
-                          <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] font-semibold ${
-                            active
-                              ? 'bg-primary/15 text-primary'
-                              : 'bg-foreground/8 text-foreground-tertiary'
-                          }`}>
-                            {wsInitial}
+                          <span className="flex h-4 w-4 shrink-0 items-center justify-center text-foreground-tertiary">
+                            <Home size={12} strokeWidth={1.7} />
                           </span>
                           <span className="truncate">{wsName}</span>
                         </button>

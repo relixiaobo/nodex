@@ -1,15 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { MessageSquare } from '../../lib/icons.js';
 import { ChatInput, type ChatInputHandle } from '../chat/ChatInput.js';
-import { openChatWithPrompt, openNewChatDrawer } from '../../lib/chat-panel-actions.js';
+import { openChatWithPrompt } from '../../lib/chat-panel-actions.js';
 import { getAvailableModelsWithMeta } from '../../lib/ai-provider-config.js';
 import { useNodeStore } from '../../stores/node-store.js';
-import { useUIStore } from '../../stores/ui-store.js';
 
 export function FloatingChatBar() {
   const [focused, setFocused] = useState(false);
-  const currentChatSessionId = useUIStore((s) => s.currentChatSessionId);
-  const openExistingDrawer = useUIStore((s) => s.openChatDrawer);
   const containerRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<ChatInputHandle>(null);
 
@@ -83,10 +79,9 @@ export function FloatingChatBar() {
           <button
             type="button"
             onClick={handleFocus}
-            className="flex h-11 w-full items-center gap-2 rounded-xl border border-border bg-background px-3 text-[15px] text-foreground-tertiary transition-colors hover:border-foreground/20"
+            className="flex h-11 w-full items-center rounded-xl border border-border bg-background px-3 text-[15px] text-foreground-tertiary transition-colors hover:border-foreground/20"
           >
-            <MessageSquare size={15} strokeWidth={1.7} className="shrink-0" />
-            <span>Ask about your notes...</span>
+            Ask about your notes...
           </button>
         )}
       </div>

@@ -340,7 +340,7 @@ export function ChatDrawer() {
 
   return (
     <div
-      className={`absolute inset-x-0 bottom-0 z-30 flex items-end pointer-events-none ${chatDrawerOpen ? 'opacity-100' : 'opacity-0'} transition-opacity duration-250`}
+      className={`absolute inset-0 z-30 flex items-end pointer-events-none ${chatDrawerOpen ? 'opacity-100' : 'opacity-0'} transition-opacity duration-250`}
       data-testid="chat-drawer"
     >
       <div

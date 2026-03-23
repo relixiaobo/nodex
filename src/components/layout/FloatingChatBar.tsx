@@ -51,18 +51,13 @@ export function FloatingChatBar() {
     setSelectedModelKey({ id: modelId, provider });
   }, []);
 
-  const handleFocus = useCallback(() => {
-    setFocused(true);
-  }, []);
-
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20" data-testid="floating-chat-bar">
-      {/* Gradient fade */}
       <div className="h-8 bg-gradient-to-t from-background to-transparent" />
 
-      <div ref={containerRef} className="pointer-events-auto bg-background px-3 pb-3">
+      <div ref={containerRef} className="pointer-events-auto bg-background">
         {focused ? (
-          /* ── Focused: full ChatInput ── */
+          /* ── Focused: ChatInput (it has its own px-3 pb-3 pt-1 + rounded-xl border) ── */
           <ChatInput
             ref={chatInputRef}
             disabled={false}
@@ -73,14 +68,16 @@ export function FloatingChatBar() {
             onModelChange={handleModelChange}
           />
         ) : (
-          /* ── Unfocused: compact single-line ── */
-          <button
-            type="button"
-            onClick={handleFocus}
-            className="flex h-11 w-full items-center rounded-xl border border-border bg-background px-3 text-[15px] text-foreground-tertiary transition-colors hover:border-foreground/20"
-          >
-            Ask about your notes...
-          </button>
+          /* ── Unfocused: match ChatInput's outer padding (px-3 pb-3) ── */
+          <div className="px-3 pb-3">
+            <button
+              type="button"
+              onClick={() => setFocused(true)}
+              className="flex h-11 w-full items-center rounded-xl border border-border bg-background px-3 text-[15px] text-foreground-tertiary transition-colors hover:border-foreground/20"
+            >
+              Ask about your notes...
+            </button>
+          </div>
         )}
       </div>
     </div>

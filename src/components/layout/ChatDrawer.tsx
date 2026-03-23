@@ -98,10 +98,10 @@ function SessionHistoryDropdown({
   function formatTime(ts: number): string {
     const d = new Date(ts);
     const now = new Date();
-    if (d.toDateString() === now.toDateString()) {
-      return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-    }
-    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    const time = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    if (d.toDateString() === now.toDateString()) return time;
+    const date = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    return `${date} ${time}`;
   }
 
   return (
@@ -129,7 +129,7 @@ function SessionHistoryDropdown({
           return (
             <div
               key={s.id}
-              className={`group/row flex items-center rounded-md transition-colors ${
+              className={`group/row flex items-start rounded-md transition-colors ${
                 isCurrent ? 'bg-foreground/[0.06]' : 'hover:bg-foreground/4'
               }`}
             >
@@ -148,7 +148,7 @@ function SessionHistoryDropdown({
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setEditingId(s.id); }}
-                className={`${SMALL_BTN} mr-1 opacity-0 group-hover/row:opacity-100`}
+                className={`${SMALL_BTN} mr-1 mt-1.5 opacity-0 group-hover/row:opacity-100`}
                 aria-label="Edit title"
               >
                 <Pencil size={11} strokeWidth={1.8} />

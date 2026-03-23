@@ -269,21 +269,23 @@ export function ChatDrawer() {
         style={{ height: `${drag.height * 100}%` }}
         data-chat-drawer="true"
       >
-        {/* Drag handle — extends above the drawer via negative margin */}
+        {/* Drag handle — pill tab above the drawer */}
         <div
-          className="absolute -top-3 left-1/2 z-10 -translate-x-1/2 cursor-row-resize touch-none rounded-t-lg bg-surface px-5 pt-1.5 pb-1"
+          className="absolute -top-4 left-1/2 z-10 -translate-x-1/2 cursor-row-resize touch-none rounded-t-xl bg-background px-6 pt-2 pb-1"
           onPointerDown={drag.onPointerDown}
           onPointerMove={drag.onPointerMove}
           onPointerUp={drag.onPointerUp}
         >
-          <div className="h-1 w-8 rounded-full bg-foreground/15" />
+          <div className="h-1 w-8 rounded-full bg-foreground/20" />
         </div>
 
         {currentChatSessionId ? (
           <>
-            <div className="shrink-0 rounded-t-[22px] bg-surface pt-1">
+            <div className="shrink-0 rounded-t-[22px] pt-1">
               <DrawerHeader sessionId={currentChatSessionId} />
             </div>
+            {/* Gradient fade between header and chat content */}
+            <div className="h-6 shrink-0 bg-gradient-to-b from-background via-background/80 to-transparent" />
             <ChatPanel sessionId={currentChatSessionId} hideHeader />
           </>
         ) : (

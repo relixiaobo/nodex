@@ -107,7 +107,7 @@ export function ToolbarUserMenu() {
             {/* Avatar trigger with sync badge */}
             <button
                 onClick={() => setOpen((v) => !v)}
-                className="relative flex shrink-0 items-center justify-center"
+                className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-foreground/4"
                 aria-label={t('userMenu.ariaLabel')}
             >
                 <div className="relative flex items-center justify-center">
@@ -116,10 +116,10 @@ export function ToolbarUserMenu() {
                             src={authUser.avatarUrl}
                             alt=""
                             referrerPolicy="no-referrer"
-                            className="h-[28px] w-[28px] rounded-full object-cover"
+                            className="h-5 w-5 rounded-full object-cover"
                         />
                     ) : authUser ? (
-                        <span className="flex h-[28px] w-[28px] items-center justify-center rounded-full bg-foreground/[0.06] text-[10px] font-medium text-foreground">
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-foreground/[0.06] text-[8px] font-medium text-foreground">
                             {initials}
                         </span>
                     ) : (

@@ -81,14 +81,14 @@ function DrawerHeader({ sessionId }: { sessionId: string }) {
     <div ref={headerRef} className="relative shrink-0">
       <div className="flex items-center gap-1 px-3 pb-2 pt-2">
         {titleEdit.editing ? (
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1 px-1.5 -ml-1.5">
             <ChatTitleInput edit={titleEdit} />
           </div>
         ) : (
           <button
             type="button"
             onClick={() => setHistoryOpen((v) => !v)}
-            className="group/title flex min-w-0 flex-1 items-center rounded-lg px-1.5 -ml-1.5 py-1 outline-none transition-colors hover:bg-foreground/4"
+            className="group/title flex min-w-0 max-w-[70%] items-center rounded-lg px-1.5 -ml-1.5 py-1 outline-none transition-colors hover:bg-foreground/4"
           >
             <span className="min-w-0 truncate text-[13px] font-medium text-foreground">
               {titleEdit.displayTitle}

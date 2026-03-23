@@ -205,6 +205,68 @@ function DrawerHeader({ sessionId }: { sessionId: string }) {
   );
 }
 
+// ── Drawer content with auto-hide header ──
+
+function DrawerContent({ sessionId, drag, drawerOpen }: {
+  sessionId: string;
+  drag: ReturnType<typeof useDragResize>;
+  drawerOpen: boolean;
+}) {
+  const [headerVisible, setHeaderVisible] = useState(true);
+  const lastScrollTop = useRef(0);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  // Show header when drawer opens
+  useEffect(() => { if (drawerOpen) setHeaderVisible(true); }, [drawerOpen]);
+
+  // Track scroll direction inside ChatPanel
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    function onScroll(e: Event) {
+      const target = e.target as HTMLElement;
+      const scrollTop = target.scrollTop;
+      const delta = scrollTop - lastScrollTop.current;
+      // Only toggle after meaningful scroll (> 8px)
+      if (Math.abs(delta) > 8) {
+        setHeaderVisible(delta < 0 || scrollTop < 10);
+        lastScrollTop.current = scrollTop;
+      }
+    }
+    el.addEventListener('scroll', onScroll, true);
+    return () => el.removeEventListener('scroll', onScroll, true);
+  }, []);
+
+  return (
+    <>
+      <div
+        className={`shrink-0 rounded-t-[22px] transition-all duration-200 ease-out ${headerVisible ? 'max-h-20 opacity-100' : 'max-h-0 opacity-0 overflow-hidden'}`}
+        onPointerEnter={() => setHeaderVisible(true)}
+      >
+        <div
+          className="group/handle flex cursor-row-resize touch-none items-center justify-center py-1.5"
+          onPointerDown={drag.onPointerDown}
+          onPointerMove={drag.onPointerMove}
+          onPointerUp={drag.onPointerUp}
+        >
+          <div className="h-1 w-8 rounded-full bg-foreground/15 transition-colors group-hover/handle:bg-foreground/40" />
+        </div>
+        <DrawerHeader sessionId={sessionId} />
+      </div>
+      {/* Hover zone at top to reveal header when hidden */}
+      {!headerVisible && (
+        <div
+          className="absolute top-0 left-0 right-0 z-10 h-3 cursor-pointer"
+          onPointerEnter={() => setHeaderVisible(true)}
+        />
+      )}
+      <div ref={contentRef} className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <ChatPanel sessionId={sessionId} hideHeader />
+      </div>
+    </>
+  );
+}
+
 // ── Drag resize ──
 
 function useDragResize(drawerRef: React.RefObject<HTMLDivElement | null>) {
@@ -268,21 +330,11 @@ export function ChatDrawer() {
         data-chat-drawer="true"
       >
         {currentChatSessionId ? (
-          <>
-            <div className="shrink-0 rounded-t-[22px]">
-              {/* Drag handle — inside container, visually at top edge */}
-              <div
-                className="group/handle flex cursor-row-resize touch-none items-center justify-center py-1.5"
-                onPointerDown={drag.onPointerDown}
-                onPointerMove={drag.onPointerMove}
-                onPointerUp={drag.onPointerUp}
-              >
-                <div className="h-1 w-8 rounded-full bg-foreground/15 transition-colors group-hover/handle:bg-foreground/40" />
-              </div>
-              <DrawerHeader sessionId={currentChatSessionId} />
-            </div>
-            <ChatPanel sessionId={currentChatSessionId} hideHeader />
-          </>
+          <DrawerContent
+            sessionId={currentChatSessionId}
+            drag={drag}
+            drawerOpen={chatDrawerOpen}
+          />
         ) : (
           <div className="flex flex-1 items-center justify-center text-sm text-foreground-tertiary">Loading chat…</div>
         )}

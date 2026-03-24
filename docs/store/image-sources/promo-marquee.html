@@ -14,7 +14,7 @@
     position: relative;
   }
 
-  /* Subtle background circles */
+  /* Subtle background shapes */
   .bg-circle { position: absolute; border-radius: 50%; opacity: 0.03; background: #5E8E65; }
   .bg-circle-1 { width: 600px; height: 600px; top: -200px; right: -100px; }
   .bg-circle-2 { width: 400px; height: 400px; bottom: -150px; left: -80px; }
@@ -38,21 +38,21 @@
   .subtitle {
     font-size: 18px; color: #666; line-height: 1.5; max-width: 420px;
   }
-  .method-row {
+  .pill-row {
     display: flex; gap: 8px; align-items: center; margin-top: 4px;
   }
-  .method-pill {
+  .pill {
     padding: 6px 16px; border-radius: 20px; font-size: 14px; font-weight: 500;
     letter-spacing: -0.2px;
   }
-  .mp-think { background: rgba(75,124,158,0.1); color: #4B7C9E; }
-  .mp-connect { background: rgba(96,100,166,0.1); color: #6064A6; }
-  .mp-compound { background: rgba(96,138,85,0.1); color: #608A55; }
-  .method-arrow { color: #999; font-size: 12px; }
+  .pill-structure { background: rgba(96,138,85,0.1); color: #608A55; }
+  .pill-capture  { background: rgba(75,124,158,0.1); color: #4B7C9E; }
+  .pill-ai       { background: rgba(225,161,94,0.1); color: #A07830; }
+  .pill-arrow { color: #999; font-size: 12px; }
 
   /* Browser mockup */
   .browser-mock {
-    width: 520px; height: 380px; background: #fff; border-radius: 12px;
+    width: 540px; height: 400px; background: #fff; border-radius: 12px;
     box-shadow: 0 0 0 1px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.06), 0 12px 36px rgba(0,0,0,0.08);
     overflow: hidden; display: flex; flex-direction: column;
   }
@@ -63,7 +63,7 @@
   }
   .dot { width: 10px; height: 10px; border-radius: 50%; }
   .dot-r { background: #EC6A5E; } .dot-y { background: #F4BF4F; } .dot-g { background: #61C554; }
-  .browser-body { flex: 1; display: flex; }
+  .browser-body { flex: 1; display: flex; overflow: hidden; }
 
   /* Webpage side */
   .webpage-side {
@@ -76,27 +76,66 @@
   .webpage-line.highlight { background: rgba(247,236,139,0.5); }
 
   /* Side panel */
-  .sp-side { width: 200px; background: #F5F4EE; padding: 14px; overflow: hidden; }
-  .sp-breadcrumb { font-size: 9px; color: #999; margin-bottom: 10px; display: flex; align-items: center; gap: 3px; }
-  .sp-breadcrumb-current { color: #1A1A1A; font-weight: 500; }
+  .sp-side {
+    width: 220px; display: flex; flex-direction: column; overflow: hidden;
+  }
+
+  /* Outliner area (top) */
+  .sp-outliner {
+    flex: 1; background: #F5F4EE; padding: 14px; overflow: hidden;
+  }
+  .sp-header { font-size: 13px; font-weight: 600; color: #1A1A1A; margin-bottom: 10px; }
   .sp-node { display: flex; gap: 5px; margin-bottom: 5px; align-items: flex-start; }
   .sp-bullet { width: 4px; height: 4px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
   .sp-b-default { background: rgba(26,26,26,0.35); }
-  .sp-b-insight { background: #608A55; }
-  .sp-b-article { background: #4B7C9E; }
+  .sp-b-green   { background: #608A55; }
+  .sp-b-blue    { background: #4B7C9E; }
+  .sp-b-amber   { background: #E1A15E; }
   .sp-bullet-parent {
     width: 11px; height: 11px; border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
     margin-top: 2px; flex-shrink: 0;
   }
-  .sp-bp-article { background: rgba(75,124,158,0.12); }
-  .sp-bp-article .sp-bp-inner { width: 4px; height: 4px; border-radius: 50%; background: #4B7C9E; }
+  .sp-bp-task { background: rgba(96,138,85,0.12); }
+  .sp-bp-task .sp-bp-inner { width: 4px; height: 4px; border-radius: 50%; background: #608A55; }
   .sp-text { font-size: 10px; color: #1A1A1A; line-height: 1.5; }
   .sp-tag { font-size: 9px; font-weight: 500; margin-left: 3px; }
   .sp-tag-hash { color: rgba(153,153,153,0.4); }
-  .sp-tag-insight { color: #608A55; }
-  .sp-tag-article { color: #4B7C9E; }
+  .sp-tag-green { color: #608A55; }
+  .sp-tag-blue  { color: #4B7C9E; }
+  .sp-tag-amber { color: #A07830; }
   .sp-indent { margin-left: 16px; }
+  .sp-checkbox {
+    width: 11px; height: 11px; border: 1.5px solid rgba(0,0,0,0.25); border-radius: 3px;
+    margin-top: 2px; flex-shrink: 0;
+  }
+
+  /* Chat drawer (bottom) */
+  .sp-chat {
+    height: 130px; background: #fff; border-top: 1px solid rgba(0,0,0,0.08);
+    padding: 10px 14px; display: flex; flex-direction: column; overflow: hidden;
+  }
+  .chat-label {
+    font-size: 9px; font-weight: 500; color: #999; text-transform: uppercase;
+    letter-spacing: 0.5px; margin-bottom: 8px;
+  }
+  .chat-msg {
+    font-size: 10px; line-height: 1.5; margin-bottom: 8px; padding: 6px 8px;
+    border-radius: 6px;
+  }
+  .chat-user {
+    color: #1A1A1A; background: #F5F4EE;
+    align-self: flex-end; max-width: 85%;
+  }
+  .chat-ai {
+    color: #1A1A1A; background: transparent;
+    max-width: 90%;
+  }
+  .chat-input {
+    margin-top: auto; height: 26px; background: #F5F4EE; border-radius: 6px;
+    display: flex; align-items: center; padding: 0 8px;
+    font-size: 10px; color: #999;
+  }
 </style>
 </head>
 <body>
@@ -109,14 +148,14 @@
         <div class="logo">S</div>
         <span class="brand-name">soma</span>
       </div>
-      <div class="tagline">Think <em>where</em> you read.</div>
-      <div class="subtitle">Write what you think, connect what you know, compound what you learn — in your browser side panel.</div>
-      <div class="method-row">
-        <span class="method-pill mp-think">Think</span>
-        <span class="method-arrow">→</span>
-        <span class="method-pill mp-connect">Connect</span>
-        <span class="method-arrow">→</span>
-        <span class="method-pill mp-compound">Compound</span>
+      <div class="tagline">Notes that <em>think</em> with you.</div>
+      <div class="subtitle">A structured notebook and AI thinking partner, right in your browser sidebar.</div>
+      <div class="pill-row">
+        <span class="pill pill-structure">Structure</span>
+        <span class="pill-arrow">→</span>
+        <span class="pill pill-capture">Capture</span>
+        <span class="pill-arrow">→</span>
+        <span class="pill pill-ai">Think with AI</span>
       </div>
     </div>
 
@@ -126,7 +165,7 @@
       </div>
       <div class="browser-body">
         <div class="webpage-side">
-          <div class="webpage-title">The Art of Deep Reading<br>in a Distracted World</div>
+          <div class="webpage-title">Why Great Products Need<br>Fewer Features</div>
           <div class="webpage-line medium"></div>
           <div class="webpage-line"></div>
           <div class="webpage-line short"></div>
@@ -147,31 +186,47 @@
           <div class="webpage-line short"></div>
         </div>
         <div class="sp-side">
-          <div class="sp-breadcrumb">
-            <span>Journal ›</span>
-            <span class="sp-breadcrumb-current">Today</span>
-          </div>
-          <div class="sp-node">
-            <div class="sp-bullet-parent sp-bp-article"><div class="sp-bp-inner"></div></div>
-            <div>
-              <span class="sp-text">The Art of Deep Reading</span>
-              <span class="sp-tag"><span class="sp-tag-hash">#</span><span class="sp-tag-article">article</span></span>
+          <!-- Outliner -->
+          <div class="sp-outliner">
+            <div class="sp-header">Today, Mar 24</div>
+            <div class="sp-node">
+              <div class="sp-bullet-parent sp-bp-task"><div class="sp-bp-inner"></div></div>
+              <div>
+                <span class="sp-text">Onboarding redesign</span>
+              </div>
+            </div>
+            <div class="sp-node sp-indent">
+              <div class="sp-checkbox"></div>
+              <div>
+                <span class="sp-text">Review user interviews</span>
+                <span class="sp-tag"><span class="sp-tag-hash">#</span><span class="sp-tag-green">Task</span></span>
+              </div>
+            </div>
+            <div class="sp-node sp-indent">
+              <div class="sp-bullet sp-b-default"></div>
+              <span class="sp-text">Map drop-off points</span>
+            </div>
+            <div class="sp-node">
+              <div class="sp-bullet sp-b-green"></div>
+              <div>
+                <span class="sp-text">Design is invisible when done right</span>
+                <span class="sp-tag"><span class="sp-tag-hash">#</span><span class="sp-tag-green">insight</span></span>
+              </div>
+            </div>
+            <div class="sp-node">
+              <div class="sp-bullet sp-b-blue"></div>
+              <div>
+                <span class="sp-text">Atomic Habits — James Clear</span>
+                <span class="sp-tag"><span class="sp-tag-hash">#</span><span class="sp-tag-blue">book</span></span>
+              </div>
             </div>
           </div>
-          <div class="sp-node sp-indent">
-            <div class="sp-bullet sp-b-insight"></div>
-            <div>
-              <span class="sp-text">Understanding = articulating in your own words</span>
-              <span class="sp-tag"><span class="sp-tag-hash">#</span><span class="sp-tag-insight">insight</span></span>
-            </div>
-          </div>
-          <div class="sp-node sp-indent">
-            <div class="sp-bullet sp-b-default"></div>
-            <span class="sp-text">Writing forces clarity that reading alone never achieves</span>
-          </div>
-          <div class="sp-node sp-indent">
-            <div class="sp-bullet sp-b-default"></div>
-            <span class="sp-text">This is why soma works — think at the point of reading</span>
+          <!-- Chat drawer -->
+          <div class="sp-chat">
+            <div class="chat-label">Chat</div>
+            <div class="chat-msg chat-user">What connects my reading notes to the onboarding project?</div>
+            <div class="chat-msg chat-ai">Your insight about "invisible design" maps directly to the drop-off at step 3 — users don't notice good onboarding…</div>
+            <div class="chat-input">Ask anything…</div>
           </div>
         </div>
       </div>

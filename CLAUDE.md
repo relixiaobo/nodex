@@ -157,7 +157,7 @@ npm run typecheck      # TypeScript 类型检查 (tsc --noEmit)
 
 | 环境 | 命令 | 输出目录 | Backend | Extension ID | 图标 |
 |------|------|---------|---------|-------------|------|
-| Store | `npm run zip` | `.output/chrome-mv3/` | production | 商店分配 `joabcnfl…` | 圆角绿底暖纸色 S |
+| Store | `npm run zip` | `.output/chrome-mv3/` | production | 商店分配 `joabcnfl…` | 三色立方体 |
 | Preview | `npm run build:preview` | `.output/chrome-mv3-preview/` | production | `andlcnfk…` | + 蓝点 |
 | Dev | `npm run dev` | `.output/chrome-mv3-dev/` | staging | `gkpgogoc…` | + 橙点 |
 

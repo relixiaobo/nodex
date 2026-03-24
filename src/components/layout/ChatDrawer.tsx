@@ -160,7 +160,7 @@ function DrawerHeader({ sessionId }: { sessionId: string }) {
 
   return (
     <div className="relative">
-      <div className="flex items-center pb-1 pl-4 pr-3">
+      <div className="flex items-center py-1 pl-4 pr-3">
         {titleEdit.editing ? (
           <div className="min-w-0 flex-1">
             <ChatTitleInput edit={titleEdit} />
@@ -351,7 +351,7 @@ export function ChatDrawer() {
         </div>
 
         {/* Card body — opaque bg, rounded top */}
-        <div className="flex min-h-0 flex-1 flex-col overflow-clip rounded-t-[22px] border border-b-0 border-border bg-surface pt-3 shadow-[0_-18px_42px_rgba(15,23,42,0.14)]">
+        <div className="flex min-h-0 flex-1 flex-col overflow-clip rounded-t-[22px] border border-b-0 border-border bg-surface pt-1 shadow-[0_-18px_42px_rgba(15,23,42,0.14)]">
           {currentChatSessionId ? (
             <DrawerContent sessionId={currentChatSessionId} drag={drag} drawerOpen={chatDrawerOpen} />
           ) : (

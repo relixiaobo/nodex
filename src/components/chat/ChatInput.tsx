@@ -271,24 +271,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
           style={{ maxHeight: compact ? 0 : 40, paddingBottom: compact ? 0 : 8, opacity: compact ? 0 : 1 }}
         >
           <div ref={menuRef} className="relative flex items-center">
-            <button
-              type="button"
-              onClick={() => {
-                setMenuOpen((open) => !open);
-                setModelMenuOpen(false);
-              }}
-              className="flex h-7 w-7 items-center justify-center rounded-lg text-foreground-tertiary outline-none transition-colors hover:bg-foreground/4 hover:text-foreground"
-              aria-label="More options"
-              aria-haspopup="menu"
-              aria-expanded={menuOpen}
-            >
-              <Plus size={16} strokeWidth={1.75} />
-            </button>
-            {menuOpen && (
-              <div className="absolute bottom-full left-0 mb-1 min-w-[180px] rounded-lg bg-background p-1 shadow-paper">
-                {/* Reserved for future menu items */}
-              </div>
-            )}
+            {/* Plus button hidden — no menu items yet */}
           </div>
           <div className="flex min-w-0 items-center gap-1.5">
             {canSelectModel && (

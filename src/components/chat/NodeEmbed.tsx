@@ -1,7 +1,7 @@
 /**
  * NodeEmbed — inline outliner for `<node id="xxx" />` markup in chat messages.
  *
- * Renders as a blockquote-style embed (left border, no box) with:
+ * Renders as an inset panel (subtle bg fill, no border) with:
  * - Sticky header: breadcrumb (🏠 / ⋯ / Parent) + open-in-outliner icon
  * - OutlinerItem tree with full interaction
  * - Internal navigation: bullet click drills into node, breadcrumb navigates back
@@ -52,17 +52,17 @@ export function NodeEmbed({ nodeId }: NodeEmbedProps) {
 
   if (!node) {
     return (
-      <div className="chat-node-embed my-2 border-l-3 border-border-emphasis pl-3 text-sm text-foreground-tertiary">
+      <div className="chat-node-embed my-2 rounded-lg bg-foreground/[0.03] px-3 py-2 text-sm text-foreground-tertiary">
         Node not found
       </div>
     );
   }
 
   return (
-    <div className="chat-node-embed my-2 border-l-3 border-border-emphasis" data-chat-embed>
+    <div className="chat-node-embed my-2 rounded-lg bg-foreground/[0.03]" data-chat-embed>
       <div className="max-h-[60vh] overflow-y-auto">
         {/* Sticky header: breadcrumb + open button */}
-        <div className="sticky top-0 z-10 flex items-center gap-1 bg-background px-3 py-1">
+        <div className="sticky top-0 z-10 flex items-center gap-1 rounded-t-lg bg-foreground/[0.03] px-2 py-1">
           <div className="flex min-w-0 flex-1 items-center gap-1 text-xs text-foreground-tertiary">
             {breadcrumb.home && (
               <button
@@ -107,16 +107,18 @@ export function NodeEmbed({ nodeId }: NodeEmbedProps) {
           </button>
         </div>
 
-        {/* Outliner content */}
-        <OutlinerItem
-          nodeId={displayNodeId}
-          depth={0}
-          rootChildIds={[displayNodeId]}
-          parentId={realParentId}
-          rootNodeId={realParentId}
-          panelId={CHAT_OUTLINER_PANEL_ID}
-          onBulletNavigate={handleBulletNavigate}
-        />
+        {/* Outliner content — pull left 6px so chevron aligns with container edge */}
+        <div className="-ml-1.5">
+          <OutlinerItem
+            nodeId={displayNodeId}
+            depth={0}
+            rootChildIds={[displayNodeId]}
+            parentId={realParentId}
+            rootNodeId={realParentId}
+            panelId={CHAT_OUTLINER_PANEL_ID}
+            onBulletNavigate={handleBulletNavigate}
+          />
+        </div>
       </div>
     </div>
   );

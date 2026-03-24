@@ -65,7 +65,7 @@ describe('node_edit tool', () => {
 
     await executeEdit({
       nodeId: 'note_1',
-      text: 'Meeting notes - Team standup\n  Follow up with design\n  Share notes',
+      text: 'Writing as a thinking tool\n  Follow up with design\n  Share notes',
     });
 
     const afterChildren = loroDoc.getChildren('note_1');
@@ -138,7 +138,7 @@ describe('node_edit tool', () => {
   it('reports unchanged when the requested patch matches current state', async () => {
     const result = await executeEdit({
       nodeId: 'note_1',
-      text: 'Meeting notes - Team standup',
+      text: 'Writing as a thinking tool',
     });
 
     expect(result.status).toBe('unchanged');

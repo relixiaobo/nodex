@@ -203,10 +203,10 @@ app.get('/privacy', (c) => {
 </head>
 <body>
   <h1>soma Privacy Policy</h1>
-  <p><em>Last updated: February 27, 2026</em></p>
+  <p><em>Last updated: March 24, 2026</em></p>
 
   <h2>What is soma</h2>
-  <p>soma is a Chrome extension that provides knowledge management in the Chrome Side Panel. It lets you create, organize, and sync notes while browsing the web.</p>
+  <p>soma is a Chrome extension that combines structured note-taking with an AI thinking partner in the Chrome Side Panel. It lets you create, organize, and sync notes while browsing the web, and think with AI alongside your notes.</p>
 
   <h2>Data We Collect</h2>
   <p><strong>Account information</strong>: When you sign in with Google, we receive your name and email address to create your account.</p>

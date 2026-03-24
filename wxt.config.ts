@@ -18,7 +18,7 @@ export default defineConfig({
   modules: ['@wxt-dev/module-react'],
   manifest: {
     name,
-    description: 'Think where you read — knowledge management in your browser side panel',
+    description: 'Notes that think with you — structured notes and AI thinking partner in your browser sidebar',
     // Extension key — determines the extension ID Chrome assigns.
     // All three environments have their own key so they can coexist in Chrome.
     //   Store   → joabcnflpakkpkalkphcdkdbfkcfhlpa

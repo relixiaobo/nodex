@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>soma — Notes that think with you</title>
+  <style>
+    /* ─── Reset & Base ─── */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --paper: #FAF8F5;
+      --surface: #FFFFFF;
+      --foreground: #1a1a1a;
+      --muted: #6b6b6b;
+      --sage: #5E8E65;
+      --sage-light: #5E8E6518;
+      --amber: #E1A15E;
+      --border: #e8e4df;
+      --radius: 16px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--paper);
+      color: var(--foreground);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ─── Layout ─── */
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    section {
+      padding: 80px 0;
+    }
+
+    /* ─── Typography ─── */
+    h1 {
+      font-size: clamp(2.5rem, 6vw, 3.5rem);
+      font-weight: 700;
+      line-height: 1.1;
+      letter-spacing: -0.03em;
+    }
+
+    h2 {
+      font-size: clamp(1.5rem, 4vw, 2rem);
+      font-weight: 600;
+      line-height: 1.2;
+      letter-spacing: -0.02em;
+    }
+
+    .lead {
+      font-size: 1.2rem;
+      color: var(--muted);
+      line-height: 1.7;
+      max-width: 600px;
+    }
+
+    /* ─── Hero ─── */
+    .hero {
+      padding: 100px 0 60px;
+      text-align: center;
+    }
+
+    .hero .lead {
+      margin: 24px auto 0;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 16px;
+      background: var(--sage-light);
+      color: var(--sage);
+      border-radius: 100px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      margin-bottom: 24px;
+    }
+
+    .hero-badge svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    .cta-row {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      margin-top: 40px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 28px;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      font-weight: 500;
+      text-decoration: none;
+      transition: all 0.2s;
+      cursor: pointer;
+      border: none;
+    }
+
+    .btn-primary {
+      background: var(--sage);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #4d7a53;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(94, 142, 101, 0.3);
+    }
+
+    .btn-secondary {
+      background: var(--surface);
+      color: var(--foreground);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      border-color: #ccc;
+      transform: translateY(-1px);
+    }
+
+    /* ─── Screenshot Frame ─── */
+    .screenshot-hero {
+      margin: 60px auto 0;
+      max-width: 420px;
+    }
+
+    .phone-frame {
+      position: relative;
+      background: var(--surface);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      overflow: hidden;
+      box-shadow:
+        0 1px 3px rgba(0,0,0,0.04),
+        0 8px 32px rgba(0,0,0,0.06);
+    }
+
+    .phone-frame img {
+      width: 100%;
+      display: block;
+    }
+
+    /* ─── Feature Sections ─── */
+    .feature {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 64px;
+      align-items: center;
+    }
+
+    .feature.reverse {
+      direction: rtl;
+    }
+
+    .feature.reverse > * {
+      direction: ltr;
+    }
+
+    .feature-text h2 {
+      margin-bottom: 16px;
+    }
+
+    .feature-text p {
+      color: var(--muted);
+      font-size: 1.05rem;
+      line-height: 1.7;
+    }
+
+    .feature-screenshot {
+      max-width: 380px;
+      justify-self: center;
+    }
+
+    .feature-screenshot .phone-frame {
+      border-radius: 12px;
+    }
+
+    /* ─── Providers ─── */
+    .providers {
+      text-align: center;
+      padding: 60px 0;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .providers h2 {
+      margin-bottom: 8px;
+    }
+
+    .providers p {
+      color: var(--muted);
+      margin-bottom: 32px;
+    }
+
+    .provider-grid {
+      display: flex;
+      justify-content: center;
+      gap: 32px;
+      flex-wrap: wrap;
+    }
+
+    .provider-chip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 20px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: var(--foreground);
+    }
+
+    .provider-chip .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    /* ─── Closing ─── */
+    .closing {
+      text-align: center;
+      padding: 100px 0;
+    }
+
+    .closing h2 {
+      font-size: clamp(1.3rem, 3.5vw, 1.75rem);
+      max-width: 640px;
+      margin: 0 auto 12px;
+    }
+
+    .closing p {
+      color: var(--muted);
+      font-size: 1.1rem;
+      max-width: 520px;
+      margin: 0 auto 40px;
+    }
+
+    /* ─── Footer ─── */
+    footer {
+      padding: 32px 0;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    footer a {
+      color: var(--sage);
+      text-decoration: none;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+
+    /* ─── Responsive ─── */
+    @media (max-width: 768px) {
+      section { padding: 60px 0; }
+
+      .feature {
+        grid-template-columns: 1fr;
+        gap: 40px;
+        text-align: center;
+      }
+
+      .feature.reverse {
+        direction: ltr;
+      }
+
+      .feature-screenshot {
+        order: -1;
+        max-width: 320px;
+        margin: 0 auto;
+      }
+
+      .hero { padding: 60px 0 40px; }
+
+      .cta-row { flex-direction: column; align-items: center; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="container">
+      <div class="hero-badge">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3L2 12h3v8h6v-6h2v6h6v-8h3z"/></svg>
+        Chrome Side Panel Extension
+      </div>
+      <h1>Notes that think<br>with you.</h1>
+      <p class="lead">
+        A structured notebook and AI thinking partner, right in your browser sidebar.
+        Capture ideas while you read, organize them into structure, and think with AI alongside your notes.
+      </p>
+      <div class="cta-row">
+        <a href="https://chromewebstore.google.com/detail/soma/joabcnflpakkpkalkphcdkdbfkcfhlpa" class="btn btn-primary">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="21.17" y1="8" x2="12" y2="8"/><line x1="3.95" y1="6.06" x2="8.54" y2="14"/><line x1="10.88" y1="21.94" x2="15.46" y2="14"/></svg>
+          Add to Chrome
+        </a>
+        <a href="https://github.com/relixiaobo/nodex" class="btn btn-secondary">
+          View on GitHub
+        </a>
+      </div>
+
+      <!-- Hero screenshot -->
+      <div class="screenshot-hero">
+        <div class="phone-frame">
+          <img src="images/screenshot-1-overview.png" alt="soma — Today's journal with notes, tasks, tags, and reading notes">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Feature 1: Structure -->
+  <section>
+    <div class="container">
+      <div class="feature">
+        <div class="feature-text">
+          <h2>Structure your thinking</h2>
+          <p>
+            You have a loose idea. You write it down, nest another underneath, drag one up, tag it with a status field.
+            In five minutes, a scattered thought becomes a structure you can build on.
+            That's what an outliner does that a flat doc never will.
+          </p>
+        </div>
+        <div class="feature-screenshot">
+          <div class="phone-frame">
+            <img src="images/screenshot-2-structure.png" alt="Reading notes with tags, insights, and structured hierarchy">
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Feature 2: Capture -->
+  <section>
+    <div class="container">
+      <div class="feature reverse">
+        <div class="feature-text">
+          <h2>Capture while you browse</h2>
+          <p>
+            You're halfway through an article when a paragraph clicks.
+            Highlight it — it's already a note in your sidebar.
+            Clip the whole page if you want. Tomorrow your journal references it.
+            Everything stays connected because it was never in a separate app to begin with.
+          </p>
+        </div>
+        <div class="feature-screenshot">
+          <div class="phone-frame">
+            <img src="images/screenshot-3-connect.png" alt="Mental models with inline references and connected thinking">
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Feature 3: Think with AI -->
+  <section>
+    <div class="container">
+      <div class="feature">
+        <div class="feature-text">
+          <h2>Think with AI</h2>
+          <p>
+            You're stuck on a draft. Pull up the chat drawer — it's right below your notes.
+            Your AI sees the actual notes, not a copy-paste. It pushes back on a weak argument,
+            suggests a structure, edits a node for you.
+            You think out loud; it thinks with you.
+          </p>
+        </div>
+        <div class="feature-screenshot">
+          <div class="phone-frame">
+            <img src="images/screenshot-4-ai.png" alt="Chat drawer with AI thinking partner beside your notes">
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Providers -->
+  <section class="providers">
+    <div class="container">
+      <h2>Bring your own model</h2>
+      <p>Works with the AI provider you already use.</p>
+      <div class="provider-grid">
+        <div class="provider-chip"><span class="dot" style="background: #d97706"></span> Anthropic Claude</div>
+        <div class="provider-chip"><span class="dot" style="background: #10b981"></span> OpenAI GPT</div>
+        <div class="provider-chip"><span class="dot" style="background: #3b82f6"></span> Google Gemini</div>
+        <div class="provider-chip"><span class="dot" style="background: #6366f1"></span> DeepSeek</div>
+        <div class="provider-chip"><span class="dot" style="background: #6b7280"></span> Custom (OpenAI-compatible)</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Closing -->
+  <section class="closing">
+    <div class="container">
+      <h2>Not another AI chatbot.<br>Not another note app.</h2>
+      <p>soma is where your notes and AI work together — so your thinking compounds over time.</p>
+      <a href="https://chromewebstore.google.com/detail/soma/joabcnflpakkpkalkphcdkdbfkcfhlpa" class="btn btn-primary">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="21.17" y1="8" x2="12" y2="8"/><line x1="3.95" y1="6.06" x2="8.54" y2="14"/><line x1="10.88" y1="21.94" x2="15.46" y2="14"/></svg>
+        Add to Chrome — it's free
+      </a>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container">
+      <p>
+        soma &middot;
+        <a href="https://github.com/relixiaobo/nodex">GitHub</a> &middot;
+        <a href="privacy-policy.md">Privacy</a>
+      </p>
+    </div>
+  </footer>
+
+</body>
+</html>

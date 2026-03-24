@@ -117,8 +117,8 @@ describe('computeBacklinks', () => {
     // Breadcrumb should include Journal, proj_1 (My Project), task_1 (Design the data model)
     const names = treeRef!.breadcrumb.map(a => a.name);
     expect(names).toContain('Daily notes');
-    expect(names).toContain('My Project');
-    expect(names).toContain('Design the data model');
+    expect(names).toContain('Rethinking our onboarding flow');
+    expect(names).toContain('Review user interview recordings');
   });
 
   it('excludes references from supertag search nodes', () => {

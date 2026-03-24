@@ -287,7 +287,7 @@ describe('search-engine', () => {
       const condId = loroDoc.createNode(undefined, SYSTEM_NODE_IDS.SEARCHES);
       loroDoc.setNodeDataBatch(condId, { type: 'queryCondition', queryOp: 'STRING_MATCH' });
       const valueId = loroDoc.createNode(undefined, condId);
-      loroDoc.setNodeDataBatch(valueId, { name: 'standup' });
+      loroDoc.setNodeDataBatch(valueId, { name: 'thinking' });
       loroDoc.commitDoc('__seed__');
 
       const condition = loroDoc.toNodexNode(condId)!;

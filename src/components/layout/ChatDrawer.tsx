@@ -369,7 +369,7 @@ export function ChatDrawer() {
           onPointerMove={drag.onPointerMove}
           onPointerUp={drag.onPointerUp}
         >
-          <div className="h-1 w-8 rounded-full bg-primary/40 transition-colors group-hover/handle:bg-primary/70" />
+          <div className="h-1 w-12 rounded-full bg-primary/40 transition-all group-hover/handle:h-1.5 group-hover/handle:bg-primary/80" />
         </div>
 
         {/* Card body — opaque bg, rounded top */}

@@ -206,18 +206,9 @@ function DrawerHeader({ sessionId, trailing }: { sessionId: string; trailing?: R
 
 // ── Drawer content with auto-hide header ──
 
-function DrawerContent({ sessionId, drag, drawerOpen }: {
+function DrawerContent({ sessionId }: {
   sessionId: string;
-  drag: ReturnType<typeof useDragResize>;
-  drawerOpen: boolean;
 }) {
-  const [headerVisible, setHeaderVisible] = useState(true);
-  const lastScrollTop = useRef(0);
-  const contentRef = useRef<HTMLDivElement>(null);
-  // Grace period: ignore scroll events right after drawer opens so
-  // ChatPanel's initial auto-scroll-to-bottom doesn't hide the header.
-  const scrollEnabledRef = useRef(false);
-
   // Debug panel state — managed here so the toggle button lives in DrawerHeader
   const [debugEnabled, setDebugEnabled] = useState(false);
   const [debugOpen, setDebugOpen] = useState(false);
@@ -226,47 +217,10 @@ function DrawerContent({ sessionId, drag, drawerOpen }: {
   }, []);
   useEffect(() => { if (!debugEnabled) setDebugOpen(false); }, [debugEnabled]);
 
-  // Show header when drawer opens + reset grace period
-  useEffect(() => {
-    if (drawerOpen) {
-      setHeaderVisible(true);
-      scrollEnabledRef.current = false;
-      const id = setTimeout(() => { scrollEnabledRef.current = true; }, 500);
-      return () => clearTimeout(id);
-    }
-  }, [drawerOpen]);
-
-  // Track scroll direction — no layout shift, so no debounce needed
-  const isDraggingRef = useRef(drag.isDragging);
-  isDraggingRef.current = drag.isDragging;
-
-  useEffect(() => {
-    const el = contentRef.current;
-    if (!el) return;
-
-    function onScroll(e: Event) {
-      if (isDraggingRef.current) return;
-      if (!scrollEnabledRef.current) return;
-      const target = e.target as HTMLElement;
-      const scrollTop = target.scrollTop;
-      const delta = scrollTop - lastScrollTop.current;
-      if (Math.abs(delta) > 8) {
-        setHeaderVisible(delta < 0 || scrollTop < 10);
-        lastScrollTop.current = scrollTop;
-      }
-    }
-
-    el.addEventListener('scroll', onScroll, true);
-    return () => el.removeEventListener('scroll', onScroll, true);
-  }, []);
-
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-      {/* Title — absolute overlay, no layout impact, slides up/down */}
-      <div
-        className={`absolute inset-x-0 top-0 z-20 bg-surface transition-transform duration-200 ease-out ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}
-        onPointerEnter={() => setHeaderVisible(true)}
-      >
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      {/* Header — always visible, in normal flow */}
+      <div className="shrink-0">
         <DrawerHeader
           sessionId={sessionId}
           trailing={debugEnabled ? (
@@ -282,8 +236,8 @@ function DrawerContent({ sessionId, drag, drawerOpen }: {
         />
       </div>
 
-      {/* Chat content — always fills the full height */}
-      <div ref={contentRef} className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      {/* Chat content */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <ChatPanel sessionId={sessionId} hideHeader debugOpen={debugOpen} />
       </div>
     </div>
@@ -293,7 +247,7 @@ function DrawerContent({ sessionId, drag, drawerOpen }: {
 // ── Drag resize ──
 
 function useDragResize(drawerRef: React.RefObject<HTMLDivElement | null>) {
-  const [height, setHeight] = useState(0.75);
+  const [height, setHeight] = useState(0.80);
   const [isDragging, setIsDragging] = useState(false);
   const dragState = useRef({ startY: 0, startHeight: 0.75 });
 
@@ -381,7 +335,7 @@ export function ChatDrawer() {
         {/* Card body — opaque bg, rounded top */}
         <div className="flex min-h-0 flex-1 flex-col overflow-clip rounded-t-[22px] border border-b-0 border-border bg-surface pt-1 shadow-[0_-18px_42px_rgba(15,23,42,0.14)]">
           {currentChatSessionId ? (
-            <DrawerContent sessionId={currentChatSessionId} drag={drag} drawerOpen={chatDrawerOpen} />
+            <DrawerContent sessionId={currentChatSessionId} />
           ) : (
             <div className="flex flex-1 items-center justify-center text-sm text-foreground-tertiary">Loading chat…</div>
           )}

@@ -93,7 +93,7 @@ export function NodeEmbed({ nodeId }: NodeEmbedProps) {
            Scroll container shifts left (-ml-[14px]) so the depth-0 chevron
            center aligns with the border line. The chevron's opaque outline
            covers the border line behind it. */}
-      <div className="rounded-lg border border-border py-1">
+      <div className="rounded-lg border border-border bg-background py-1">
         <div className="-ml-[14px] max-h-[calc(60vh-8px)] overflow-y-auto">
           {hasChildren ? (
             childIds.map((childId) => (

@@ -96,13 +96,9 @@ export function NodeEmbed({ nodeId }: NodeEmbedProps) {
         </button>
       </div>
 
-      {/* Bordered panel: children of the node.
-           Scroll container shifts left (-ml-[14px]) so the depth-0 chevron
-           center aligns with the border line. The chevron's opaque outline
-           covers the border line behind it. */}
+      {/* Bordered panel: children of the node */}
       {hasChildren && (
-        <div className="rounded-lg border border-border py-1">
-          <div className="-ml-[14px] max-h-[calc(60vh-8px)] overflow-x-hidden overflow-y-auto">
+        <div className="max-h-[60vh] overflow-y-auto rounded-lg border border-border py-1">
             {childIds.map((childId) => (
               <OutlinerItem
                 key={childId}
@@ -115,7 +111,6 @@ export function NodeEmbed({ nodeId }: NodeEmbedProps) {
                 onBulletNavigate={handleBulletNavigate}
               />
             ))}
-          </div>
         </div>
       )}
     </div>

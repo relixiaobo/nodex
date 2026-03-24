@@ -91,6 +91,7 @@ export {
   CopyPlus,
   MoveRight,
   Type,
+  Maximize2,
 } from 'lucide-react';
 
 // ─── Slash Command ───────────────────────────────────────────────────────────

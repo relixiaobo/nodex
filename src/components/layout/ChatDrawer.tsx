@@ -249,7 +249,7 @@ function DrawerContent({ sessionId }: {
 function useDragResize(drawerRef: React.RefObject<HTMLDivElement | null>) {
   const [height, setHeight] = useState(0.80);
   const [isDragging, setIsDragging] = useState(false);
-  const dragState = useRef({ startY: 0, startHeight: 0.75 });
+  const dragState = useRef({ startY: 0, startHeight: 0.80 });
 
   const onPointerDown = useCallback((e: React.PointerEvent) => {
     e.preventDefault();

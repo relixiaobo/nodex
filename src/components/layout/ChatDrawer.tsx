@@ -96,6 +96,7 @@ function SessionHistoryDropdown({
 
   return (
     <DropdownPanel anchorRef={anchorRef} onClose={onClose} width={320}>
+      <div className="p-1">
       {loading ? (
         <div className="px-3 py-2 text-sm text-foreground-tertiary">Loading…</div>
       ) : sessions.length === 0 ? (
@@ -147,6 +148,7 @@ function SessionHistoryDropdown({
           );
         })
       )}
+      </div>
     </DropdownPanel>
   );
 }

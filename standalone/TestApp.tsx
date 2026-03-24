@@ -2,21 +2,21 @@
  * Standalone test App — local-only mode.
  *
  * Initializes LoroDoc, seeds test data, and renders the outliner.
+ * Mirrors the real App.tsx layout (DrawerLayout) without auth/sync.
  */
 import { useEffect, useState } from 'react';
 import { useWorkspaceStore } from '../src/stores/workspace-store';
 import { useUIStore } from '../src/stores/ui-store';
 import { useNodeStore } from '../src/stores/node-store';
 import { useNavUndoKeyboard } from '../src/hooks/use-nav-undo-keyboard';
-import { usePanelKeyboard } from '../src/hooks/use-panel-keyboard.js';
 import { useGlobalSelectionDismiss } from '../src/hooks/use-global-selection-dismiss.js';
-import { GlobalTools } from '../src/components/toolbar/TopToolbar';
-import { PanelLayout } from '../src/components/panel/PanelLayout';
+import { DrawerLayout } from '../src/components/layout/DrawerLayout.js';
 import { CommandPalette } from '../src/components/search/CommandPalette';
 import { BatchTagSelector } from '../src/components/tags/BatchTagSelector';
 import { seedTestData } from '../src/entrypoints/test/seed-data';
 import * as loroDoc from '../src/lib/loro-doc.js';
 import { ensureTodayNode } from '../src/lib/journal.js';
+import { TooltipProvider } from '../src/components/ui/Tooltip';
 
 /** Map port -> agent identity for visual differentiation */
 const AGENT_BY_PORT: Record<string, { name: string; color: string }> = {
@@ -33,20 +33,14 @@ function getAgentInfo() {
 
 function useTestBootstrap(): boolean {
   const [ready, setReady] = useState(false);
-  const panels = useUIStore((s) => s.panels);
-  const replacePanel = useUIStore((s) => s.replacePanel);
 
   useEffect(() => {
     async function init() {
       // Initialize LoroDoc + seed test data (async: loads IndexedDB snapshot if any)
       await seedTestData({ forceFresh: true });
 
-      // Navigate to Today if no panel open.
-      // Use replacePanel (not navigateTo) to avoid creating a Loro undo entry
-      // whose UI snapshot is the empty initial state (Bug 1 fix).
-      if (panels.length === 0) {
-        replacePanel(ensureTodayNode());
-      }
+      // Navigate to Today
+      useUIStore.getState().replaceCurrentNode(ensureTodayNode());
 
       // Expose stores + loro-doc on window for MCP/DevTools console testing
       Object.assign(window, {
@@ -74,8 +68,6 @@ export function TestApp() {
 
   // Global Cmd+Z / Cmd+Shift+Z for unified Loro undo/redo (parity with App.tsx)
   useNavUndoKeyboard();
-  // Global multi-panel keyboard shortcuts (Cmd+\, Cmd+Shift+W, Cmd+Option+←/→)
-  usePanelKeyboard();
 
   if (!ready) {
     return (
@@ -88,39 +80,41 @@ export function TestApp() {
   const agent = getAgentInfo();
 
   return (
-    <div
-      className="flex h-screen w-full flex-col overflow-hidden bg-background text-foreground"
-      onPointerDownCapture={selectionDismissHandlers.onPointerDownCapture}
-      onFocusCapture={selectionDismissHandlers.onFocusCapture}
-    >
-      <PanelLayout toolbar={<GlobalTools />} />
-      <CommandPalette />
-      <BatchTagSelector />
-      {/* Agent badge — only shown with ?badge query param (for multi-agent debugging) */}
-      {new URLSearchParams(window.location.search).has('badge') && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 50,
-            right: 6,
-            maxWidth: 'calc(100vw - 80px)',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            backgroundColor: agent.color,
-            color: '#fff',
-            fontSize: 11,
-            fontWeight: 600,
-            padding: '2px 8px',
-            borderRadius: 4,
-            zIndex: 9999,
-            opacity: 0.85,
-            pointerEvents: 'none',
-          }}
-        >
-          {agent.name}
-        </div>
-      )}
-    </div>
+    <TooltipProvider>
+      <div
+        className="flex h-screen w-full flex-col overflow-hidden bg-background text-foreground"
+        onPointerDownCapture={selectionDismissHandlers.onPointerDownCapture}
+        onFocusCapture={selectionDismissHandlers.onFocusCapture}
+      >
+        <DrawerLayout />
+        <CommandPalette />
+        <BatchTagSelector />
+        {/* Agent badge — only shown with ?badge query param (for multi-agent debugging) */}
+        {new URLSearchParams(window.location.search).has('badge') && (
+          <div
+            style={{
+              position: 'fixed',
+              top: 50,
+              right: 6,
+              maxWidth: 'calc(100vw - 80px)',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              backgroundColor: agent.color,
+              color: '#fff',
+              fontSize: 11,
+              fontWeight: 600,
+              padding: '2px 8px',
+              borderRadius: 4,
+              zIndex: 9999,
+              opacity: 0.85,
+              pointerEvents: 'none',
+            }}
+          >
+            {agent.name}
+          </div>
+        )}
+      </div>
+    </TooltipProvider>
   );
 }

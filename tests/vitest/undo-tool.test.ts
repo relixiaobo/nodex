@@ -39,7 +39,7 @@ describe('undo tool', () => {
     const before = loroDoc.toNodexNode('task_1');
     const beforeParentId = loroDoc.getParentId('task_1');
 
-    expect(before?.name).toBe('Design the data model');
+    expect(before?.name).toBe('Review user interview recordings');
     expect(before?.tags).toContain('tagDef_task');
     expect(beforeParentId).toBe('proj_1');
 

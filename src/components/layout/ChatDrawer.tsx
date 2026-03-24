@@ -172,6 +172,7 @@ function DrawerHeader({ sessionId, trailing }: { sessionId: string; trailing?: R
               ref={titleButtonRef}
               type="button"
               onClick={() => setHistoryOpen((v) => !v)}
+              onDoubleClick={(e) => { e.stopPropagation(); setHistoryOpen(false); titleEdit.startEdit(e as any); }}
               className="flex min-w-0 max-w-[70%] items-center gap-1 rounded-lg px-1.5 -ml-1.5 py-1 outline-none transition-colors hover:bg-foreground/4"
             >
               <span className="min-w-0 truncate text-[13px] font-medium text-foreground-secondary">

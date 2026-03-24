@@ -233,7 +233,7 @@ export function ChevronButton({
         }}
       >
         <div
-          className={`flex h-[15px] w-[15px] items-center justify-center rounded-full bg-surface outline outline-2 outline-background transition-colors ${isExpanded ? '[&>svg]:rotate-90' : ''
+          className={`flex h-[15px] w-[15px] items-center justify-center rounded-full bg-background-recessed outline outline-2 outline-background transition-colors ${isExpanded ? '[&>svg]:rotate-90' : ''
             }`}
         >
           <svg

@@ -248,7 +248,7 @@ function DrawerContent({ sessionId, drag, drawerOpen }: {
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
       {/* Title — absolute overlay, no layout impact, slides up/down */}
       <div
-        className={`absolute inset-x-0 top-0 z-20 bg-background transition-transform duration-200 ease-out ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}
+        className={`absolute inset-x-0 top-0 z-20 bg-surface transition-transform duration-200 ease-out ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}
         onPointerEnter={() => setHeaderVisible(true)}
       >
         <DrawerHeader sessionId={sessionId} />
@@ -351,7 +351,7 @@ export function ChatDrawer() {
         </div>
 
         {/* Card body — opaque bg, rounded top */}
-        <div className="flex min-h-0 flex-1 flex-col overflow-clip rounded-t-[22px] border border-b-0 border-border bg-background pt-3 shadow-[0_-18px_42px_rgba(15,23,42,0.14)]">
+        <div className="flex min-h-0 flex-1 flex-col overflow-clip rounded-t-[22px] border border-b-0 border-border bg-surface pt-3 shadow-[0_-18px_42px_rgba(15,23,42,0.14)]">
           {currentChatSessionId ? (
             <DrawerContent sessionId={currentChatSessionId} drag={drag} drawerOpen={chatDrawerOpen} />
           ) : (

@@ -82,7 +82,7 @@ export function NodeEmbed({ nodeId }: NodeEmbedProps) {
             <ExternalLink size={12} />
           </button>
         </div>
-        <div className="-ml-[14px] max-h-[40vh] overflow-y-auto py-1">
+        <div className="-ml-[14px] max-h-[40vh] overflow-y-auto overscroll-contain py-1">
           {hasChildren ? (
             childIds.map((childId) => (
               <OutlinerItem

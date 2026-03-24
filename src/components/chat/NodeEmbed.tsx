@@ -4,10 +4,11 @@
  * Layout:
  * - Header (outside panel): node bullet + name + ↗ open-in-outliner icon
  * - Bordered panel: children of the node rendered as OutlinerItems
- * - Internal navigation: bullet click drills into child, header shows new root
+ * - No drill-down: bullet click in the panel = default outliner behavior (navigate to node panel)
+ * - No children: show bordered panel with an empty trailing-input-like placeholder
  * - Max height with scroll
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { ExternalLink } from '../../lib/icons.js';
 import { buildExpandedNodeKey } from '../../lib/expanded-node-key.js';
 import { useNode } from '../../hooks/use-node.js';
@@ -23,38 +24,24 @@ interface NodeEmbedProps {
 }
 
 export function NodeEmbed({ nodeId }: NodeEmbedProps) {
-  const [displayNodeId, setDisplayNodeId] = useState(nodeId);
-  const node = useNode(displayNodeId);
+  const node = useNode(nodeId);
   const childIds = node?.children ?? [];
   const setExpanded = useUIStore((s) => s.setExpanded);
   const navigateToNode = useUIStore((s) => s.navigateToNode);
   const closeChatDrawer = useUIStore((s) => s.closeChatDrawer);
   const hasChildren = childIds.length > 0;
 
-  // Auto-expand children on mount / navigation — only when displayNodeId changes,
-  // NOT on every render (childIds is a new array ref each render, which would
-  // re-expand nodes the user just collapsed).
+  // Auto-expand children on mount so they're visible
   useEffect(() => {
-    const n = loroDoc.toNodexNode(displayNodeId);
+    const n = loroDoc.toNodexNode(nodeId);
     for (const cid of n?.children ?? []) {
       const child = loroDoc.toNodexNode(cid);
       if ((child?.children?.length ?? 0) > 0) {
-        setExpanded(buildExpandedNodeKey(CHAT_OUTLINER_PANEL_ID, displayNodeId, cid), true, true);
+        setExpanded(buildExpandedNodeKey(CHAT_OUTLINER_PANEL_ID, nodeId, cid), true, true);
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally only on displayNodeId change
-  }, [displayNodeId]);
-
-  // Bullet click → drill into node within the embed
-  const handleBulletNavigate = useCallback((targetNodeId: string) => {
-    setDisplayNodeId(targetNodeId);
-  }, []);
-
-  // Header bullet click → drill into the displayed node itself (navigate to it in outliner)
-  const handleHeaderBulletClick = useCallback(() => {
-    closeChatDrawer();
-    navigateToNode(displayNodeId);
-  }, [displayNodeId, closeChatDrawer, navigateToNode]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- only on mount
+  }, [nodeId]);
 
   if (!node) {
     return (
@@ -67,6 +54,11 @@ export function NodeEmbed({ nodeId }: NodeEmbedProps) {
   const displayName = node.name ?? '';
   const displayHtml = marksToHtml(displayName, node.marks ?? [], node.inlineRefs ?? []);
 
+  const handleOpenInOutliner = () => {
+    closeChatDrawer();
+    navigateToNode(nodeId);
+  };
+
   return (
     <div className="chat-node-embed my-2" data-chat-embed>
       {/* Header: node identity + open button — outside the bordered panel */}
@@ -75,7 +67,7 @@ export function NodeEmbed({ nodeId }: NodeEmbedProps) {
           <BulletChevron
             hasChildren={hasChildren}
             isExpanded={hasChildren}
-            onBulletClick={handleHeaderBulletClick}
+            onBulletClick={handleOpenInOutliner}
             tooltipLabel="Open in outliner"
           />
           {displayHtml ? (
@@ -89,10 +81,7 @@ export function NodeEmbed({ nodeId }: NodeEmbedProps) {
         </div>
         <button
           type="button"
-          onClick={() => {
-            closeChatDrawer();
-            navigateToNode(displayNodeId);
-          }}
+          onClick={handleOpenInOutliner}
           className="flex shrink-0 items-center justify-center rounded p-1 text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground-secondary"
           title="Open in outliner"
         >
@@ -104,24 +93,32 @@ export function NodeEmbed({ nodeId }: NodeEmbedProps) {
            Scroll container shifts left (-ml-[14px]) so the depth-0 chevron
            center aligns with the border line. The chevron's opaque outline
            covers the border line behind it. */}
-      {hasChildren && (
-        <div className="rounded-lg border border-border py-1">
-          <div className="-ml-[14px] max-h-[calc(60vh-8px)] overflow-y-auto">
-            {childIds.map((childId) => (
+      <div className="rounded-lg border border-border py-1">
+        <div className="-ml-[14px] max-h-[calc(60vh-8px)] overflow-y-auto">
+          {hasChildren ? (
+            childIds.map((childId) => (
               <OutlinerItem
                 key={childId}
                 nodeId={childId}
                 depth={0}
                 rootChildIds={childIds}
-                parentId={displayNodeId}
-                rootNodeId={displayNodeId}
+                parentId={nodeId}
+                rootNodeId={nodeId}
                 panelId={CHAT_OUTLINER_PANEL_ID}
-                onBulletNavigate={handleBulletNavigate}
               />
-            ))}
-          </div>
+            ))
+          ) : (
+            /* Empty state: placeholder node so the embed is visually recognizable
+               and the user can add children via the outliner */
+            <div
+              className="flex min-h-6 items-center py-px text-sm text-foreground-tertiary/40"
+              style={{ paddingLeft: 6 + 15 + 15 + 4 }}
+            >
+              Empty
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

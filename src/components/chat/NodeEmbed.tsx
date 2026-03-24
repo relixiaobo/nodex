@@ -9,13 +9,13 @@
  * - Max height with scroll
  */
 import { useEffect } from 'react';
-import { ExternalLink } from '../../lib/icons.js';
+import { ExternalLink, ListTree } from '../../lib/icons.js';
 import { buildExpandedNodeKey } from '../../lib/expanded-node-key.js';
 import { useNode } from '../../hooks/use-node.js';
 import { useUIStore } from '../../stores/ui-store.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { OutlinerItem } from '../outliner/OutlinerItem.js';
-import { BulletChevron } from '../outliner/BulletChevron.js';
+
 import { CHAT_OUTLINER_PANEL_ID } from './NodePopover.js';
 import { marksToHtml } from '../../lib/editor-marks.js';
 
@@ -61,40 +61,29 @@ export function NodeEmbed({ nodeId }: NodeEmbedProps) {
 
   return (
     <div className="chat-node-embed my-2" data-chat-embed>
-      {/* Header: node identity + open button — outside the bordered panel */}
-      <div className="flex items-center gap-1 py-0.5">
-        <div className="flex min-w-0 flex-1 items-center gap-1">
-          <BulletChevron
-            hasChildren={hasChildren}
-            isExpanded={hasChildren}
-            onBulletClick={handleOpenInOutliner}
-            tooltipLabel="Open in outliner"
-          />
+      {/* Bordered panel: header + children together for visual cohesion */}
+      <div className="rounded-lg border border-border bg-background">
+        {/* Header: ListTree icon + node name + open-in-outliner */}
+        <div className="flex items-center gap-1.5 border-b border-border px-3 py-1.5">
+          <ListTree size={14} strokeWidth={1.5} className="shrink-0 text-foreground-tertiary" />
           {displayHtml ? (
             <span
               className="min-w-0 flex-1 truncate text-sm font-medium text-foreground node-content"
               dangerouslySetInnerHTML={{ __html: displayHtml }}
             />
           ) : (
-            <span className="text-sm text-foreground-tertiary">Untitled</span>
+            <span className="min-w-0 flex-1 text-sm text-foreground-tertiary">Untitled</span>
           )}
+          <button
+            type="button"
+            onClick={handleOpenInOutliner}
+            className="flex shrink-0 items-center justify-center rounded p-1 text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground-secondary"
+            title="Open in outliner"
+          >
+            <ExternalLink size={12} />
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={handleOpenInOutliner}
-          className="flex shrink-0 items-center justify-center rounded p-1 text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground-secondary"
-          title="Open in outliner"
-        >
-          <ExternalLink size={12} />
-        </button>
-      </div>
-
-      {/* Bordered panel: children of the node.
-           Scroll container shifts left (-ml-[14px]) so the depth-0 chevron
-           center aligns with the border line. The chevron's opaque outline
-           covers the border line behind it. */}
-      <div className="rounded-lg border border-border bg-background py-1">
-        <div className="-ml-[14px] max-h-[40vh] overflow-y-auto">
+        <div className="-ml-[14px] max-h-[40vh] overflow-y-auto py-1">
           {hasChildren ? (
             childIds.map((childId) => (
               <OutlinerItem

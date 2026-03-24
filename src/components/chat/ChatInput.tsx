@@ -248,7 +248,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
             value={draft}
             disabled={inputDisabled}
             rows={1}
-            placeholder={canSteer ? 'Steer the conversation…' : disabled ? 'Responding…' : busy ? 'Working…' : 'Ask about your notes…'}
+            placeholder={canSteer ? 'Steer the conversation…' : disabled ? 'Responding…' : busy ? 'Working…' : 'Ask anything…'}
             className={`w-full resize-none bg-transparent text-base leading-6 outline-none placeholder:text-foreground-tertiary disabled:cursor-not-allowed disabled:opacity-60 ${compact ? 'text-foreground-tertiary' : 'text-foreground'}`}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={(event) => {

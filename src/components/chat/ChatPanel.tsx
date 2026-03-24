@@ -428,13 +428,13 @@ export function ChatPanel({ sessionId, hideHeader, debugOpen: externalDebugOpen 
                 {messages.length === 0 ? (
                   <div className="flex h-full min-h-40 flex-col items-center justify-center gap-4 px-6">
                     <div className="text-center text-sm text-foreground-tertiary">
-                      Ask about your notes, clips, or the page you&apos;re reading.
+                      What are you thinking about?
                     </div>
                     <div className="flex w-full max-w-[260px] flex-col gap-2">
                       {[
                         'Summarize this page',
-                        'Organize my notes from today',
-                        'What did I clip this week?',
+                        'Help me think through this',
+                        'What do I know about…',
                       ].map((suggestion) => (
                         <button
                           key={suggestion}

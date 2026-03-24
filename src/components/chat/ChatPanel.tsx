@@ -23,6 +23,8 @@ export interface ChatPanelProps {
   sessionId: string;
   /** When true, hide the panel-level header because the surrounding layout already renders it. */
   hideHeader?: boolean;
+  /** Externally controlled debug panel open state (used by ChatDrawer which renders the toggle in its header). */
+  debugOpen?: boolean;
 }
 
 export function shouldStickChatScroll(
@@ -83,7 +85,7 @@ function mergeToolCallOnlyEntries(entries: ToolCallOnlyEntry[]): ChatMessageEntr
   };
 }
 
-export function ChatPanel({ sessionId, hideHeader }: ChatPanelProps) {
+export function ChatPanel({ sessionId, hideHeader, debugOpen: externalDebugOpen }: ChatPanelProps) {
   const pendingChatPrompt = useUIStore((s) => s.pendingChatPrompt);
   const setPendingChatPrompt = useUIStore((s) => s.setPendingChatPrompt);
   const chatDrawerOpen = useUIStore((s) => s.chatDrawerOpen);
@@ -108,8 +110,12 @@ export function ChatPanel({ sessionId, hideHeader }: ChatPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<ChatInputHandle>(null);
   const shouldStickToBottomRef = useRef(true);
-  const [debugEnabled, setDebugEnabled] = useState(false);
-  const [debugOpen, setDebugOpen] = useState(false);
+  // Debug state: when externally controlled (drawer mode), use externalDebugOpen.
+  // When standalone (no hideHeader), manage internally.
+  const [internalDebugEnabled, setInternalDebugEnabled] = useState(false);
+  const [internalDebugOpen, setInternalDebugOpen] = useState(false);
+  const debugEnabled = externalDebugOpen !== undefined || internalDebugEnabled;
+  const debugOpen = externalDebugOpen ?? internalDebugOpen;
   const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel | null>(debug.thinkingLevel);
   const [selectedModelKey, setSelectedModelKey] = useState<{ id: string; provider: string } | null>(null);
   const [pendingMessageActionId, setPendingMessageActionId] = useState<string | null>(null);
@@ -153,19 +159,15 @@ export function ChatPanel({ sessionId, hideHeader }: ChatPanelProps) {
     };
   }, [agent.state.model?.name, availableModels, debug.modelId, debug.provider, debug.reasoning, selectedModelKey]);
 
+  // Standalone mode: load debug enabled from storage
   useEffect(() => {
+    if (externalDebugOpen !== undefined) return; // drawer manages its own
     let cancelled = false;
-
-    void readChatDebugEnabled().then((storedDebugEnabled) => {
-      if (!cancelled) {
-        setDebugEnabled((current) => current || storedDebugEnabled);
-      }
+    void readChatDebugEnabled().then((v) => {
+      if (!cancelled) setInternalDebugEnabled((c) => c || v);
     });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    return () => { cancelled = true; };
+  }, [externalDebugOpen]);
 
   useEffect(() => {
     setThinkingLevel(debug.thinkingLevel);
@@ -173,9 +175,8 @@ export function ChatPanel({ sessionId, hideHeader }: ChatPanelProps) {
   }, [debug.thinkingLevel, debug.modelId, debug.provider]);
 
   useEffect(() => {
-    if (debugEnabled) return;
-    setDebugOpen(false);
-  }, [debugEnabled]);
+    if (!internalDebugEnabled) setInternalDebugOpen(false);
+  }, [internalDebugEnabled]);
 
   const steeringArmedRef = useRef(false);
   useEffect(() => {
@@ -360,11 +361,12 @@ export function ChatPanel({ sessionId, hideHeader }: ChatPanelProps) {
       )}
 
       <div className="relative flex flex-1 flex-col overflow-hidden">
-        {debugEnabled && (
+        {/* Debug toggle — only shown in standalone mode. In drawer mode, the button is in DrawerHeader. */}
+        {externalDebugOpen === undefined && internalDebugEnabled && (
           <button
             type="button"
-            onClick={() => setDebugOpen((v) => !v)}
-            className={`absolute right-12 top-[5px] z-30 inline-flex h-7 min-w-8 items-center justify-center rounded-full px-2 font-mono text-[11px] transition-colors ${
+            onClick={() => setInternalDebugOpen((v) => !v)}
+            className={`absolute right-3 top-10 z-10 inline-flex h-7 min-w-8 items-center justify-center rounded-full px-2 font-mono text-[11px] transition-colors ${
               debugOpen
                 ? 'bg-foreground/8 text-foreground'
                 : 'text-foreground-tertiary hover:bg-foreground/4 hover:text-foreground'

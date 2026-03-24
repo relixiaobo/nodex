@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Check, ChevronDown, Pencil, Plus, RefreshCw } from '../../lib/icons.js';
 import { openNewChatDrawer } from '../../lib/chat-panel-actions.js';
 import { getChatSession, listChatSessionMetasPage, saveChatSession, type ChatSessionMeta } from '../../lib/ai-persistence.js';
 import { regenerateChatTitle } from '../../lib/ai-service.js';
+import { readChatDebugEnabled } from '../../lib/ai-debug.js';
 import { useUIStore } from '../../stores/ui-store.js';
 import { ChatTitleInput, useChatTitleEdit } from '../chat/ChatPanelHeader.js';
 import { ChatPanel } from '../chat/ChatPanel.js';
@@ -153,7 +154,7 @@ function SessionHistoryDropdown({
 
 // ── Drawer header ──
 
-function DrawerHeader({ sessionId }: { sessionId: string }) {
+function DrawerHeader({ sessionId, trailing }: { sessionId: string; trailing?: ReactNode }) {
   const titleEdit = useChatTitleEdit(sessionId);
   const [historyOpen, setHistoryOpen] = useState(false);
   const titleButtonRef = useRef<HTMLButtonElement>(null);
@@ -181,6 +182,7 @@ function DrawerHeader({ sessionId }: { sessionId: string }) {
             <div className="flex-1" />
           </>
         )}
+        {trailing}
         <button type="button" onClick={() => void openNewChatDrawer()} className={ICON_BTN} aria-label="New chat">
           <Plus size={15} strokeWidth={1.8} />
         </button>
@@ -210,6 +212,14 @@ function DrawerContent({ sessionId, drag, drawerOpen }: {
   // ChatPanel's initial auto-scroll-to-bottom doesn't hide the header.
   const scrollEnabledRef = useRef(false);
 
+  // Debug panel state — managed here so the toggle button lives in DrawerHeader
+  const [debugEnabled, setDebugEnabled] = useState(false);
+  const [debugOpen, setDebugOpen] = useState(false);
+  useEffect(() => {
+    void readChatDebugEnabled().then((v) => setDebugEnabled((c) => c || v));
+  }, []);
+  useEffect(() => { if (!debugEnabled) setDebugOpen(false); }, [debugEnabled]);
+
   // Show header when drawer opens + reset grace period
   useEffect(() => {
     if (drawerOpen) {
@@ -231,9 +241,7 @@ function DrawerContent({ sessionId, drag, drawerOpen }: {
     function onScroll(e: Event) {
       if (isDraggingRef.current) return;
       if (!scrollEnabledRef.current) return;
-      // Ignore scroll events from nested scroll containers (e.g. NodeEmbed outliner)
       const target = e.target as HTMLElement;
-      if (target.closest('[data-chat-embed]')) return;
       const scrollTop = target.scrollTop;
       const delta = scrollTop - lastScrollTop.current;
       if (Math.abs(delta) > 8) {
@@ -253,12 +261,24 @@ function DrawerContent({ sessionId, drag, drawerOpen }: {
         className={`absolute inset-x-0 top-0 z-20 bg-surface transition-transform duration-200 ease-out ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}
         onPointerEnter={() => setHeaderVisible(true)}
       >
-        <DrawerHeader sessionId={sessionId} />
+        <DrawerHeader
+          sessionId={sessionId}
+          trailing={debugEnabled ? (
+            <button
+              type="button"
+              onClick={() => setDebugOpen((v) => !v)}
+              className={`${ICON_BTN} font-mono text-[11px] ${debugOpen ? 'bg-foreground/8 text-foreground' : ''}`}
+              aria-label={debugOpen ? 'Hide debug panel' : 'Show debug panel'}
+            >
+              {'</>'}
+            </button>
+          ) : undefined}
+        />
       </div>
 
       {/* Chat content — always fills the full height */}
       <div ref={contentRef} className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <ChatPanel sessionId={sessionId} hideHeader />
+        <ChatPanel sessionId={sessionId} hideHeader debugOpen={debugOpen} />
       </div>
     </div>
   );

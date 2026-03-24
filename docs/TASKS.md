@@ -123,6 +123,7 @@
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-24 | 新图标 + 截图 + store 资产 — 三色立方体 + 真实 app 截图 | claude | #177 |
 | 2026-03-24 | 上架资料刷新 — store listing + landing page + 截图 + 定位统一 | claude | #176 |
 | 2026-03-24 | View Context Injection — AI 看到用户可见的 outliner 树 | codex | #174 |
 | 2026-03-24 | Chat Embed 交互修复 — NodeEmbed 限高 + dropdown portal 迁移 + focus 隔离 | codex | #175 |

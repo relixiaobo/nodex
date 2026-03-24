@@ -985,30 +985,19 @@ export async function regenerateResponse(
 
   const session = ensureCurrentSession(agent);
 
-  // Walk up from the target node to find the first assistant message in this
-  // agent turn. The chain is: User → Asst → ToolResult → Asst → ToolResult → Asst
-  // We want the first Asst after the User message.
+  // Walk up to find the first assistant message in this agent turn.
+  // Chain: User → Asst → ToolResult → Asst → ... → Asst (target)
+  // We regenerate from the earliest Asst whose ancestor is the User message.
   let regenerateTarget = nodeId;
-  let current = nodeId;
-  const visited = new Set<string>();
-  while (true) {
-    const node = session.mapping[current];
-    if (!node?.parentId || visited.has(node.parentId)) break;
-    visited.add(node.parentId);
-    const parent = session.mapping[node.parentId];
+  let cursor = nodeId;
+  while (cursor) {
+    const parentId = session.mapping[cursor]?.parentId;
+    if (!parentId) break;
+    const parent = session.mapping[parentId];
     if (!parent?.message) break;
-    // If parent is assistant or toolResult, keep walking up
-    if (parent.message.role === 'assistant') {
-      regenerateTarget = parent.id;
-      current = parent.id;
-      continue;
-    }
-    if (parent.message.role === 'toolResult') {
-      current = parent.id;
-      continue;
-    }
-    // Parent is a real user message — stop
-    break;
+    if (parent.message.role === 'assistant') { regenerateTarget = parentId; cursor = parentId; }
+    else if (parent.message.role === 'toolResult') { cursor = parentId; }
+    else break; // hit user message
   }
 
   regenerateTree(session, regenerateTarget);

@@ -610,11 +610,6 @@ html, body {
   margin-top: 2px;
 }
 
-/* Chat embed: chevrons always visible (not hover-only) */
-.chat-node-embed [data-chevron-btn] {
-  opacity: 1;
-  pointer-events: auto;
-}
 
 /* Headings — styled via element selectors, no custom classes needed */
 .chat-prose h1 {

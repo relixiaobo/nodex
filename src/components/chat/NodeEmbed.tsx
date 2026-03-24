@@ -107,8 +107,13 @@ export function NodeEmbed({ nodeId }: NodeEmbedProps) {
         </button>
       </div>
 
-      {/* Bordered panel: outliner content */}
-      <div className="max-h-[60vh] overflow-y-auto rounded-lg border border-border py-1">
+      {/* Bordered panel: outliner content.
+           The scroll container shifts left (-ml-[14px]) so the depth-0 chevron
+           center aligns with the border line. The bordered wrapper keeps default
+           overflow (visible) so the chevron can extend past it. The chevron's
+           opaque outline covers the border line behind it. */}
+      <div className="rounded-lg border border-border py-1">
+        <div className="-ml-[14px] max-h-[calc(60vh-8px)] overflow-x-hidden overflow-y-auto">
         <OutlinerItem
           nodeId={displayNodeId}
           depth={0}
@@ -118,6 +123,7 @@ export function NodeEmbed({ nodeId }: NodeEmbedProps) {
           panelId={CHAT_OUTLINER_PANEL_ID}
           onBulletNavigate={handleBulletNavigate}
         />
+        </div>
       </div>
     </div>
   );

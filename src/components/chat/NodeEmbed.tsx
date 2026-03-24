@@ -9,7 +9,7 @@
  * - Max height with scroll
  */
 import { useEffect } from 'react';
-import { ExternalLink, ListTree } from '../../lib/icons.js';
+import { ExternalLink } from '../../lib/icons.js';
 import { buildExpandedNodeKey } from '../../lib/expanded-node-key.js';
 import { useNode } from '../../hooks/use-node.js';
 import { useUIStore } from '../../stores/ui-store.js';
@@ -65,7 +65,6 @@ export function NodeEmbed({ nodeId }: NodeEmbedProps) {
       <div className="rounded-lg border border-border bg-background">
         {/* Header: ListTree icon + node name + open-in-outliner */}
         <div className="flex items-center gap-1.5 border-b border-border px-3 py-1.5">
-          <ListTree size={14} strokeWidth={1.5} className="shrink-0 text-foreground-tertiary" />
           {displayHtml ? (
             <span
               className="min-w-0 flex-1 truncate text-sm font-medium text-foreground node-content"

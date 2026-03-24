@@ -231,7 +231,9 @@ function DrawerContent({ sessionId, drag, drawerOpen }: {
     function onScroll(e: Event) {
       if (isDraggingRef.current) return;
       if (!scrollEnabledRef.current) return;
+      // Ignore scroll events from nested scroll containers (e.g. NodeEmbed outliner)
       const target = e.target as HTMLElement;
+      if (target.closest('[data-chat-embed]')) return;
       const scrollTop = target.scrollTop;
       const delta = scrollTop - lastScrollTop.current;
       if (Math.abs(delta) > 8) {

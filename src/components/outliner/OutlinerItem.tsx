@@ -120,6 +120,8 @@ interface OutlinerItemProps {
   bulletColors?: string[];
   /** Effective-node path in current display recursion (used to stop cyclic reference expansion). */
   referencePath?: readonly string[];
+  /** When true, bullet click toggles expand instead of navigating to the node panel. Used by chat embed. */
+  bulletToggleExpand?: boolean;
 }
 
 function focusTrailingInputForParent(parentId: string): boolean {
@@ -218,6 +220,7 @@ export function OutlinerItem({
   onNavigateOut,
   bulletColors,
   referencePath = EMPTY_REFERENCE_PATH,
+  bulletToggleExpand,
 }: OutlinerItemProps) {
   const node = useNode(nodeId);
   const referenceTargetId = node?.type === 'reference' ? (node.targetId ?? null) : null;
@@ -1194,9 +1197,13 @@ export function OutlinerItem({
 
   const handleBulletClick = useCallback((e: React.MouseEvent) => {
     void e.altKey;
+    if (bulletToggleExpand) {
+      handleToggle();
+      return;
+    }
     navigateTo(panelNavigationNodeId);
     ensureUndoFocusAfterNavigation();
-  }, [panelNavigationNodeId, navigateTo]);
+  }, [bulletToggleExpand, handleToggle, panelNavigationNodeId, navigateTo]);
 
   const handleIndentLineClick = useCallback(() => {
     // Toggle expand/collapse all direct children (Tana indent guide line behavior)
@@ -2080,6 +2087,7 @@ export function OutlinerItem({
                 panelId={panelId}
                 referencePath={nextReferencePath}
                 bulletColors={templateContentColors.get(row.id)}
+                bulletToggleExpand={bulletToggleExpand}
               />
             )}
             renderGroupHeader={(row) => (

@@ -25,22 +25,28 @@ function InlineRowEditor({ sessionId, initialTitle, onDone }: { sessionId: strin
   useEffect(() => { inputRef.current?.select(); }, []);
 
   async function save() {
-    const trimmed = draft.trim();
-    if (trimmed && trimmed !== initialTitle) {
-      const session = await getChatSession(sessionId);
-      if (session) {
-        session.title = trimmed;
-        await saveChatSession(session);
+    try {
+      const trimmed = draft.trim();
+      if (trimmed && trimmed !== initialTitle) {
+        const session = await getChatSession(sessionId);
+        if (session) {
+          session.title = trimmed;
+          await saveChatSession(session);
+        }
       }
+    } finally {
+      onDone();
     }
-    onDone();
   }
 
   async function handleAiRename() {
     setRegenerating(true);
-    const title = await regenerateChatTitle(sessionId);
-    if (title) setDraft(title);
-    setRegenerating(false);
+    try {
+      const title = await regenerateChatTitle(sessionId);
+      if (title) setDraft(title);
+    } finally {
+      setRegenerating(false);
+    }
   }
 
   return (
@@ -172,7 +178,6 @@ function DrawerHeader({ sessionId, trailing }: { sessionId: string; trailing?: R
               ref={titleButtonRef}
               type="button"
               onClick={() => setHistoryOpen((v) => !v)}
-              onDoubleClick={(e) => { e.stopPropagation(); setHistoryOpen(false); titleEdit.startEdit(e as any); }}
               className="flex min-w-0 max-w-[70%] items-center gap-1 rounded-lg px-1.5 -ml-1.5 py-1 outline-none transition-colors hover:bg-foreground/4"
             >
               <span className="min-w-0 truncate text-[13px] font-medium text-foreground-secondary">

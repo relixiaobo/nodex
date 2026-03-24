@@ -451,9 +451,16 @@ export function ChatPanel({ sessionId, hideHeader, debugOpen: externalDebugOpen 
                   renderConversationMessages()
                 )}
                 <div className="flex h-6 items-center">
-                  {isStreaming && (
-                    <span className="inline-block h-3 w-1.5 animate-pulse rounded-sm bg-primary" />
-                  )}
+                  {isStreaming && (() => {
+                    // Only show cursor when there's text streaming, not during tool-only execution.
+                    // This prevents the cursor from jumping when tool groups collapse.
+                    const last = messages[messages.length - 1];
+                    const hasText = last?.message.role === 'assistant' &&
+                      last.message.content.some((b) => b.type === 'text' && b.text.trim().length > 0);
+                    return hasText ? (
+                      <span className="inline-block h-3 w-1.5 animate-pulse rounded-sm bg-primary" />
+                    ) : null;
+                  })()}
                 </div>
               </div>
               <div className="relative">

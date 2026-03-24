@@ -41,9 +41,9 @@ English
 ## Screenshots to upload (in order)
 1. `images/screenshot-1-overview.png` — Overview: browser + side panel with outliner and chat drawer (1280×800)
 2. `images/screenshot-2-structure.png` — Structure your thinking: outliner with tags, fields, nested nodes (1280×800)
-3. `images/screenshot-3-connect.png` — Capture while you browse: web highlights + sidebar notes (1280×800)
+3. `images/screenshot-3-capture.png` — Capture while you browse: web highlights + sidebar notes (1280×800)
 4. `images/screenshot-4-ai.png` — Think with AI: chat drawer with node embed (1280×800)
-5. `images/screenshot-5-project.png` — Bring your own model: multi-provider AI setup (1280×800)
+5. `images/screenshot-5-providers.png` — Bring your own model: multi-provider AI setup (1280×800)
 
 HTML source files for regenerating screenshots: `image-sources/`
 

@@ -997,13 +997,9 @@ export async function regenerateResponse(
     visited.add(node.parentId);
     const parent = session.mapping[node.parentId];
     if (!parent?.message) break;
-    // Stop if parent is a real user message (not a tool_result continuation)
-    const parentContent = parent.message.content;
-    const isToolResult = parent.message.role === 'user' &&
-      Array.isArray(parentContent) &&
-      parentContent.some((b: { type: string }) => b.type === 'tool_result');
-    if (!isToolResult) break;
-    // Parent is a tool_result → keep walking up to the assistant before it
+    // Stop if parent is a real user message (not a toolResult continuation)
+    if (parent.message.role !== 'toolResult') break;
+    // Parent is a toolResult → keep walking up to the assistant before it
     const grandparent = parent.parentId ? session.mapping[parent.parentId] : null;
     if (grandparent?.message?.role === 'assistant') {
       regenerateTarget = grandparent.id;

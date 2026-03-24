@@ -1,6 +1,7 @@
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import type { ThinkingLevel } from '@mariozechner/pi-ai';
 import { ArrowUp, Brain, Check, ChevronDown, Plus, Settings, Square } from '../../lib/icons.js';
+import { useUIStore } from '../../stores/ui-store.js';
 import { DropdownPanel } from '../ui/DropdownPanel.js';
 
 export interface ChatInputModel {
@@ -112,7 +113,13 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
   onModelChange,
   onThinkingChange,
 }, ref) {
-  const [draft, setDraft] = useState('');
+  const [draft, setDraftRaw] = useState('');
+  const setChatDraft = useUIStore((s) => s.setChatDraft);
+  // Wrap setDraft to sync to ui-store so FloatingChatBar can show unsent text
+  const setDraft = useCallback((text: string) => {
+    setDraftRaw(text);
+    setChatDraft(text);
+  }, [setChatDraft]);
 
   useImperativeHandle(ref, () => ({
     setDraft(text: string) {

@@ -78,6 +78,10 @@ interface UIStore {
   pendingChatPrompt: PendingChatPrompt | null;
   setPendingChatPrompt(prompt: PendingChatPrompt | null): void;
 
+  // Chat input draft (synced from ChatInput so FloatingChatBar can show it)
+  chatDraft: string;
+  setChatDraft(text: string): void;
+
   // Batch tag selector
   batchTagSelectorOpen: boolean;
   openBatchTagSelector(): void;
@@ -462,6 +466,9 @@ export const useUIStore = create<UIStore>()(
 
       pendingChatPrompt: null,
       setPendingChatPrompt: (prompt) => set({ pendingChatPrompt: prompt }),
+
+      chatDraft: '',
+      setChatDraft: (text) => set({ chatDraft: text }),
 
       dragNodeId: null,
       dropTargetId: null,

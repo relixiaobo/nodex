@@ -9,7 +9,7 @@
  * - Max height 40vh with scroll
  */
 import { useEffect } from 'react';
-import { PanelRight } from '../../lib/icons.js';
+import { Maximize2 } from '../../lib/icons.js';
 import { buildExpandedNodeKey } from '../../lib/expanded-node-key.js';
 import { useNode } from '../../hooks/use-node.js';
 import { useUIStore } from '../../stores/ui-store.js';
@@ -78,7 +78,7 @@ export function NodeEmbed({ nodeId }: NodeEmbedProps) {
             className="flex shrink-0 items-center justify-center rounded p-1 text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground-secondary"
             title="Open in outliner"
           >
-            <PanelRight size={14} strokeWidth={1.5} />
+            <Maximize2 size={12} />
           </button>
         </div>
         <div className="-ml-[14px] max-h-[40vh] overflow-y-auto py-1">

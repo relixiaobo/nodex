@@ -984,7 +984,35 @@ export async function regenerateResponse(
   await ensureAgentHydrated(agent);
 
   const session = ensureCurrentSession(agent);
-  regenerateTree(session, nodeId);
+
+  // Walk up from the target node to find the first assistant message in this
+  // agent turn — the one whose parent is a genuine user message (not a
+  // tool_result). This ensures we regenerate the entire multi-turn response
+  // (tool calls + final text), not just the last assistant fragment.
+  let regenerateTarget = nodeId;
+  const visited = new Set<string>();
+  while (true) {
+    const node = session.mapping[regenerateTarget];
+    if (!node?.parentId || visited.has(node.parentId)) break;
+    visited.add(node.parentId);
+    const parent = session.mapping[node.parentId];
+    if (!parent?.message) break;
+    // Stop if parent is a real user message (not a tool_result continuation)
+    const parentContent = parent.message.content;
+    const isToolResult = parent.message.role === 'user' &&
+      Array.isArray(parentContent) &&
+      parentContent.some((b: { type: string }) => b.type === 'tool_result');
+    if (!isToolResult) break;
+    // Parent is a tool_result → keep walking up to the assistant before it
+    const grandparent = parent.parentId ? session.mapping[parent.parentId] : null;
+    if (grandparent?.message?.role === 'assistant') {
+      regenerateTarget = grandparent.id;
+    } else {
+      break;
+    }
+  }
+
+  regenerateTree(session, regenerateTarget);
 
   const messagesForAgent = getCompressedPath(session);
   agent.replaceMessages(messagesForAgent);

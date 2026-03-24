@@ -60,7 +60,7 @@ export function AboutSection() {
     <div className="flex flex-col pr-4 pb-4">
       {/* About soma */}
       <ParentRow
-        text="Think with your AI"
+        text="Think where you read"
         description={<><em>"The test of a first-rate intelligence is the ability to hold two opposed ideas in mind at the same time and still retain the ability to function."</em> — Fitzgerald</>}
         expanded={aboutExpanded}
         onToggle={useCallback(() => setAboutExpanded((v) => !v), [])}

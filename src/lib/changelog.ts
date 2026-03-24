@@ -7,6 +7,35 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.3.0',
+    date: '2026-03-24',
+    summary: 'Chat Drawer + Node Embed',
+    items: [
+      // Layout
+      'Chat Drawer — Outliner always visible, AI Chat as bottom drawer with drag-to-resize',
+      'Chat and Outliner use distinct backgrounds (white vs warm paper) for clear visual separation',
+      'Auto-hide drawer header on scroll — reveals on scroll up or hover, stays visible on open',
+
+      // Node Embed
+      'Redesigned node embed in chat — header with node name + children in bordered panel',
+      'Full outliner interaction inside chat embeds — edit, expand/collapse, field pickers all work',
+      'Embed max height 40vh with independent scroll, empty state placeholder',
+      'Chevron circular background — sits on panel border line for compact layout',
+
+      // Interaction Fixes
+      'Focus isolation — editing in chat embed does not affect main outliner focus',
+      'Escape priority — closing a dropdown does not close the chat drawer',
+      'Click-outside safety — clicking portal dropdowns does not dismiss the drawer',
+      'Session history and model menu use portal-based dropdowns (no overflow clipping)',
+
+      // AI Tools
+      'AI tools use Tana Paste text format — more reliable node creation and editing',
+      'AI can create search nodes, merge duplicate nodes, and batch delete',
+      'Custom model support — configure any OpenAI-compatible provider with base URL + API key',
+      'Tool call groups always collapsed for cleaner chat UI',
+    ],
+  },
+  {
     version: '0.2.0',
     date: '2026-03-20',
     summary: 'Think with your AI',

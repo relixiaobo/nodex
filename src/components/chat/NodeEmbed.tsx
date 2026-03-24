@@ -4,9 +4,10 @@
  * Renders as a blockquote-style embed (left border, no box) with:
  * - Sticky header: breadcrumb (🏠 / ⋯ / Parent) + open-in-outliner icon
  * - OutlinerItem tree with full interaction
+ * - Internal navigation: bullet click drills into node, breadcrumb navigates back
  * - Max height with scroll
  */
-import { useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ExternalLink, Home, MoreHorizontal } from '../../lib/icons.js';
 import { buildExpandedNodeKey } from '../../lib/expanded-node-key.js';
 import { useNode } from '../../hooks/use-node.js';
@@ -21,28 +22,33 @@ interface NodeEmbedProps {
 }
 
 export function NodeEmbed({ nodeId }: NodeEmbedProps) {
-  const node = useNode(nodeId);
+  const [displayNodeId, setDisplayNodeId] = useState(nodeId);
+  const node = useNode(displayNodeId);
   const setExpanded = useUIStore((s) => s.setExpanded);
   const navigateToNode = useUIStore((s) => s.navigateToNode);
   const closeChatDrawer = useUIStore((s) => s.closeChatDrawer);
-  const realParentId = loroDoc.getParentId(nodeId) ?? nodeId;
+  const realParentId = loroDoc.getParentId(displayNodeId) ?? displayNodeId;
   const hasChildren = (node?.children?.length ?? 0) > 0;
-  const { ancestors, workspaceRootId } = useAncestors(nodeId);
+  const { ancestors, workspaceRootId } = useAncestors(displayNodeId);
 
   // Breadcrumb: 🏠 / ⋯ / immediateParent
   const breadcrumb = useMemo(() => {
     if (ancestors.length === 0) return { home: workspaceRootId, middle: null, last: null };
     if (ancestors.length === 1) return { home: workspaceRootId, middle: null, last: ancestors[0] };
-    // 2+: show home, ellipsis for middle, last ancestor
     return { home: workspaceRootId, middle: ancestors.slice(0, -1), last: ancestors[ancestors.length - 1] };
   }, [ancestors, workspaceRootId]);
 
-  // Auto-expand on mount so children are visible
+  // Auto-expand on mount (and when displayNodeId changes) so children are visible
   useEffect(() => {
     if (hasChildren) {
-      setExpanded(buildExpandedNodeKey(CHAT_OUTLINER_PANEL_ID, realParentId, nodeId), true, true);
+      setExpanded(buildExpandedNodeKey(CHAT_OUTLINER_PANEL_ID, realParentId, displayNodeId), true, true);
     }
-  }, [nodeId, realParentId, hasChildren, setExpanded]);
+  }, [displayNodeId, realParentId, hasChildren, setExpanded]);
+
+  // Bullet click → drill into node within the embed
+  const handleBulletNavigate = useCallback((targetNodeId: string) => {
+    setDisplayNodeId(targetNodeId);
+  }, []);
 
   if (!node) {
     return (
@@ -57,32 +63,32 @@ export function NodeEmbed({ nodeId }: NodeEmbedProps) {
       <div className="max-h-[60vh] overflow-y-auto">
         {/* Sticky header: breadcrumb + open button */}
         <div className="sticky top-0 z-10 flex items-center gap-1 bg-background px-3 py-1">
-          <div className="flex min-w-0 flex-1 items-center gap-0.5 text-xs text-foreground-tertiary">
+          <div className="flex min-w-0 flex-1 items-center gap-1 text-xs text-foreground-tertiary">
             {breadcrumb.home && (
               <button
                 type="button"
-                onClick={() => navigateToNode(breadcrumb.home!)}
-                className="flex shrink-0 items-center rounded px-0.5 py-0.5 transition-colors hover:bg-foreground/4 hover:text-foreground-secondary"
+                onClick={() => setDisplayNodeId(breadcrumb.home!)}
+                className="flex shrink-0 items-center justify-center rounded-md px-0.5 py-0.5 transition-colors hover:text-foreground"
               >
-                <Home size={12} />
+                <Home size={12} strokeWidth={1.7} />
               </button>
             )}
             {breadcrumb.home && (breadcrumb.middle || breadcrumb.last) && (
-              <span className="text-foreground-tertiary/60">/</span>
+              <span className="shrink-0 text-foreground-tertiary/50 mx-0.5">/</span>
             )}
             {breadcrumb.middle && (
               <>
-                <span className="flex shrink-0 items-center rounded px-0.5 py-0.5 text-foreground-tertiary/60">
+                <span className="flex shrink-0 items-center rounded-md px-0.5 py-0.5 text-foreground-tertiary/50">
                   <MoreHorizontal size={12} />
                 </span>
-                <span className="text-foreground-tertiary/60">/</span>
+                <span className="shrink-0 text-foreground-tertiary/50 mx-0.5">/</span>
               </>
             )}
             {breadcrumb.last && (
               <button
                 type="button"
-                onClick={() => navigateToNode(breadcrumb.last!.id)}
-                className="min-w-0 truncate rounded px-0.5 py-0.5 transition-colors hover:bg-foreground/4 hover:text-foreground-secondary"
+                onClick={() => setDisplayNodeId(breadcrumb.last!.id)}
+                className="min-w-0 max-w-[120px] truncate rounded px-0.5 transition-colors hover:text-foreground"
               >
                 {breadcrumb.last.name}
               </button>
@@ -92,7 +98,7 @@ export function NodeEmbed({ nodeId }: NodeEmbedProps) {
             type="button"
             onClick={() => {
               closeChatDrawer();
-              navigateToNode(nodeId);
+              navigateToNode(displayNodeId);
             }}
             className="flex shrink-0 items-center justify-center rounded p-1 text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground-secondary"
             title="Open in outliner"
@@ -103,13 +109,13 @@ export function NodeEmbed({ nodeId }: NodeEmbedProps) {
 
         {/* Outliner content */}
         <OutlinerItem
-          nodeId={nodeId}
+          nodeId={displayNodeId}
           depth={0}
-          rootChildIds={[nodeId]}
+          rootChildIds={[displayNodeId]}
           parentId={realParentId}
           rootNodeId={realParentId}
           panelId={CHAT_OUTLINER_PANEL_ID}
-          bulletToggleExpand
+          onBulletNavigate={handleBulletNavigate}
         />
       </div>
     </div>

@@ -3,203 +3,38 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=1280, height=800">
-<title>Screenshot 1 — Think where you read</title>
+<title>Screenshot 1 — Overview</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@400;600&display=swap" rel="stylesheet">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
-    width: 1280px; height: 800px;
-    background: #EBEBE6;
-    font-family: 'Inter', system-ui, sans-serif;
+    width: 1280px; height: 800px; background: #F5F4EE;
+    font-family: 'Inter', system-ui, sans-serif; overflow: hidden;
+    display: flex; align-items: center; justify-content: center; gap: 80px;
+  }
+  .text-side { max-width: 400px; }
+  .text-side h1 {
+    font-size: 44px; font-weight: 600; color: #1A1A1A;
+    letter-spacing: -1.2px; line-height: 1.12; margin-bottom: 16px;
+  }
+  .text-side h1 em { font-style: normal; color: #5E8E65; }
+  .text-side p { font-size: 18px; color: #666; line-height: 1.6; }
+
+  .phone-frame {
+    width: 380px; height: 680px; background: #fff; border-radius: 16px;
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.06), 0 8px 32px rgba(0,0,0,0.08), 0 24px 64px rgba(0,0,0,0.06);
     overflow: hidden;
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    gap: 24px;
   }
-
-  /* Caption */
-  .caption {
-    font-size: 32px; font-weight: 600; color: #1A1A1A;
-    letter-spacing: -0.8px; text-align: center;
-  }
-  .caption em { font-style: normal; color: #5E8E65; }
-  .subtitle {
-    font-size: 17px; color: #666; margin-top: -12px;
-    letter-spacing: -0.2px;
-  }
-
-  /* Browser */
-  .browser {
-    width: 1100px; height: 640px;
-    background: #fff; border-radius: 12px;
-    box-shadow: 0 0 0 1px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.08), 0 24px 48px rgba(0,0,0,0.06);
-    overflow: hidden; display: flex; flex-direction: column;
-  }
-  .titlebar {
-    height: 44px; background: #f6f5f0;
-    display: flex; align-items: center;
-    padding: 0 16px; gap: 8px;
-    border-bottom: 1px solid rgba(0,0,0,0.06);
-  }
-  .dot { width: 12px; height: 12px; border-radius: 50%; }
-  .dot-r { background: #EC6A5E; } .dot-y { background: #F4BF4F; } .dot-g { background: #61C554; }
-  .url-bar {
-    flex: 1; height: 28px; background: rgba(0,0,0,0.04); border-radius: 6px;
-    margin-left: 12px; display: flex; align-items: center;
-    padding: 0 12px; font-size: 12px; color: #999;
-  }
-  .content-split { flex: 1; display: flex; }
-
-  /* Article */
-  .article-side {
-    flex: 1; padding: 44px 48px; overflow: hidden;
-    font-family: 'Source Serif 4', Georgia, serif;
-  }
-  .article-meta {
-    font-family: 'Inter', sans-serif; font-size: 12px; color: #999;
-    margin-bottom: 14px; text-transform: uppercase; letter-spacing: 1px;
-  }
-  .article-title {
-    font-size: 30px; font-weight: 600; color: #1A1A1A;
-    line-height: 1.25; margin-bottom: 10px; letter-spacing: -0.5px;
-  }
-  .article-author {
-    font-family: 'Inter', sans-serif; font-size: 13px; color: #666;
-    margin-bottom: 24px;
-  }
-  .article-p { font-size: 16.5px; line-height: 1.72; color: #333; margin-bottom: 16px; }
-  .highlight-mark { background: rgba(247,236,139,0.55); padding: 2px 0; }
-
-  /* Side panel */
-  .sidepanel {
-    width: 340px; background: #F5F4EE;
-    border-left: 1px solid rgba(0,0,0,0.06);
-    display: flex; flex-direction: column; overflow: hidden;
-  }
-  .sp-toolbar {
-    height: 44px; display: flex; align-items: center; justify-content: space-between;
-    padding: 0 14px;
-    border-bottom: 1px solid rgba(0,0,0,0.06);
-    background: rgba(245,244,238,0.85);
-  }
-  .sp-breadcrumb { font-size: 13px; color: #999; display: flex; align-items: center; gap: 4px; }
-  .sp-breadcrumb-current { color: #1A1A1A; font-weight: 500; }
-  .sp-icon-btn {
-    width: 28px; height: 28px; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center; color: #999;
-  }
-  .sp-body { flex: 1; padding: 16px 0; overflow: hidden; }
-  .panel-title {
-    font-size: 18px; font-weight: 500; color: #1A1A1A;
-    margin-bottom: 14px; padding: 0 14px 0 33px;
-  }
-
-  /* Nodes */
-  .node-list { display: flex; flex-direction: column; gap: 3px; padding-right: 14px; }
-  .node { display: flex; gap: 4px; align-items: flex-start; min-height: 22px; padding-left: 6px; }
-  .node-i1 { padding-left: 30px; }
-  .chevron { width: 14px; height: 22px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; opacity: 0; }
-  .bcol { width: 14px; height: 22px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-  .bullet { width: 5px; height: 5px; border-radius: 50%; background: rgba(26,26,26,0.4); }
-  .bullet-parent {
-    width: 14px; height: 14px; border-radius: 50%;
-    background: rgba(75,124,158,0.12);
-    display: flex; align-items: center; justify-content: center;
-  }
-  .bullet-parent .bullet { background: #4B7C9E; }
-  .nc { flex: 1; min-width: 0; }
-  .nt-line { font-size: 14px; line-height: 22px; color: #1A1A1A; }
-  .nd { font-size: 10px; line-height: 14px; color: #999; }
-
-  .tag {
-    display: inline-flex; align-items: center; height: 18px;
-    font-size: 12px; font-weight: 500; margin-left: 5px; gap: 2px;
-    vertical-align: baseline;
-  }
-  .tag-hash { color: rgba(153,153,153,0.4); }
-  .tag-article .tag-name { color: #4B7C9E; }
-  .tag-insight .tag-name { color: #608A55; }
-  .tag-method .tag-name { color: #4B7C9E; }
-
-  .cursor {
-    display: inline-block; width: 1.5px; height: 16px;
-    background: #5E8E65; vertical-align: text-bottom;
-    animation: blink 1s step-end infinite; margin-left: 1px;
-  }
-  @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+  .phone-frame img { width: 100%; height: 100%; object-fit: cover; object-position: top; }
 </style>
 </head>
 <body>
-  <div class="caption">Think <em>where</em> you read.</div>
-  <div class="subtitle">Your notes live right beside the page — no tab-switching, no "save for later."</div>
-
-  <div class="browser">
-    <div class="titlebar">
-      <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
-      <div class="url-bar">aeon.co/essays/the-art-of-deep-reading-in-a-distracted-world</div>
-    </div>
-    <div class="content-split">
-      <div class="article-side">
-        <div class="article-meta">Essay</div>
-        <div class="article-title">The Art of Deep Reading<br>in a Distracted World</div>
-        <div class="article-author">by Maria Chen · 12 min read</div>
-        <div class="article-p">The modern reader faces a paradox: never before has so much knowledge been so freely accessible, yet never before have we struggled so deeply to absorb it. We skim, we scan, we bookmark for later — but rarely do we stop to think.</div>
-        <div class="article-p"><span class="highlight-mark">True understanding doesn't come from consuming more — it emerges when we pause to articulate what we've just read in our own words.</span> This act of translation, from author's thought to reader's language, is where learning actually happens.</div>
-        <div class="article-p">The most effective readers throughout history have been writers. Not because writing was their profession, but because <span class="highlight-mark">the discipline of putting thoughts into words forces a clarity that passive reading never achieves.</span></div>
-      </div>
-      <div class="sidepanel">
-        <div class="sp-toolbar">
-          <div class="sp-breadcrumb">
-            <span>Journal</span><span>›</span>
-            <span class="sp-breadcrumb-current">Today</span>
-          </div>
-          <div class="sp-icon-btn">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-          </div>
-        </div>
-        <div class="sp-body">
-          <div class="panel-title">Today</div>
-          <div class="node-list">
-            <div class="node">
-              <div class="chevron"></div>
-              <div class="bcol"><div class="bullet-parent"><div class="bullet"></div></div></div>
-              <div class="nc">
-                <div class="nt-line">
-                  The Art of Deep Reading
-                  <span class="tag tag-article"><span class="tag-hash">#</span><span class="tag-name">article</span></span>
-                </div>
-                <div class="nd">aeon.co</div>
-              </div>
-            </div>
-            <div class="node node-i1">
-              <div class="chevron"></div>
-              <div class="bcol"><div class="bullet"></div></div>
-              <div class="nc">
-                <div class="nt-line">Understanding = pausing to articulate in your own words</div>
-              </div>
-            </div>
-            <div class="node node-i1">
-              <div class="chevron"></div>
-              <div class="bcol"><div class="bullet"></div></div>
-              <div class="nc">
-                <div class="nt-line">
-                  Writing forces a clarity that reading alone never achieves
-                  <span class="tag tag-insight"><span class="tag-hash">#</span><span class="tag-name">insight</span></span>
-                </div>
-              </div>
-            </div>
-            <div class="node node-i1">
-              <div class="chevron"></div>
-              <div class="bcol"><div class="bullet"></div></div>
-              <div class="nc">
-                <div class="nt-line">This is exactly why soma works — think at the point of reading<span class="cursor"></span></div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+  <div class="text-side">
+    <h1>Notes that <em>think</em> with you.</h1>
+    <p>A structured notebook and AI thinking partner, right in your browser sidebar. Capture ideas while you read, organize them into structure, and think with AI alongside your notes.</p>
+  </div>
+  <div class="phone-frame">
+    <img src="../images/screenshot-1-overview.png" alt="Overview">
   </div>
 </body>
 </html>

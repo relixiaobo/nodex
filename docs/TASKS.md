@@ -16,9 +16,9 @@
 
 | 工作区 | 分支 | 任务 | 状态 |
 |--------|------|------|------|
-| nodex-claude | — | 空闲 | — |
+| nodex-claude | — | 上架资料整理 | 待启动 |
 | nodex-gemini | — | 空闲 | — |
-| nodex-codex | — | 空闲 | — |
+| nodex-codex | codex/view-context-injection | View Context Injection (#174) | 待启动 |
 
 ---
 
@@ -30,9 +30,9 @@
 
 ## 待办
 
-### v0.2 — AI 思考伙伴（当前阶段）
+### v0.3 — Chat Drawer + AI 体验（当前阶段）
 
-> **产品方向**：Think with your AI。AI 作为批判性思考伙伴，模块化能力（is/has 框架），用户选择体验模式。详见 `docs/plans/ai-first-product-vision.md` + `docs/ai-personality.md`。
+> **产品方向**：Think where you read。Outliner 常驻 + Chat 抽屉随时呼出，AI 作为通用思考伙伴。详见 `docs/plans/ai-first-product-vision.md` + `docs/ai-personality.md`。
 
 #### Chat 体验
 

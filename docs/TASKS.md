@@ -18,13 +18,11 @@
 |--------|------|------|------|
 | nodex-claude | — | 上架资料整理 | 待启动 |
 | nodex-gemini | — | 空闲 | — |
-| nodex-codex | codex/view-context-injection | View Context Injection (#174) | 待启动 |
+| nodex-codex | — | 空闲 | — |
 
 ---
 
 ## 进行中
-
-- [ ] **View Context Injection** (#174, Codex) — system reminder 注入可见树快照（跟随展开状态，JSON 格式与 node_read 一致）
 
 ---
 
@@ -37,7 +35,7 @@
 #### Chat 体验
 
 - [ ] **@ 引用节点** — Chat 输入框 `@` 触发节点选择器，精确注入上下文
-- [ ] **View Context Injection** — system reminder 注入可见树快照（跟随展开状态，JSON 格式与 node_read 一致）。设计：`docs/plans/view-context-injection.md`。依赖 #173
+- [x] ~~**View Context Injection**~~ (#174) — system reminder 注入可见树快照
 
 #### AI 能力
 
@@ -125,6 +123,7 @@
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-24 | View Context Injection — AI 看到用户可见的 outliner 树 | codex | #174 |
 | 2026-03-24 | Chat Embed 交互修复 — NodeEmbed 限高 + dropdown portal 迁移 + focus 隔离 | codex | #175 |
 | 2026-03-23 | Expand key 作用域隔离 — chat embed 和 outliner 独立展开状态 | codex | #173 |
 | 2026-03-23 | Chat Drawer 布局 — Outliner 底层 + Chat 底部抽屉 + 单层 full-bleed | codex | #172 |

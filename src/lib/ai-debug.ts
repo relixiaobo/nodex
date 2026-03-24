@@ -102,6 +102,19 @@ function hasLocalStorage(): boolean {
   return typeof localStorage !== 'undefined';
 }
 
+/** Synchronous read from LoroDoc only (for Zustand selectors). */
+export function readChatDebugEnabled_sync(): boolean {
+  try {
+    const fieldEntry = loroDoc.toNodexNode(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_DEBUG_FIELD_ENTRY);
+    const valueNodeId = fieldEntry?.children?.[0];
+    if (valueNodeId) {
+      const valueNode = loroDoc.toNodexNode(valueNodeId);
+      return valueNode?.name === SYS_V.YES;
+    }
+  } catch { /* LoroDoc not ready */ }
+  return false;
+}
+
 export async function readChatDebugEnabled(): Promise<boolean> {
   // Read from LoroDoc Settings field
   try {

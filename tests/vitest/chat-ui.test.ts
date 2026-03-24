@@ -467,9 +467,8 @@ describe('chat ui', () => {
     });
 
     await vi.waitFor(() => {
-      expect(container.textContent).toContain('Welcome to soma');
-      expect(container.textContent).toContain('Save API key');
-      expect(container.textContent).toContain('Start with outliner');
+      expect(container.textContent).toContain('Connect an AI provider');
+      expect(container.textContent).toContain('Save');
     });
   });
 
@@ -515,7 +514,7 @@ describe('chat ui', () => {
     });
 
     await vi.waitFor(() => {
-      expect(container.textContent).toContain('Save API key');
+      expect(container.textContent).toContain('Save');
     });
 
     const apiKeyInput = container.querySelector('input[aria-label="API key"]') as HTMLInputElement;
@@ -533,36 +532,11 @@ describe('chat ui', () => {
 
     await vi.waitFor(() => {
       expect(getApiKeyForProvider('anthropic')).toBe('sk-ant-primary');
-      expect(container.textContent).toContain('Ask about your notes, clips, or the page you\'re reading.');
+      expect(container.textContent).toContain('What are you thinking about?');
     });
   });
 
-  it('lets onboarding switch the current panel to Today and persist the startup preference', async () => {
-    resetAndSeed();
-    await deleteDB(DB_NAME);
-    resetChatPersistenceForTests();
-    useUIStore.getState().navigateTo('chat:session-startup');
-
-    flushSync(() => {
-      root.render(React.createElement(ChatPanel, { sessionId: 'session-startup' }));
-    });
-
-    await vi.waitFor(() => {
-      expect(container.textContent).toContain('Start with outliner');
-    });
-
-    const outlinerButton = Array.from(container.querySelectorAll('button'))
-      .find((button) => button.textContent?.includes('Start with outliner'));
-
-    flushSync(() => {
-      outlinerButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
-
-    await vi.waitFor(() => {
-      expect(getStartupPagePreference()).toBe(STARTUP_PAGE.TODAY);
-      expect(useUIStore.getState().currentNodeId).toBe(ensureTodayNode());
-    });
-  });
+  // "Start with outliner" button removed — outliner is always visible in drawer layout.
 
   it('updates the rendered conversation when switching chat branches', async () => {
     resetAndSeed();

@@ -1,14 +1,11 @@
 import { getProviders } from '@mariozechner/pi-ai';
 import { useMemo, useState, type FormEvent } from 'react';
 import { toast } from 'sonner';
-import { ensureTodayNode } from '../../lib/journal.js';
 import {
   guessProviderFromApiKey,
   normalizeProviderId,
   saveProviderApiKey,
 } from '../../lib/ai-provider-config.js';
-import { STARTUP_PAGE, setStartupPagePreference } from '../../lib/settings-service.js';
-import { useUIStore } from '../../stores/ui-store.js';
 
 function getActionErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message.trim().length > 0) {
@@ -41,81 +38,52 @@ export function ChatOnboarding() {
     }
   }
 
-  function handleStartWithOutliner() {
-    setStartupPagePreference(STARTUP_PAGE.TODAY);
-    const todayId = ensureTodayNode();
-    useUIStore.getState().navigateToNode(todayId);
-  }
-
   return (
-    <div className="flex flex-1 overflow-hidden">
-      <div className="flex flex-1 flex-col justify-center px-6 py-8">
-        <div className="mx-auto flex w-full max-w-[320px] flex-col items-center gap-4 text-center">
-          <div className="space-y-1">
-            <p className="text-lg font-medium text-foreground">Welcome to soma</p>
-            <p className="text-sm text-foreground-tertiary">
-              Paste an API key to unlock Chat without leaving this panel.
-            </p>
-          </div>
+    <div className="flex flex-1 flex-col items-center justify-center px-6 py-6">
+      <div className="flex w-full max-w-[300px] flex-col gap-3">
+        <div className="space-y-0.5">
+          <p className="text-sm font-medium text-foreground">Connect an AI provider</p>
+          <p className="text-xs text-foreground-tertiary">
+            Add an API key to start chatting.
+          </p>
+        </div>
 
-          <form className="flex w-full flex-col gap-3" onSubmit={handleSubmit}>
-            <label className="flex flex-col gap-1 text-left">
-              <span className="text-xs font-medium uppercase tracking-[0.08em] text-foreground-tertiary">
-                Provider
-              </span>
-              <select
-                aria-label="Select provider"
-                value={provider}
-                onChange={(event) => setProvider(event.target.value)}
-                className="h-10 rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none transition-colors focus:border-foreground/20"
-              >
-                {providerOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </label>
+        <form className="flex flex-col gap-2.5" onSubmit={handleSubmit}>
+          <select
+            aria-label="Select provider"
+            value={provider}
+            onChange={(event) => setProvider(event.target.value)}
+            className="h-9 rounded-lg border border-border bg-surface px-2.5 text-sm text-foreground outline-none transition-colors focus:border-foreground/20"
+          >
+            {providerOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
 
-            <label className="flex flex-col gap-1 text-left">
-              <span className="text-xs font-medium uppercase tracking-[0.08em] text-foreground-tertiary">
-                API key
-              </span>
-              <input
-                aria-label="API key"
-                type="password"
-                value={apiKey}
-                onChange={(event) => {
-                  const nextValue = event.target.value;
-                  setApiKey(nextValue);
-
-                  const detectedProvider = guessProviderFromApiKey(nextValue);
-                  if (detectedProvider) {
-                    setProvider(detectedProvider);
-                  }
-                }}
-                placeholder="Paste your API key"
-                className="h-10 rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none transition-colors placeholder:text-foreground-tertiary focus:border-foreground/20"
-              />
-            </label>
-
-            <button
-              type="submit"
-              disabled={submitting}
-              className="inline-flex h-10 items-center justify-center rounded-xl bg-foreground px-4 text-sm font-medium text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {submitting ? 'Saving…' : 'Save API key'}
-            </button>
-          </form>
+          <input
+            aria-label="API key"
+            type="password"
+            value={apiKey}
+            onChange={(event) => {
+              const nextValue = event.target.value;
+              setApiKey(nextValue);
+              const detectedProvider = guessProviderFromApiKey(nextValue);
+              if (detectedProvider) setProvider(detectedProvider);
+            }}
+            placeholder="Paste your API key"
+            className="h-9 rounded-lg border border-border bg-surface px-2.5 text-sm text-foreground outline-none transition-colors placeholder:text-foreground-tertiary focus:border-foreground/20"
+          />
 
           <button
-            type="button"
-            onClick={handleStartWithOutliner}
-            className="text-sm text-foreground-secondary transition-colors hover:text-foreground"
+            type="submit"
+            disabled={submitting || !apiKey.trim()}
+            className="inline-flex h-9 items-center justify-center rounded-lg bg-foreground px-4 text-sm font-medium text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Start with outliner →
+            {submitting ? 'Saving…' : 'Save'}
           </button>
-        </div>
+        </form>
       </div>
     </div>
   );

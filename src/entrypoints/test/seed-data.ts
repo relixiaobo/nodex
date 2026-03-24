@@ -22,7 +22,7 @@ import { SYSTEM_NODE_IDS, FIELD_TYPES, SYS_T, NDX_F, NDX_T, SYS_V } from '../../
 import type { InlineRefEntry, TextMark } from '../../types/index.js';
 import { buildExpandedNodeKey } from '../../lib/expanded-node-key.js';
 import { ensureDateNode } from '../../lib/journal.js';
-import { SYSTEM_SCHEMA_NODE_IDS, ensureSystemSchema } from '../../lib/system-schema-presets.js';
+import { SYSTEM_SCHEMA_NODE_IDS, ensureSystemSchema, migrateSettingsToAIGroup } from '../../lib/system-schema-presets.js';
 import { ensureAgentNode } from '../../lib/ai-agent-node.js';
 
 const WS_ID = 'ws_default';
@@ -63,6 +63,7 @@ function seedBody(): void {
   cn(SYSTEM_NODE_IDS.SETTINGS, WS_ID, { name: 'Settings', locked: true });
   ensureSystemSchema();
   ensureAgentNode(WS_ID);
+  migrateSettingsToAIGroup();
 
   const today = new Date();
   const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);

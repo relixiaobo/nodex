@@ -94,7 +94,7 @@ export function NodeEmbed({ nodeId }: NodeEmbedProps) {
            center aligns with the border line. The chevron's opaque outline
            covers the border line behind it. */}
       <div className="rounded-lg border border-border bg-background py-1">
-        <div className="-ml-[14px] max-h-[calc(60vh-8px)] overflow-y-auto">
+        <div className="-ml-[14px] max-h-[40vh] overflow-y-auto">
           {hasChildren ? (
             childIds.map((childId) => (
               <OutlinerItem

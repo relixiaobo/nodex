@@ -349,7 +349,7 @@ export function ChatPanel({ sessionId, hideHeader }: ChatPanelProps) {
   }
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden bg-background">
+    <div className="flex flex-1 flex-col overflow-hidden">
       {!hideHeader && (
         <ChatPanelHeader
           sessionId={sessionId}

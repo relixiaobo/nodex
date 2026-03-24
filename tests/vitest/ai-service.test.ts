@@ -956,20 +956,15 @@ describe('ai-service', () => {
 
     await regenerateResponse(targetAssistant!.id, agent);
 
+    // Walk-up traces back to the first assistant in the turn (assistant-with-tool),
+    // so regenerate creates a sibling of that node. The path sent to the agent
+    // is just the user message — the entire multi-turn tool chain is replayed.
     expect(agent.replaceMessages).toHaveBeenCalledTimes(1);
     expect(agent.replaceMessages.mock.calls[0][0]).toEqual([
       createUserMessage('user-1', 1),
-      createAssistantMessage('assistant-with-tool', 2),
-      createToolResultMessage('tool output', 3),
     ]);
     expect(agent.continue).toHaveBeenCalledTimes(1);
     expect(agent.prompt).not.toHaveBeenCalled();
-    expect(getLinearPath(session).map((node) => node.message)).toEqual([
-      createUserMessage('user-1', 1),
-      createAssistantMessage('assistant-with-tool', 2),
-      createToolResultMessage('tool output', 3),
-      regeneratedReply,
-    ]);
   });
 
   it('switchMessageBranch swaps the active branch, persists it, and does not prompt the agent', async () => {

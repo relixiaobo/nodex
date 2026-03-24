@@ -210,7 +210,6 @@ export function ChevronButton({
       <button
         className="flex shrink-0 h-6 w-[15px] items-center justify-center opacity-0 group-hover/row:opacity-100 pointer-events-none group-hover/row:pointer-events-auto transition-opacity focus:outline-none"
         tabIndex={-1}
-        data-chevron-btn
         onPointerDown={(e) => {
           onTogglePointerDown?.();
           // Pointer events fire before mousedown; prevent focus theft here.

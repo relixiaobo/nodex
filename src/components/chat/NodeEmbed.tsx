@@ -31,15 +31,19 @@ export function NodeEmbed({ nodeId }: NodeEmbedProps) {
   const closeChatDrawer = useUIStore((s) => s.closeChatDrawer);
   const hasChildren = childIds.length > 0;
 
-  // Auto-expand children on mount / navigation so they're visible
+  // Auto-expand children on mount / navigation — only when displayNodeId changes,
+  // NOT on every render (childIds is a new array ref each render, which would
+  // re-expand nodes the user just collapsed).
   useEffect(() => {
-    for (const childId of childIds) {
-      const child = loroDoc.toNodexNode(childId);
+    const n = loroDoc.toNodexNode(displayNodeId);
+    for (const cid of n?.children ?? []) {
+      const child = loroDoc.toNodexNode(cid);
       if ((child?.children?.length ?? 0) > 0) {
-        setExpanded(buildExpandedNodeKey(CHAT_OUTLINER_PANEL_ID, displayNodeId, childId), true, true);
+        setExpanded(buildExpandedNodeKey(CHAT_OUTLINER_PANEL_ID, displayNodeId, cid), true, true);
       }
     }
-  }, [displayNodeId, childIds, setExpanded]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally only on displayNodeId change
+  }, [displayNodeId]);
 
   // Bullet click → drill into node within the embed
   const handleBulletNavigate = useCallback((targetNodeId: string) => {

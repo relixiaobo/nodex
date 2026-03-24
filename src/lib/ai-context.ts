@@ -3,15 +3,35 @@ import { IMAGE_PLACEHOLDER, messageHasImage, replaceMessageImages } from './ai-m
 import * as loroDoc from './loro-doc.js';
 import { getAncestorChain } from './tree-utils.js';
 import { isOutlinerContentNodeType } from './node-type-utils.js';
+import { buildExpandedNodeKey } from './expanded-node-key.js';
+import { getTagDisplayNames, toCheckedValue } from './ai-tools/shared.js';
 import { useUIStore } from '../stores/ui-store.js';
 import { isAppPanel } from '../types/index.js';
 import { buildMentionedNodeEditReminder } from './ai-mentioned-nodes.js';
 
 const RECENT_IMAGE_MESSAGES = 3;
+const VIEW_MAX_DEPTH = 3;
+const VIEW_MAX_CHILDREN = 10;
+const MAIN_PANEL_ID = 'node-main';
 
 export interface PreparedAgentContext {
   reminder: string;
   messages: AgentMessage[];
+}
+
+interface ViewChildSummary {
+  id: string;
+  name: string;
+  hasChildren: boolean;
+  childCount: number;
+  tags: string[];
+  checked: boolean | null;
+  isReference?: boolean;
+  targetId?: string;
+  children?: {
+    total: number;
+    items: ViewChildSummary[];
+  };
 }
 
 function escapeXml(text: string): string {
@@ -42,38 +62,92 @@ export function formatLocalTimestamp(date: Date): string {
   ].join('');
 }
 
-function buildPanelContext(): string | null {
+function getContentChildIds(nodeId: string): string[] {
+  return loroDoc.getChildren(nodeId).filter((childId) => {
+    const child = loroDoc.toNodexNode(childId);
+    return child != null && isOutlinerContentNodeType(child.type);
+  });
+}
+
+function summarizeVisibleTree(
+  nodeId: string,
+  parentId: string,
+  expandedNodes: Set<string>,
+  depth: number,
+): ViewChildSummary {
+  const node = loroDoc.toNodexNode(nodeId);
+  if (!node) {
+    return {
+      id: nodeId,
+      name: '',
+      hasChildren: false,
+      childCount: 0,
+      tags: [],
+      checked: null,
+    };
+  }
+
+  const isReference = node.type === 'reference' && !!node.targetId;
+  const effectiveNodeId = isReference ? node.targetId! : nodeId;
+  const effectiveNode = isReference ? loroDoc.toNodexNode(effectiveNodeId) ?? node : node;
+  const effectiveChildIds = getContentChildIds(effectiveNodeId);
+
+  const summary: ViewChildSummary = {
+    id: nodeId,
+    name: effectiveNode?.name ?? '',
+    hasChildren: effectiveChildIds.length > 0,
+    childCount: effectiveChildIds.length,
+    tags: depth <= 1 ? getTagDisplayNames(effectiveNode?.tags ?? []) : [],
+    checked: toCheckedValue(nodeId),
+  };
+
+  if (isReference) {
+    summary.isReference = true;
+    summary.targetId = effectiveNodeId;
+  }
+
+  const expandKey = buildExpandedNodeKey(MAIN_PANEL_ID, parentId, nodeId);
+  if (expandedNodes.has(expandKey) && depth < VIEW_MAX_DEPTH && effectiveChildIds.length > 0) {
+    const pagedIds = effectiveChildIds.slice(0, VIEW_MAX_CHILDREN);
+    summary.children = {
+      total: effectiveChildIds.length,
+      items: pagedIds.map((childId) => summarizeVisibleTree(childId, effectiveNodeId, expandedNodes, depth + 1)),
+    };
+  }
+
+  return summary;
+}
+
+export function buildViewContext(): string | null {
   const ui = useUIStore.getState();
-  const currentPanelId = ui.currentNodeId;
-  if (!currentPanelId || isAppPanel(currentPanelId)) return null;
+  const currentNodeId = ui.currentNodeId;
+  if (!currentNodeId || isAppPanel(currentNodeId)) return null;
 
-  const panelNode = loroDoc.toNodexNode(currentPanelId);
-  if (!panelNode) return null;
+  const node = loroDoc.toNodexNode(currentNodeId);
+  if (!node) return null;
 
-  const { ancestors, workspaceRootId } = getAncestorChain(currentPanelId);
+  const { ancestors, workspaceRootId } = getAncestorChain(currentNodeId);
   const breadcrumb = ancestors
     .filter((ancestor) => ancestor.id !== workspaceRootId)
     .map((ancestor) => ancestor.name);
-  const panelPath = [...breadcrumb, panelNode.name ?? currentPanelId].join(' > ');
-  const childLines = loroDoc.getChildren(currentPanelId)
-    .map((childId) => loroDoc.toNodexNode(childId))
-    .filter((node): node is NonNullable<ReturnType<typeof loroDoc.toNodexNode>> => node !== null && isOutlinerContentNodeType(node.type))
-    .slice(0, 10)
-    .map((child) => {
-      const childCount = loroDoc.getChildren(child.id)
-        .map((grandId) => loroDoc.toNodexNode(grandId))
-        .filter((node): node is NonNullable<ReturnType<typeof loroDoc.toNodexNode>> => node !== null && isOutlinerContentNodeType(node.type))
-        .length;
-      const checkedState = child.completedAt == null ? '' : (child.completedAt > 0 ? ', checkbox: done' : ', checkbox: undone');
-      return `  - "${escapeXml(child.name ?? '')}" (id: ${child.id}, ${childCount} children${checkedState})`;
-    });
+  const contentChildIds = getContentChildIds(currentNodeId);
+  const pagedIds = contentChildIds.slice(0, VIEW_MAX_CHILDREN);
+  const viewData = {
+    id: currentNodeId,
+    name: node.name ?? '',
+    tags: getTagDisplayNames(node.tags),
+    breadcrumb,
+    focusedNodeId: ui.focusedNodeId,
+    children: {
+      total: contentChildIds.length,
+      items: pagedIds.map((childId) => summarizeVisibleTree(childId, currentNodeId, ui.expandedNodes, 0)),
+    },
+  };
 
   return [
-    '<panel-context>',
-    `Current panel: ${escapeXml(panelPath)} (ID: ${currentPanelId})`,
-    `Children (${childLines.length}):`,
-    ...(childLines.length > 0 ? childLines : ['  - none']),
-    '</panel-context>',
+    '<view-context>',
+    JSON.stringify(viewData, null, 2),
+    '</view-context>',
   ].join('\n');
 }
 
@@ -133,7 +207,7 @@ function buildTimeContext(): string {
 
 export async function buildSystemReminder(): Promise<string> {
   const sections = [
-    buildPanelContext(),
+    buildViewContext(),
     await getPageContext(),
     buildTimeContext(),
     buildMentionedNodeEditReminder(),

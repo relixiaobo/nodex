@@ -1,10 +1,10 @@
 # soma Privacy Policy
 
-*Last updated: March 11, 2026*
+*Last updated: March 24, 2026*
 
 ## What is soma
 
-soma is a Chrome extension that provides knowledge management in the Chrome Side Panel. It lets you create, organize, and sync notes while browsing the web.
+soma is a Chrome extension that combines structured note-taking with an AI thinking partner in the Chrome Side Panel. It lets you create, organize, and sync notes while browsing the web, and think with AI alongside your notes.
 
 ## Data We Collect
 
@@ -25,18 +25,20 @@ We do **not** use your data for advertising, analytics, or any purpose unrelated
 
 ## AI Features
 
-soma offers optional AI-powered features (chat, clip analysis, review). When you use these features:
+soma offers optional AI-powered features (chat, note analysis, web clipping). When you use these features:
 
-**API key**: Your Anthropic API key is stored locally in your browser (chrome.storage). It is sent to our proxy server only when making AI requests and is never stored on our servers.
+**AI providers**: soma supports multiple AI providers — Anthropic Claude, OpenAI GPT, Google Gemini, DeepSeek, and any OpenAI-compatible provider. You choose which provider to use and configure your own API key.
 
-**Data sent to AI**: When you use AI features, the following data may be sent to the AI provider (Anthropic) through our proxy server:
+**API key**: Your API key is stored locally in your browser (chrome.storage). It is sent to the AI provider only when making AI requests and is never stored on our servers.
+
+**Data sent to AI**: When you use AI features, the following data may be sent to your configured AI provider:
 - Your chat messages
 - Content from your notes that you include in conversations
 - Web page content when using AI-assisted clipping
 
-**Third-party AI provider**: AI requests are processed by Anthropic (anthropic.com). Your data is subject to Anthropic's usage policy. We do not use the Anthropic Batch API or allow your data to be used for model training.
+**Third-party AI providers**: AI requests are processed by the provider you configure. Your data is subject to that provider's usage policy. We do not allow your data to be used for model training.
 
-**AI data is not stored on our servers**: Our proxy server forwards your requests to Anthropic and streams the response back. We do not log or store the content of AI conversations.
+**AI data is not stored on our servers**: We do not log or store the content of AI conversations.
 
 ## Data Storage
 

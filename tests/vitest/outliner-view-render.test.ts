@@ -12,7 +12,7 @@ describe('OutlinerView render safety', () => {
   it('renders node panel outliner without runtime error', () => {
     const html = renderToStaticMarkup(createElement(OutlinerView, { rootNodeId: 'task_1' }));
     expect(html).toContain('Status');
-    expect(html).toContain('Define node types and properties');
+    expect(html).toContain('Session 3 — user struggled with the pricing page');
     expect(html).not.toMatch(/title="\\d+ references?"/);
   });
 });

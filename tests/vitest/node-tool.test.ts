@@ -181,7 +181,7 @@ describe('node tools (Phase 1.5)', () => {
 
   it('searches by query and tag display name', async () => {
     const details = await executeSearch({
-      rules: { query: 'weekly sync', searchTags: ['meeting'] },
+      rules: { query: 'design review', searchTags: ['meeting'] },
     }) as {
       total: number;
       items: Array<{ id: string; name: string }>;
@@ -189,7 +189,7 @@ describe('node tools (Phase 1.5)', () => {
 
     expect(details.total).toBeGreaterThan(0);
     expect(details.items.map((item) => item.id)).toContain('meeting_1');
-    expect(details.items.map((item) => item.name)).toContain('Weekly sync');
+    expect(details.items.map((item) => item.name)).toContain('Design review with Sarah');
   });
 
   it('moves deleted nodes to Trash instead of hard-deleting them', async () => {
@@ -200,7 +200,7 @@ describe('node tools (Phase 1.5)', () => {
       action: string;
     };
 
-    expect(details.name).toBe('Next meeting on Friday');
+    expect(details.name).toBe('Most people think they understand until they try to explain it');
     expect(details.action).toBe('trashed');
     expect(loroDoc.getParentId('note_1c')).toBe(SYSTEM_NODE_IDS.TRASH);
   });

@@ -1,8 +1,8 @@
 # soma
 
-> Think where you read.
+> Notes that think with you.
 
-浏览器侧边栏知识管理工具，忠实复刻 Tana 核心功能。
+浏览器侧栏结构化笔记 + AI 思考伙伴。
 
 ## 项目概述
 

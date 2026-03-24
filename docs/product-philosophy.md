@@ -1,6 +1,6 @@
 # soma 产品方法论 (v4)
 
-> Think where you read.
+> Notes that think with you.
 
 > **注意**：本文档是 v4 版本，记录了 "Think → Connect → Emerge" 的产品方法论和三条认知工作流。
 > 产品方向已演进到 **v6（批判性思考伙伴 + 模块化能力 + 自我进化）**，核心变化包括：

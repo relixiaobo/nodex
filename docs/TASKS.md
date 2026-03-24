@@ -30,7 +30,7 @@
 
 ### v0.3 — Chat Drawer + AI 体验（当前阶段）
 
-> **产品方向**：Think where you read。Outliner 常驻 + Chat 抽屉随时呼出，AI 作为通用思考伙伴。详见 `docs/plans/ai-first-product-vision.md` + `docs/ai-personality.md`。
+> **产品方向**：Notes that think with you。Outliner 常驻 + Chat 抽屉随时呼出，AI 作为通用思考伙伴。详见 `docs/plans/ai-first-product-vision.md` + `docs/ai-personality.md`。
 
 #### Chat 体验
 

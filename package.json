@@ -1,7 +1,7 @@
 {
   "name": "soma",
   "version": "0.3.0",
-  "description": "Think with your AI — your thinking partner in the browser",
+  "description": "Notes that think with you — structured notes and AI thinking partner in your browser sidebar",
   "type": "module",
   "scripts": {
     "dev": "wxt",

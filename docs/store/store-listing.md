@@ -4,40 +4,28 @@
 soma
 
 ## Short Description (132 chars max)
-Think where you read. Write what you think, connect what you know, compound what you learn — in your browser side panel.
+Notes that think with you. Structured notes, web highlights, and AI thinking partner — all in your browser sidebar.
 
 ## Detailed Description
 
-**Think where you read.**
+**Notes that think with you.**
 
-You read a lot online. Most of it fades — not because it wasn't good, but because you didn't stop to think about it. soma changes that.
+You're reading an article that sparks an idea. You highlight a sentence, jot a reaction in the sidebar, and keep reading. Later, you open the AI drawer and ask "what connects this to what I wrote last week?" It finds a thread you didn't see.
 
-soma lives in your browser side panel. While you read, you think. While you think, you write. Your notes sit right beside the page — no tab-switching, no "save for later" that becomes never.
+That's soma — a structured notebook and AI thinking partner, right in your browser sidebar.
 
-**Think — write what you think**
-The moment you read something that matters, capture it. Highlight a sentence. Jot a reaction. Write it in your own words. Each step is thinking — from a quick highlight to a full reflection.
+**Structure your thinking**
+You have a loose idea. You write it down, nest another underneath, drag one up, tag it with a status field. In five minutes, a scattered thought becomes a structure you can build on. That's what an outliner does that a flat doc never will.
 
-**Connect — find the threads**
-Tag your notes, drag them into structure, link ideas together. Every time you organize, you discover relationships you didn't see before. Organizing isn't filing — it's thinking.
+**Capture while you browse**
+You're halfway through an article when a paragraph clicks. Highlight it — it's already a note in your sidebar. Clip the whole page if you want. Tomorrow your journal references it. Everything stays connected because it was never in a separate app to begin with.
 
-**Emerge — AI reveals the threads in your thinking**
-AI doesn't think for you — it reveals the threads in your own thinking. Three cognitive workflows help new understanding emerge from your accumulated notes:
-• **Reading Ring** — When you clip a page, AI extracts the thinking framework and connects it to your existing notes. You focus on "what does this make me think?" instead of summarizing.
-• **Collision Ring** — Open Chat with a half-formed idea. AI adds density and angles. You leave with sharper questions, not just answers.
-• **Review Ring** — `/review` analyzes how your thinking has evolved: new structures emerging, old ones upgrading, hidden contradictions. A cognitive mirror, not a summary.
+**Think with AI**
+You're stuck on a draft. Pull up the chat drawer — it's right below your notes. "Here's what I have so far" — and your AI sees the actual notes, not a copy-paste. It pushes back on a weak argument, suggests a structure, edits a node for you. You think out loud; it thinks with you.
 
-**How it works**
-• Nested outliner with keyboard-first navigation — expand, collapse, drag, indent
-• Tags with structured fields — status, priority, dates, custom templates
-• Highlight text on any webpage — each highlight is already a thought
-• Cmd+K to search everything — notes, tags, commands
-• Daily journal for stream-of-consciousness capture
-• Rich text — bold, italic, code, highlights, internal links between notes
-• Sync across devices — edit offline, changes merge automatically
-• AI chat for thinking out loud — bring a rough idea, leave with a sharper one
-• Clip any webpage — AI extracts the structure so you can focus on your own reactions
+Bring your own model: Claude, GPT, Gemini, DeepSeek, or any OpenAI-compatible provider.
 
-**Not another bookmark manager.** soma doesn't help you save more — it helps you think more. 100 notes you've thought through beat 10,000 unread bookmarks.
+**Not another AI chatbot. Not another note app.** soma is where your notes and AI work together — so your thinking compounds over time.
 
 ---
 
@@ -48,19 +36,19 @@ Productivity
 English
 
 ## Promo images
-- `images/promo-marquee.png` — 1400×560 marquee: "Think where you read" + Think→Connect→Emerge pills + browser mockup
+- `images/promo-marquee.png` — 1400×560 marquee: "Notes that think with you" + browser mockup
 
 ## Screenshots to upload (in order)
-1. `images/screenshot-1-overview.png` — Think where you read: browser + side panel overview (1280×800)
-2. `images/screenshot-2-think.png` — Write it in your own words: reading → understanding (1280×800)
-3. `images/screenshot-3-connect.png` — Organize your notes, discover what you think (1280×800)
-4. `images/screenshot-4-emerge.png` — AI finds the threads in your thinking (1280×800)
-5. `images/screenshot-5-belief.png` — 100 notes thought through beat 10,000 unread bookmarks (1280×800)
+1. `images/screenshot-1-overview.png` — Overview: browser + side panel with outliner and chat drawer (1280×800)
+2. `images/screenshot-2-structure.png` — Structure your thinking: outliner with tags, fields, nested nodes (1280×800)
+3. `images/screenshot-3-capture.png` — Capture while you browse: web highlights + sidebar notes (1280×800)
+4. `images/screenshot-4-ai.png` — Think with AI: chat drawer with node embed (1280×800)
+5. `images/screenshot-5-providers.png` — Bring your own model: multi-provider AI setup (1280×800)
 
 HTML source files for regenerating screenshots: `image-sources/`
 
 ## Privacy Policy (single purpose description)
-Think where you read — knowledge management in your browser side panel.
+Notes that think with you — structured notes and AI thinking partner in your browser sidebar.
 
 ## Permissions justification
 | Permission | Reason |

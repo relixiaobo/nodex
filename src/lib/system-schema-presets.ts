@@ -1,5 +1,6 @@
 import { getProviders } from '@mariozechner/pi-ai';
 import { SYSTEM_NODE_IDS, FIELD_TYPES, NDX_F, NDX_T, SYS_T, SYS_V } from '../types/index.js';
+import { SETTINGS_AI_NODE_IDS } from './ai-system-node-ids.js';
 import * as loroDoc from './loro-doc.js';
 
 const PROVIDER_OPTION_ID_PREFIX = 'NDX_PROVIDER_OPT_';
@@ -210,14 +211,6 @@ const SYSTEM_SCHEMA_NODE_PRESETS: ReadonlyArray<FixedSchemaNodePreset> = [
     },
   },
   {
-    id: SYSTEM_SCHEMA_NODE_IDS.SETTINGS_STARTUP_PAGE_FIELD_ENTRY,
-    parentId: SYSTEM_NODE_IDS.SETTINGS,
-    data: {
-      type: 'fieldEntry',
-      fieldDefId: NDX_F.SETTING_STARTUP_PAGE,
-    },
-  },
-  {
     id: SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDERS_FIELD_ENTRY,
     parentId: SYSTEM_NODE_IDS.SETTINGS,
     data: {
@@ -360,6 +353,14 @@ function cleanupLegacySettingsNodes(): void {
   if (loroDoc.hasNode(SYSTEM_SCHEMA_NODE_IDS.LEGACY_SETTINGS_AI_API_KEY_FIELD_ENTRY)) {
     loroDoc.deleteNode(SYSTEM_SCHEMA_NODE_IDS.LEGACY_SETTINGS_AI_API_KEY_FIELD_ENTRY);
   }
+  // v0.3: Startup page removed (drawer layout always shows outliner + today).
+  // Delete the field entry + value + options if they exist.
+  for (const nodeId of [
+    SYSTEM_SCHEMA_NODE_IDS.SETTINGS_STARTUP_PAGE_FIELD_ENTRY,
+    SYSTEM_SCHEMA_NODE_IDS.SETTINGS_STARTUP_PAGE_VALUE,
+  ]) {
+    if (loroDoc.hasNode(nodeId)) loroDoc.deleteNode(nodeId);
+  }
 }
 
 /**
@@ -393,15 +394,6 @@ export function ensureSystemSchema(): void {
     );
   }
 
-  const startupPageFieldEntry = loroDoc.toNodexNode(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_STARTUP_PAGE_FIELD_ENTRY);
-  if ((startupPageFieldEntry?.children?.length ?? 0) === 0) {
-    ensureTargetValue(
-      SYSTEM_SCHEMA_NODE_IDS.SETTINGS_STARTUP_PAGE_FIELD_ENTRY,
-      SYSTEM_SCHEMA_NODE_IDS.SETTINGS_STARTUP_PAGE_VALUE,
-      SYSTEM_SCHEMA_NODE_IDS.SETTINGS_STARTUP_PAGE_CHAT_OPTION,
-    );
-  }
-
   // Only create default Anthropic provider when migrating a legacy API key.
   // New users start with an empty provider list — no provider is special-cased.
   const providerConfigsFieldEntry = loroDoc.toNodexNode(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDERS_FIELD_ENTRY);
@@ -413,4 +405,16 @@ export function ensureSystemSchema(): void {
   }
 
   cleanupLegacySettingsNodes();
+}
+
+/**
+ * Move AI Debug field entry from Settings root to AI group.
+ * Must run AFTER ensureAgentNode() creates the AI group node.
+ */
+export function migrateSettingsToAIGroup(): void {
+  if (!loroDoc.hasNode(SETTINGS_AI_NODE_IDS.AI)) return;
+  const debugParent = loroDoc.getParentId(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_DEBUG_FIELD_ENTRY);
+  if (debugParent === SYSTEM_NODE_IDS.SETTINGS) {
+    loroDoc.moveNode(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_DEBUG_FIELD_ENTRY, SETTINGS_AI_NODE_IDS.AI);
+  }
 }

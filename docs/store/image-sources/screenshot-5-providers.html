@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280, height=800">
+<title>Screenshot 5 — Bring your own model</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 1280px; height: 800px; background: #F5F4EE;
+    font-family: 'Inter', system-ui, sans-serif; overflow: hidden;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 48px;
+  }
+  .text-center { text-align: center; max-width: 640px; }
+  .text-center h1 {
+    font-size: 40px; font-weight: 600; color: #1A1A1A;
+    letter-spacing: -1.2px; line-height: 1.15; margin-bottom: 12px;
+  }
+  .text-center p { font-size: 18px; color: #666; line-height: 1.6; margin-bottom: 40px; }
+
+  .provider-row { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; }
+  .chip {
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px 28px; background: #fff; border: 1px solid rgba(0,0,0,0.08);
+    border-radius: 12px; font-size: 16px; font-weight: 500; color: #1A1A1A;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .chip .dot { width: 10px; height: 10px; border-radius: 50%; }
+
+  .closing {
+    font-size: 20px; font-weight: 500; color: #666; letter-spacing: -0.3px;
+    max-width: 560px; text-align: center; line-height: 1.5;
+  }
+  .closing strong { color: #1A1A1A; font-weight: 600; }
+</style>
+</head>
+<body>
+  <div class="text-center">
+    <h1>Bring your own model</h1>
+    <p>Works with the AI provider you already use — no vendor lock-in.</p>
+  </div>
+  <div class="provider-row">
+    <div class="chip"><span class="dot" style="background: #d97706"></span> Anthropic Claude</div>
+    <div class="chip"><span class="dot" style="background: #10b981"></span> OpenAI GPT</div>
+    <div class="chip"><span class="dot" style="background: #3b82f6"></span> Google Gemini</div>
+    <div class="chip"><span class="dot" style="background: #6366f1"></span> DeepSeek</div>
+    <div class="chip"><span class="dot" style="background: #6b7280"></span> Custom (OpenAI-compatible)</div>
+  </div>
+  <div class="closing">
+    <strong>Not another AI chatbot. Not another note app.</strong><br>
+    soma is where your notes and AI work together — so your thinking compounds over time.
+  </div>
+</body>
+</html>

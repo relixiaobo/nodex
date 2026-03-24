@@ -2,11 +2,11 @@
  * NodeEmbed — inline outliner for `<node id="xxx" />` markup in chat messages.
  *
  * Layout:
- * - Header (outside panel): node bullet + name + ↗ open-in-outliner icon
- * - Bordered panel: children of the node rendered as OutlinerItems
- * - No drill-down: bullet click in the panel = default outliner behavior (navigate to node panel)
- * - No children: show bordered panel with an empty trailing-input-like placeholder
- * - Max height with scroll
+ * - Bordered panel (bg-background warm paper) with header + children
+ * - Header: node name + ↗ open-in-outliner icon, separated by border-b
+ * - Children: OutlinerItems at depth=0 with chevrons aligned on left border
+ * - Empty state: "Empty" placeholder when node has no children
+ * - Max height 40vh with scroll
  */
 import { useEffect } from 'react';
 import { ExternalLink } from '../../lib/icons.js';
@@ -15,7 +15,6 @@ import { useNode } from '../../hooks/use-node.js';
 import { useUIStore } from '../../stores/ui-store.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { OutlinerItem } from '../outliner/OutlinerItem.js';
-
 import { CHAT_OUTLINER_PANEL_ID } from './NodePopover.js';
 import { marksToHtml } from '../../lib/editor-marks.js';
 
@@ -63,7 +62,7 @@ export function NodeEmbed({ nodeId }: NodeEmbedProps) {
     <div className="chat-node-embed my-2" data-chat-embed>
       {/* Bordered panel: header + children together for visual cohesion */}
       <div className="rounded-lg border border-border bg-background">
-        {/* Header: ListTree icon + node name + open-in-outliner */}
+        {/* Header: node name + open-in-outliner */}
         <div className="flex items-center gap-1.5 border-b border-border px-3 py-1.5">
           {displayHtml ? (
             <span

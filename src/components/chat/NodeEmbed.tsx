@@ -1,11 +1,12 @@
 /**
  * NodeEmbed — inline outliner for `<node id="xxx" />` markup in chat messages.
  *
- * Renders as an inset panel (subtle bg fill, no border) with:
- * - Sticky header: breadcrumb (🏠 / ⋯ / Parent) + open-in-outliner icon
- * - OutlinerItem tree with full interaction
+ * Renders as a rounded-border panel with:
+ * - Header outside the panel: breadcrumb (🏠 / ⋯ / Parent) + open-in-outliner icon
+ * - OutlinerItem tree inside the panel with full interaction
  * - Internal navigation: bullet click drills into node, breadcrumb navigates back
  * - Max height with scroll
+ * - Chevrons always visible (via CSS .chat-node-embed [data-chevron-btn])
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ExternalLink, Home, MoreHorizontal } from '../../lib/icons.js';
@@ -52,73 +53,71 @@ export function NodeEmbed({ nodeId }: NodeEmbedProps) {
 
   if (!node) {
     return (
-      <div className="chat-node-embed my-2 rounded-lg bg-foreground/[0.03] px-3 py-2 text-sm text-foreground-tertiary">
+      <div className="chat-node-embed my-2 pl-3 text-sm text-foreground-tertiary">
         Node not found
       </div>
     );
   }
 
   return (
-    <div className="chat-node-embed my-2 rounded-lg bg-foreground/[0.03]" data-chat-embed>
-      <div className="max-h-[60vh] overflow-y-auto">
-        {/* Sticky header: breadcrumb + open button */}
-        <div className="sticky top-0 z-10 flex items-center gap-1 rounded-t-lg bg-foreground/[0.03] px-2 py-1">
-          <div className="flex min-w-0 flex-1 items-center gap-1 text-xs text-foreground-tertiary">
-            {breadcrumb.home && (
-              <button
-                type="button"
-                onClick={() => setDisplayNodeId(breadcrumb.home!)}
-                className="flex shrink-0 items-center justify-center rounded-md px-0.5 py-0.5 transition-colors hover:text-foreground"
-              >
-                <Home size={12} strokeWidth={1.7} />
-              </button>
-            )}
-            {breadcrumb.home && (breadcrumb.middle || breadcrumb.last) && (
+    <div className="chat-node-embed my-2" data-chat-embed>
+      {/* Header: breadcrumb + open button — outside the bordered panel */}
+      <div className="flex items-center gap-1 px-1 py-1">
+        <div className="flex min-w-0 flex-1 items-center gap-1 text-xs text-foreground-tertiary">
+          {breadcrumb.home && (
+            <button
+              type="button"
+              onClick={() => setDisplayNodeId(breadcrumb.home!)}
+              className="flex shrink-0 items-center justify-center rounded-md px-0.5 py-0.5 transition-colors hover:text-foreground"
+            >
+              <Home size={12} strokeWidth={1.7} />
+            </button>
+          )}
+          {breadcrumb.home && (breadcrumb.middle || breadcrumb.last) && (
+            <span className="shrink-0 text-foreground-tertiary/50 mx-0.5">/</span>
+          )}
+          {breadcrumb.middle && (
+            <>
+              <span className="flex shrink-0 items-center rounded-md px-0.5 py-0.5 text-foreground-tertiary/50">
+                <MoreHorizontal size={12} />
+              </span>
               <span className="shrink-0 text-foreground-tertiary/50 mx-0.5">/</span>
-            )}
-            {breadcrumb.middle && (
-              <>
-                <span className="flex shrink-0 items-center rounded-md px-0.5 py-0.5 text-foreground-tertiary/50">
-                  <MoreHorizontal size={12} />
-                </span>
-                <span className="shrink-0 text-foreground-tertiary/50 mx-0.5">/</span>
-              </>
-            )}
-            {breadcrumb.last && (
-              <button
-                type="button"
-                onClick={() => setDisplayNodeId(breadcrumb.last!.id)}
-                className="min-w-0 max-w-[120px] truncate rounded px-0.5 transition-colors hover:text-foreground"
-              >
-                {breadcrumb.last.name}
-              </button>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              closeChatDrawer();
-              navigateToNode(displayNodeId);
-            }}
-            className="flex shrink-0 items-center justify-center rounded p-1 text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground-secondary"
-            title="Open in outliner"
-          >
-            <ExternalLink size={12} />
-          </button>
+            </>
+          )}
+          {breadcrumb.last && (
+            <button
+              type="button"
+              onClick={() => setDisplayNodeId(breadcrumb.last!.id)}
+              className="min-w-0 max-w-[120px] truncate rounded px-0.5 transition-colors hover:text-foreground"
+            >
+              {breadcrumb.last.name}
+            </button>
+          )}
         </div>
+        <button
+          type="button"
+          onClick={() => {
+            closeChatDrawer();
+            navigateToNode(displayNodeId);
+          }}
+          className="flex shrink-0 items-center justify-center rounded p-1 text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground-secondary"
+          title="Open in outliner"
+        >
+          <ExternalLink size={12} />
+        </button>
+      </div>
 
-        {/* Outliner content — pull left 6px so chevron aligns with container edge */}
-        <div className="-ml-1.5">
-          <OutlinerItem
-            nodeId={displayNodeId}
-            depth={0}
-            rootChildIds={[displayNodeId]}
-            parentId={realParentId}
-            rootNodeId={realParentId}
-            panelId={CHAT_OUTLINER_PANEL_ID}
-            onBulletNavigate={handleBulletNavigate}
-          />
-        </div>
+      {/* Bordered panel: outliner content */}
+      <div className="max-h-[60vh] overflow-y-auto rounded-lg border border-border py-1">
+        <OutlinerItem
+          nodeId={displayNodeId}
+          depth={0}
+          rootChildIds={[displayNodeId]}
+          parentId={realParentId}
+          rootNodeId={realParentId}
+          panelId={CHAT_OUTLINER_PANEL_ID}
+          onBulletNavigate={handleBulletNavigate}
+        />
       </div>
     </div>
   );

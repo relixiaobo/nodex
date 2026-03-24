@@ -3,7 +3,8 @@ import { Check, ChevronDown, Pencil, Plus, RefreshCw } from '../../lib/icons.js'
 import { openNewChatDrawer } from '../../lib/chat-panel-actions.js';
 import { getChatSession, listChatSessionMetasPage, saveChatSession, type ChatSessionMeta } from '../../lib/ai-persistence.js';
 import { regenerateChatTitle } from '../../lib/ai-service.js';
-import { readChatDebugEnabled } from '../../lib/ai-debug.js';
+import { readChatDebugEnabled_sync } from '../../lib/ai-debug.js';
+import { useNodeStore } from '../../stores/node-store.js';
 import { useUIStore } from '../../stores/ui-store.js';
 import { ChatTitleInput, useChatTitleEdit } from '../chat/ChatPanelHeader.js';
 import { ChatPanel } from '../chat/ChatPanel.js';
@@ -209,12 +210,14 @@ function DrawerHeader({ sessionId, trailing }: { sessionId: string; trailing?: R
 function DrawerContent({ sessionId }: {
   sessionId: string;
 }) {
-  // Debug panel state — managed here so the toggle button lives in DrawerHeader
-  const [debugEnabled, setDebugEnabled] = useState(false);
+  // Debug panel state — managed here so the toggle button lives in DrawerHeader.
+  // Re-read on every store version change so toggling the setting in Settings
+  // immediately shows/hides the debug button without reopening the drawer.
+  const debugEnabled = useNodeStore((s) => {
+    void s._version;
+    try { return readChatDebugEnabled_sync(); } catch { return false; }
+  });
   const [debugOpen, setDebugOpen] = useState(false);
-  useEffect(() => {
-    void readChatDebugEnabled().then((v) => setDebugEnabled((c) => c || v));
-  }, []);
   useEffect(() => { if (!debugEnabled) setDebugOpen(false); }, [debugEnabled]);
 
   return (

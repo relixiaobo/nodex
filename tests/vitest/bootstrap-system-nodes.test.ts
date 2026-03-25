@@ -16,7 +16,15 @@ import { SYSTEM_NODE_IDS, NDX_F, NDX_T, SYS_T, SYS_V } from '../../src/types/ind
 import { SYSTEM_SCHEMA_NODE_IDS } from '../../src/lib/system-schema-presets.js';
 import { useNodeStore } from '../../src/stores/node-store.js';
 import { isOutlinerContentNodeType } from '../../src/lib/node-type-utils.js';
-import { ensureSparkAgentNode, SETTINGS_AI_NODE_IDS, SKILL_NODE_IDS } from '../../src/lib/ai-agent-node.js';
+import {
+  AI_AGENT_NODE_IDS,
+  buildDefaultSystemPrompt,
+  ensureSparkAgentNode,
+  SETTINGS_AI_NODE_IDS,
+  SKILL_NODE_IDS,
+  SPARK_AGENT_NODE_IDS,
+  SPARK_DEFAULT_PROMPT_LINES,
+} from '../../src/lib/ai-agent-node.js';
 
 describe('ensureSystemNodes', () => {
   beforeEach(() => {
@@ -136,7 +144,7 @@ describe('ensureSystemNodes', () => {
     expect(toNodexNode(SYSTEM_SCHEMA_NODE_IDS.DEFAULT_AI_PROVIDER_API_KEY_VALUE)?.name).toBe('sk-ant-legacy-123');
   });
 
-  it('ensureAgentNode keeps built-in prompt out of node children on repeated calls', () => {
+  it('ensureAgentNode syncs locked built-in prompt children on repeated calls', () => {
     ensureSystemNodes('ws_bootstrap');
 
     const contentChildrenBefore = getChildren(SYSTEM_NODE_IDS.AGENT)
@@ -144,7 +152,10 @@ describe('ensureSystemNodes', () => {
         const n = toNodexNode(id);
         return n != null && isOutlinerContentNodeType(n.type);
       });
-    expect(contentChildrenBefore.length).toBe(0);
+    expect(contentChildrenBefore.length).toBe(
+      buildDefaultSystemPrompt(SYSTEM_NODE_IDS.AGENT).split('\n').filter((line) => line.trim().length > 0).length,
+    );
+    expect(toNodexNode(AI_AGENT_NODE_IDS.PROMPT_LINE_0)?.locked).toBe(true);
 
     ensureSystemNodes('ws_bootstrap');
 
@@ -157,7 +168,7 @@ describe('ensureSystemNodes', () => {
     expect(contentChildrenAfter).toEqual(contentChildrenBefore);
   });
 
-  it('ensureSparkAgentNode keeps built-in prompt out of node children on repeated calls', () => {
+  it('ensureSparkAgentNode syncs locked built-in prompt children on repeated calls', () => {
     ensureSystemNodes('ws_bootstrap');
     ensureSparkAgentNode('ws_bootstrap');
 
@@ -168,7 +179,8 @@ describe('ensureSystemNodes', () => {
         const n = toNodexNode(id);
         return n != null && isOutlinerContentNodeType(n.type);
       });
-    expect(contentChildrenBefore.length).toBe(0);
+    expect(contentChildrenBefore.length).toBe(SPARK_DEFAULT_PROMPT_LINES.length);
+    expect(toNodexNode(SPARK_AGENT_NODE_IDS.PROMPT_LINE_0)?.locked).toBe(true);
 
     ensureSparkAgentNode('ws_bootstrap');
 

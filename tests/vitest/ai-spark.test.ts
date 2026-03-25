@@ -290,7 +290,7 @@ describe('spark agent node bootstrapping', () => {
     expect(sparkAgent!.tags).toContain(SYS_T.AGENT);
   });
 
-  it('does not seed built-in prompt lines into Spark node content', () => {
+  it('syncs locked built-in prompt lines while preserving user-authored children', () => {
     ensureSparkAgentNode();
     loroDoc.commitDoc();
 
@@ -299,7 +299,28 @@ describe('spark agent node bootstrapping', () => {
       const n = loroDoc.toNodexNode(id);
       return n != null && n.type !== 'fieldEntry';
     });
-    expect(contentChildren.length).toBe(0);
+    expect(contentChildren.length).toBe(SPARK_DEFAULT_PROMPT_LINES.length);
+    expect(loroDoc.toNodexNode(SPARK_AGENT_NODE_IDS.PROMPT_LINE_0)?.locked).toBe(true);
+
+    loroDoc.setNodeRichTextContent(SPARK_AGENT_NODE_IDS.PROMPT_LINE_0, 'Stale spark prompt', [], []);
+    loroDoc.deleteNode(SPARK_AGENT_NODE_IDS.PROMPT_LINE_10);
+
+    loroDoc.createNode('legacy_locked_spark_prompt', SYSTEM_NODE_IDS.SPARK_AGENT);
+    loroDoc.setNodeRichTextContent('legacy_locked_spark_prompt', 'Legacy locked spark prompt', [], []);
+    loroDoc.setNodeData('legacy_locked_spark_prompt', 'locked', true);
+
+    loroDoc.createNode('user_spark_instruction', SYSTEM_NODE_IDS.SPARK_AGENT);
+    loroDoc.setNodeRichTextContent('user_spark_instruction', 'User spark instruction', [], []);
+
+    ensureSparkAgentNode();
+
+    expect(loroDoc.toNodexNode(SPARK_AGENT_NODE_IDS.PROMPT_LINE_0)?.name).toBe(SPARK_DEFAULT_PROMPT_LINES[0]);
+    expect(loroDoc.hasNode(SPARK_AGENT_NODE_IDS.PROMPT_LINE_10)).toBe(true);
+    expect(loroDoc.toNodexNode(SPARK_AGENT_NODE_IDS.PROMPT_LINE_10)?.locked).toBe(true);
+    expect(loroDoc.hasNode('legacy_locked_spark_prompt')).toBe(false);
+
+    const config = readSparkAgentConfig();
+    expect(config.userInstructions).toBe('User spark instruction');
   });
 
   it('creates field entries for Model, Temperature, MaxTokens', () => {

@@ -1,6 +1,6 @@
 import * as loroDoc from './loro-doc.js';
 import { getSystemNodePreset } from './system-node-presets.js';
-import { SYSTEM_NODE_IDS } from '../types/index.js';
+import { SYSTEM_NODE_IDS, SYS_T } from '../types/index.js';
 
 export type SystemNodeRole = 'workspaceHome' | 'system';
 export type NodeRole = SystemNodeRole | 'general';
@@ -23,6 +23,10 @@ export function isLockedNode(nodeId: string): boolean {
   const preset = getSystemNodePreset(nodeId);
   if (preset?.locked) return true;
   return loroDoc.toNodexNode(nodeId)?.locked === true;
+}
+
+export function canSearchLockedNode(nodeId: string): boolean {
+  return loroDoc.toNodexNode(nodeId)?.searchableWhenLocked === true;
 }
 
 export function isNodeInTrash(nodeId: string): boolean {
@@ -78,11 +82,12 @@ export function getNodeCapabilities(nodeId: string): NodeCapabilities {
 
   const preset = getSystemNodePreset(nodeId);
   if (preset?.locked || node?.locked === true) {
+    const isLockedSkill = node?.tags.includes(SYS_T.SKILL) === true;
     return {
       role: 'system',
       canEditNode: false,
-      canEditStructure: preset?.canEditStructure ?? false,
-      canEditFieldValues: preset?.canEditFieldValues ?? false,
+      canEditStructure: preset?.canEditStructure ?? isLockedSkill,
+      canEditFieldValues: preset?.canEditFieldValues ?? isLockedSkill,
       canMove: false,
       canDelete: false,
     };

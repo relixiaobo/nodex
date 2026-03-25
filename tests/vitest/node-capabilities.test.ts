@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  canSearchLockedNode,
   canCreateChildrenUnder,
   canEditFieldEntryValue,
   getNodeCapabilities,
@@ -14,6 +15,7 @@ import { ensureJournalTagDefs } from '../../src/lib/journal.js';
 import { SYSTEM_TAGS } from '../../src/types/system-nodes.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
 import { useNodeStore } from '../../src/stores/node-store.js';
+import { SKILL_NODE_IDS } from '../../src/lib/ai-agent-node.js';
 
 describe('node capabilities', () => {
   beforeEach(() => {
@@ -109,6 +111,36 @@ describe('node capabilities', () => {
       canMove: false,
       canDelete: false,
     });
+  });
+
+  it('lets generic locked nodes host children even though the node itself is immutable', () => {
+    expect(getNodeCapabilities(SKILL_NODE_IDS.SKILL_CREATOR)).toEqual({
+      role: 'system',
+      canEditNode: false,
+      canEditStructure: true,
+      canEditFieldValues: true,
+      canMove: false,
+      canDelete: false,
+    });
+    expect(canCreateChildrenUnder(SKILL_NODE_IDS.SKILL_CREATOR)).toBe(true);
+    expect(canSearchLockedNode(SKILL_NODE_IDS.SKILL_CREATOR)).toBe(true);
+  });
+
+  it('keeps non-skill locked content fully immutable by default', () => {
+    loroDoc.createNode('locked_note', 'ws_default');
+    loroDoc.setNodeDataBatch('locked_note', { name: 'Locked note', locked: true });
+    loroDoc.commitDoc('__seed__');
+
+    expect(getNodeCapabilities('locked_note')).toEqual({
+      role: 'system',
+      canEditNode: false,
+      canEditStructure: false,
+      canEditFieldValues: false,
+      canMove: false,
+      canDelete: false,
+    });
+    expect(canCreateChildrenUnder('locked_note')).toBe(false);
+    expect(canSearchLockedNode('locked_note')).toBe(false);
   });
 
   it('detects direct and nested nodes inside Trash via parent-chain walk', () => {

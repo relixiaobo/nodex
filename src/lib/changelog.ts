@@ -7,6 +7,38 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.3.1',
+    date: '2026-03-25',
+    summary: 'AI Context + Official Skills + Polish',
+    items: [
+      // AI Intelligence
+      'AI sees what you see — view context injection sends your visible outliner tree to the AI',
+      'AI no longer guesses intent from browser tabs — system-reminder treated as background only',
+      'Regenerate replays the entire agent turn (all tool calls), not just the last response',
+
+      // Official Skills
+      'Official skills auto-update — locked rules sync on every launch, your custom rules preserved',
+      'System prompt auto-sync — code-managed defaults update without losing user instructions',
+
+      // Chat UX
+      'Unsent draft visible in floating chat bar when drawer is closed',
+      'Chat drawer header always visible (no more auto-hide flicker)',
+      'Streaming cursor stays pinned at bottom (no jump on tool group collapse)',
+      'Chat rename buttons always work (try-finally error handling)',
+      'Onboarding simplified — "Connect an AI provider" replaces old Welcome screen',
+      'Placeholder text repositioned as general agent ("Ask anything…")',
+
+      // Settings & Icons
+      'New three-color cube icon (sage green / warm amber / brick red)',
+      'AI Debug moved under AI group in Settings',
+      'Startup page setting removed (always outliner + today)',
+      'Chat drawer uses white background to distinguish from outliner',
+
+      // Dependencies
+      'pi-ai / pi-agent-core upgraded to 0.62.0 (new models, OpenRouter thinking)',
+    ],
+  },
+  {
     version: '0.3.0',
     date: '2026-03-24',
     summary: 'Chat Drawer + Node Embed',

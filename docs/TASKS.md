@@ -18,7 +18,7 @@
 |--------|------|------|------|
 | nodex-claude | — | 空闲 | — |
 | nodex-gemini | — | 空闲 | — |
-| nodex-codex | — | 空闲 | — |
+| nodex-codex | codex/official-skill-sync | Official Skill Sync (#178) | 待启动 |
 
 ---
 

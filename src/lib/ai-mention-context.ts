@@ -12,7 +12,6 @@ import type { InlineRefEntry } from '../types/index.js';
 import * as loroDoc from './loro-doc.js';
 import { isOutlinerContentNodeType } from './node-type-utils.js';
 import { computeNodeFields } from '../hooks/use-node-fields.js';
-import { resolveDataType } from './field-utils.js';
 import { useNodeStore } from '../stores/node-store.js';
 import { useUIStore } from '../stores/ui-store.js';
 import { getTagDisplayNames } from './ai-tools/shared.js';
@@ -214,13 +213,13 @@ export function buildMentionContext(): string | null {
 
   let body = sections.join('\n');
 
-  // Budget enforcement: progressively reduce children if over limit
-  if (body.length > MAX_MENTION_CHARS && childrenLimit > 0) {
-    // Rebuild with fewer children
-    const reducedLimit = Math.max(1, Math.floor(childrenLimit / 2));
+  // Budget enforcement: progressively reduce children until under limit
+  let currentLimit = childrenLimit;
+  while (body.length > MAX_MENTION_CHARS && currentLimit > 0) {
+    currentLimit = Math.max(0, Math.floor(currentLimit / 2));
     const reduced: string[] = [sections[0]];
     for (let i = 0; i < detailed.length; i++) {
-      const summary = formatNodeSummary(detailed[i].targetNodeId, reducedLimit);
+      const summary = formatNodeSummary(detailed[i].targetNodeId, currentLimit);
       if (!summary) continue;
       reduced.push(`\n[${i + 1}/${total}] ${summary}`);
     }

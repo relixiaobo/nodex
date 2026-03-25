@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { EditorState, TextSelection, type Plugin } from 'prosemirror-state';
+import { EditorState, type Plugin } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { keymap } from 'prosemirror-keymap';
 import { chainCommands, exitCode } from 'prosemirror-commands';
@@ -16,14 +16,12 @@ import type { ThinkingLevel } from '@mariozechner/pi-ai';
 import { ArrowUp, Brain, Check, ChevronDown, Settings, Square } from '../../lib/icons.js';
 import { useUIStore } from '../../stores/ui-store.js';
 import { DropdownPanel } from '../ui/DropdownPanel.js';
-import { pmSchema } from '../editor/pm-schema.js';
 import { docToMarks, marksToDoc } from '../../lib/pm-doc-utils.js';
 import {
   isEditorViewAlive,
   replaceEditorRangeWithInlineRef,
   setEditorPlainTextContent,
 } from '../../lib/pm-editor-view.js';
-import { isImeComposingEvent } from '../../lib/ime-keyboard.js';
 import {
   ReferenceSelector,
   type ReferenceDropdownHandle,
@@ -233,8 +231,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
 
   // ─── Send / steer ───
 
-  const handleSendRef = useRef<() => void>(() => {});
-  handleSendRef.current = () => {
+  const handleSend = useCallback(() => {
     const view = viewRef.current;
     if (!view || view.isDestroyed) return;
 
@@ -260,7 +257,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
     setDraft('');
     hasUserEditedRef.current = false;
     void p.onSend(prompt);
-  };
+  }, [setDraft, setPendingMentions]);
 
   // ─── Reference selector callbacks ───
 
@@ -329,7 +326,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
 
     return [
       keymap({
-        'Enter': (state, dispatch, view) => {
+        'Enter': () => {
           if (isComposing()) return false;
           if (refActiveRef.current) {
             // Confirm selection in dropdown
@@ -343,10 +340,10 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
             return true;
           }
           // Send message
-          handleSendRef.current();
+          handleSend();
           return true;
         },
-        'Shift-Enter': (state, dispatch, view) => {
+        'Shift-Enter': (state, dispatch) => {
           if (isComposing()) return false;
           return insertHardBreak(state, dispatch);
         },
@@ -376,7 +373,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
         },
       }),
     ];
-  }, [handleRefSelect, handleRefClose]);
+  }, [handleSend, handleRefSelect, handleRefClose]);
 
   // ─── Editor mount ───
 
@@ -401,8 +398,8 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
         setDraftRaw(text);
         setChatDraft(text);
 
-        // Trigger detection (only on user edits, not programmatic)
-        if (!isImeComposingEvent(tr.getMeta('uiEvent') as unknown as null)) {
+        // Trigger detection — skip during IME composition (handled in compositionend)
+        if (view.dom.dataset.composing !== 'true') {
           runTriggerDetection(view, tr.docChanged);
         }
       },
@@ -639,7 +636,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
             ) : (
               <button
                 type="button"
-                onClick={() => handleSendRef.current()}
+                onClick={() => handleSend()}
                 disabled={!canSend}
                 className={`flex h-7 w-7 items-center justify-center rounded-lg outline-none transition-colors ${
                   canSend

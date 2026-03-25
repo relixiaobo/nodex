@@ -199,11 +199,12 @@ app.get('/privacy', (c) => {
     h1 { font-size: 24px; }
     h2 { font-size: 18px; margin-top: 32px; }
     p { margin: 8px 0; }
+    ul { margin: 8px 0; padding-left: 24px; }
   </style>
 </head>
 <body>
   <h1>soma Privacy Policy</h1>
-  <p><em>Last updated: March 24, 2026</em></p>
+  <p><em>Last updated: March 25, 2026</em></p>
 
   <h2>What is soma</h2>
   <p>soma is a Chrome extension that combines structured note-taking with an AI thinking partner in the Chrome Side Panel. It lets you create, organize, and sync notes while browsing the web, and think with AI alongside your notes.</p>
@@ -217,11 +218,25 @@ app.get('/privacy', (c) => {
   <p>Your data is used solely to provide and improve the soma service: authenticate your account, store and sync your notes across devices, and enable web clipping when you request it.</p>
   <p>We do <strong>not</strong> use your data for advertising, analytics, or any purpose unrelated to the core service.</p>
 
+  <h2>AI Features</h2>
+  <p>soma offers optional AI-powered features (chat, note analysis, web clipping). When you use these features:</p>
+  <p><strong>AI providers</strong>: soma supports multiple AI providers — Anthropic Claude, OpenAI GPT, Google Gemini, DeepSeek, and any OpenAI-compatible provider. You choose which provider to use and configure your own API key.</p>
+  <p><strong>API key</strong>: Your API key is stored locally in your browser (chrome.storage). It is sent to the AI provider only when making AI requests and is never stored on our servers.</p>
+  <p><strong>Data sent to AI</strong>: When you use AI features, the following data may be sent to your configured AI provider:</p>
+  <ul>
+    <li>Your chat messages</li>
+    <li>Content from your notes that you include in conversations</li>
+    <li>Web page content when using AI-assisted clipping</li>
+  </ul>
+  <p><strong>Third-party AI providers</strong>: AI requests are processed by the provider you configure. Your data is subject to that provider's usage policy. We do not allow your data to be used for model training.</p>
+  <p><strong>AI data is not stored on our servers</strong>: We do not log or store the content of AI conversations.</p>
+
   <h2>Data Storage</h2>
-  <p>Your notes are stored locally in your browser for offline access. When signed in, your data is synced to secure cloud servers to enable cross-device access.</p>
+  <p><strong>Local storage</strong>: Your notes are stored locally in your browser using Chrome's storage API for offline access.</p>
+  <p><strong>Cloud sync</strong>: When signed in, your data is synced to secure cloud servers (Cloudflare) to enable cross-device access.</p>
 
   <h2>Data Sharing</h2>
-  <p>We do <strong>not</strong> sell, trade, or transfer your data to third parties. Your data is only transmitted between your browser and our sync servers.</p>
+  <p>We do <strong>not</strong> sell, trade, or transfer your data to third parties. Your data is transmitted between your browser and our servers. When you use AI features, your requests are forwarded to your configured AI provider for processing — see the AI Features section above.</p>
 
   <h2>Data Deletion</h2>
   <p>You can delete your account and all associated data at any time by signing out and requesting account deletion. Local data can be removed by uninstalling the extension.</p>

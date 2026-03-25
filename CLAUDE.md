@@ -157,11 +157,11 @@ npm run typecheck      # TypeScript 类型检查 (tsc --noEmit)
 
 | 环境 | 命令 | 输出目录 | Backend | Extension ID | 图标 |
 |------|------|---------|---------|-------------|------|
-| Store | `npm run zip` | `.output/chrome-mv3/` | production | 商店分配 `joabcnfl…` | 三色立方体 |
+| Store | `npm run zip` | `.output/chrome-mv3/` | production | 商店分配 `joabcnfl…` | 绿色 2+猫 |
 | Preview | `npm run build:preview` | `.output/chrome-mv3-preview/` | production | `andlcnfk…` | + 蓝点 |
 | Dev | `npm run dev` | `.output/chrome-mv3-dev/` | staging | `gkpgogoc…` | + 橙点 |
 
-三个环境各有独立 extension key，可同时加载到 Chrome 中共存。图标右下角的彩色圆点区分当前版本。源文件 `docs/icon-drafts/soma-logo-final.png`（2048x2048），图标 `public/icon*/`（16/32/48/128px，圆角）。
+三个环境各有独立 extension key，可同时加载到 Chrome 中共存。图标右下角的彩色圆点区分当前版本。源文件 `docs/icon-drafts/soma-logo-final.png`（3432x3432），图标 `public/icon*/`（16/32/48/128px）。
 
 ## 项目结构
 

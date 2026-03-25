@@ -223,6 +223,9 @@ export interface NodexNode {
   /** Locked system node flag (mapped from SYS_A.LOCKED semantics). */
   locked?: boolean;
 
+  /** Allows a locked node to remain eligible in search result sets. */
+  searchableWhenLocked?: boolean;
+
   /** One-time bootstrap/migration version recorded on the workspace home node. */
   systemBootstrapVersion?: number;
 

@@ -75,6 +75,15 @@ export const AI_AGENT_NODE_IDS = {
   PROMPT_LINE_5: 'NDX_N58',
 } as const;
 
+const DEFAULT_AGENT_PROMPT_PRESET_IDS = [
+  AI_AGENT_NODE_IDS.PROMPT_LINE_0,
+  AI_AGENT_NODE_IDS.PROMPT_LINE_1,
+  AI_AGENT_NODE_IDS.PROMPT_LINE_2,
+  AI_AGENT_NODE_IDS.PROMPT_LINE_3,
+  AI_AGENT_NODE_IDS.PROMPT_LINE_4,
+  AI_AGENT_NODE_IDS.PROMPT_LINE_5,
+] as const;
+
 export const SKILL_NODE_IDS = {
   SKILL_CREATOR: 'NDX_N40',
   SKILL_CREATOR_RULE_1: 'NDX_N41',
@@ -149,22 +158,13 @@ const LEGACY_IDS = {
 // IDs from deleted default skills (Writing assistant rules, Research + rules)
 const LEGACY_SKILL_IDS = ['NDX_N46', 'NDX_N47', 'NDX_N48', 'NDX_N49', 'NDX_N50', 'NDX_N51'];
 
-// Legacy prompt lines — only used to clean up old seeded nodes from earlier versions.
-// The actual system prompt is now DEFAULT_AGENT_SYSTEM_PROMPT above.
-const LEGACY_PROMPT_LINES = [
-  'You are soma, an AI collaborator inside the user\'s knowledge graph.',
-  'Operate carefully on the outliner and prefer precise, reversible changes.',
-  'Use tools when the user asks you to inspect, create, edit, delete, search, or undo nodes.',
-  'When you mention an existing node in your answer, use <ref id="nodeId">display text</ref>.',
-  'When you cite evidence from a node, use <cite id="nodeId">N</cite>.',
-  'Reply in the user\'s language unless they explicitly ask otherwise.',
-  'Use <node id="nodeId" /> on its own line to display a node\'s content as an interactive outliner.',
-];
-
-const DEFAULT_PROMPT_PRESETS = LEGACY_PROMPT_LINES.map((text, i) => ({
-  id: AI_AGENT_NODE_IDS[`PROMPT_LINE_${i}` as keyof typeof AI_AGENT_NODE_IDS],
-  text,
-}));
+const DEFAULT_PROMPT_PRESETS = buildDefaultSystemPrompt(SYSTEM_NODE_IDS.AGENT)
+  .split('\n')
+  .filter((line) => line.trim().length > 0)
+  .map((text, index) => ({
+    id: DEFAULT_AGENT_PROMPT_PRESET_IDS[index] ?? `NDX_AGENT_PROMPT_${index}`,
+    text,
+  }));
 
 const SPARK_DEFAULT_PROMPT_PRESETS = SPARK_DEFAULT_PROMPT_LINES.map((text, i) => ({
   id: SPARK_AGENT_NODE_IDS[`PROMPT_LINE_${i}` as keyof typeof SPARK_AGENT_NODE_IDS],
@@ -350,6 +350,11 @@ const DEFAULT_SKILL_PRESETS: ReadonlyArray<DefaultSkillPreset> = [
 const SKILL_INDEX_READ_INSTRUCTION =
   "When you need a skill's detailed rules, use node_read to read the skill node's children.";
 
+interface LockedContentPreset {
+  id: string;
+  text: string;
+}
+
 // ─── Node helpers ───
 
 function ensureNode({ id, parentId, name, data }: FixedNodePreset): void {
@@ -419,6 +424,31 @@ function ensureTextValue(fieldEntryId: string, valueNodeId: string, value: strin
   });
 }
 
+function syncLockedContentChildren(parentId: string, presets: ReadonlyArray<LockedContentPreset>): void {
+  for (const [index, preset] of presets.entries()) {
+    ensureNode({
+      id: preset.id,
+      parentId,
+      name: preset.text,
+      data: {
+        locked: true,
+      },
+    });
+    moveNodeToIndex(preset.id, parentId, index);
+  }
+
+  const presetIds = new Set(presets.map((preset) => preset.id));
+  for (const childId of loroDoc.getChildren(parentId)) {
+    if (presetIds.has(childId)) continue;
+
+    const child = loroDoc.toNodexNode(childId);
+    if (!child?.locked) continue;
+    if (!isOutlinerContentNodeType(child.type) || child.type === 'reference') continue;
+
+    loroDoc.deleteNode(childId);
+  }
+}
+
 function ensureTargetValue(fieldEntryId: string, valueNodeId: string, targetId: string): void {
   const fieldEntry = loroDoc.toNodexNode(fieldEntryId);
   if ((fieldEntry?.children?.length ?? 0) > 0) return;
@@ -437,6 +467,7 @@ function ensureSkillNode(skillPreset: DefaultSkillPreset): void {
     name: skillPreset.name,
     data: {
       description: skillPreset.description,
+      locked: true,
     },
   });
 
@@ -445,46 +476,7 @@ function ensureSkillNode(skillPreset: DefaultSkillPreset): void {
     loroDoc.addTag(skillPreset.id, SYS_T.SKILL);
   }
 
-  const contentChildren = loroDoc.getChildren(skillPreset.id)
-    .filter((childId) => {
-      const child = loroDoc.toNodexNode(childId);
-      return child != null && isOutlinerContentNodeType(child.type);
-    });
-
-  if (contentChildren.length > 0) return;
-
-  for (const rulePreset of skillPreset.rulePresets) {
-    ensureNode({
-      id: rulePreset.id,
-      parentId: skillPreset.id,
-      name: rulePreset.text,
-    });
-  }
-}
-
-function isDefaultPromptPresetNode(nodeId: string, parentId: string, text: string): boolean {
-  if (loroDoc.getParentId(nodeId) !== parentId) return false;
-
-  const node = loroDoc.toNodexNode(nodeId);
-  if (!node || !isOutlinerContentNodeType(node.type) || node.type === 'reference') return false;
-  if ((node.name ?? '').trim() !== text) return false;
-  if ((node.description ?? '').trim().length > 0) return false;
-  if ((node.tags?.length ?? 0) > 0) return false;
-  if (node.targetId) return false;
-  if (loroDoc.getChildren(nodeId).length > 0) return false;
-
-  return true;
-}
-
-function cleanupSeededPromptPresetNodes(
-  parentId: string,
-  presets: ReadonlyArray<{ id: string; text: string }>,
-): void {
-  for (const preset of presets) {
-    if (isDefaultPromptPresetNode(preset.id, parentId, preset.text)) {
-      loroDoc.deleteNode(preset.id);
-    }
-  }
+  syncLockedContentChildren(skillPreset.id, skillPreset.rulePresets);
 }
 
 function moveNodeToIndex(nodeId: string, parentId: string, index: number): void {
@@ -626,10 +618,7 @@ export function ensureAgentNode(workspaceId = loroDoc.getCurrentWorkspaceId() ??
     }
   }
 
-  // Default prompt now lives in code. Legacy seeded prompt lines are removed
-  // when they still match the old built-in defaults, while custom content
-  // remains as user-authored instructions.
-  cleanupSeededPromptPresetNodes(SYSTEM_NODE_IDS.AGENT, DEFAULT_PROMPT_PRESETS);
+  syncLockedContentChildren(SYSTEM_NODE_IDS.AGENT, DEFAULT_PROMPT_PRESETS);
 
   // Field entries
   ensureFieldEntry(SYSTEM_NODE_IDS.AGENT, AI_AGENT_NODE_IDS.MODEL_FIELD_ENTRY, NDX_F.AGENT_MODEL);
@@ -731,6 +720,7 @@ function readUserInstructionsFromChildren(agentNodeId: string): string {
   for (const childId of children) {
     const child = loroDoc.toNodexNode(childId);
     if (!child || !isOutlinerContentNodeType(child.type)) continue;
+    if (child.locked) continue;
 
     if (child.type === 'reference' && child.targetId) {
       // Resolve reference → use target's content (name + children)
@@ -804,7 +794,7 @@ export function ensureSparkAgentNode(workspaceId = loroDoc.getCurrentWorkspaceId
     loroDoc.addTag(SYSTEM_NODE_IDS.SPARK_AGENT, SYS_T.AGENT);
   }
 
-  cleanupSeededPromptPresetNodes(SYSTEM_NODE_IDS.SPARK_AGENT, SPARK_DEFAULT_PROMPT_PRESETS);
+  syncLockedContentChildren(SYSTEM_NODE_IDS.SPARK_AGENT, SPARK_DEFAULT_PROMPT_PRESETS);
 
   // Field entries
   ensureFieldEntry(SYSTEM_NODE_IDS.SPARK_AGENT, SPARK_AGENT_NODE_IDS.MODEL_FIELD_ENTRY, NDX_F.AGENT_MODEL);

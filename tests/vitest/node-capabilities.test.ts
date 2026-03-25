@@ -14,6 +14,7 @@ import { ensureJournalTagDefs } from '../../src/lib/journal.js';
 import { SYSTEM_TAGS } from '../../src/types/system-nodes.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
 import { useNodeStore } from '../../src/stores/node-store.js';
+import { SKILL_NODE_IDS } from '../../src/lib/ai-agent-node.js';
 
 describe('node capabilities', () => {
   beforeEach(() => {
@@ -109,6 +110,18 @@ describe('node capabilities', () => {
       canMove: false,
       canDelete: false,
     });
+  });
+
+  it('lets generic locked nodes host children even though the node itself is immutable', () => {
+    expect(getNodeCapabilities(SKILL_NODE_IDS.SKILL_CREATOR)).toEqual({
+      role: 'system',
+      canEditNode: false,
+      canEditStructure: true,
+      canEditFieldValues: true,
+      canMove: false,
+      canDelete: false,
+    });
+    expect(canCreateChildrenUnder(SKILL_NODE_IDS.SKILL_CREATOR)).toBe(true);
   });
 
   it('detects direct and nested nodes inside Trash via parent-chain walk', () => {

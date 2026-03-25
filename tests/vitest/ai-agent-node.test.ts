@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   AI_AGENT_NODE_IDS,
+  buildDefaultSystemPrompt,
   buildAgentSystemPrompt,
   DEFAULT_AGENT_SYSTEM_PROMPT,
   DEFAULT_AGENT_MAX_TOKENS,
   DEFAULT_AGENT_MODEL_ID,
   DEFAULT_AGENT_TEMPERATURE,
+  ensureAgentNode,
   readAgentNodeConfig,
   readSkillIds,
   SETTINGS_AI_NODE_IDS,
@@ -15,6 +17,7 @@ import * as loroDoc from '../../src/lib/loro-doc.js';
 import { SYSTEM_NODE_IDS, SYS_T } from '../../src/types/index.js';
 import { runSearch } from '../../src/lib/search-engine.js';
 import { resetAndSeed } from './helpers/test-state.js';
+import { isOutlinerContentNodeType } from '../../src/lib/node-type-utils.js';
 
 function createSkillNode({
   id,
@@ -53,6 +56,14 @@ const BASE_CONFIG = {
   skillIds: [] as string[],
 };
 
+function getContentChildren(parentId: string): string[] {
+  return loroDoc.getChildren(parentId)
+    .filter((id) => {
+      const node = loroDoc.toNodexNode(id);
+      return node != null && isOutlinerContentNodeType(node.type);
+    });
+}
+
 describe('ai agent skill bootstrap and prompt rendering', () => {
   beforeEach(() => {
     resetAndSeed();
@@ -65,6 +76,8 @@ describe('ai agent skill bootstrap and prompt rendering', () => {
   it('places the built-in skill under Library', () => {
     expect(loroDoc.getParentId(SKILL_NODE_IDS.SKILL_CREATOR)).toBe(SYSTEM_NODE_IDS.LIBRARY);
     expect(loroDoc.toNodexNode(SKILL_NODE_IDS.SKILL_CREATOR)?.tags).toContain(SYS_T.SKILL);
+    expect(loroDoc.toNodexNode(SKILL_NODE_IDS.SKILL_CREATOR)?.locked).toBe(true);
+    expect(loroDoc.toNodexNode(SKILL_NODE_IDS.SKILL_CREATOR_RULE_1)?.locked).toBe(true);
   });
 
   it('uses fixed Settings AI search nodes to aggregate all agents and skills', () => {
@@ -95,10 +108,60 @@ describe('ai agent skill bootstrap and prompt rendering', () => {
     );
   });
 
-  it('reads agent node content as user instructions, not built-in system prompt', () => {
+  it('syncs official skill rules while preserving user-authored children', () => {
+    loroDoc.setNodeRichTextContent(SKILL_NODE_IDS.SKILL_CREATOR_RULE_1, 'stale rule text', [], []);
+    loroDoc.deleteNode(SKILL_NODE_IDS.SKILL_CREATOR_RULE_5);
+
+    loroDoc.createNode('legacy_official_skill_rule', SKILL_NODE_IDS.SKILL_CREATOR);
+    loroDoc.setNodeRichTextContent('legacy_official_skill_rule', 'Legacy official rule', [], []);
+    loroDoc.setNodeData('legacy_official_skill_rule', 'locked', true);
+
+    loroDoc.createNode('user_skill_rule', SKILL_NODE_IDS.SKILL_CREATOR);
+    loroDoc.setNodeRichTextContent('user_skill_rule', 'User-authored supplement', [], []);
+
+    ensureAgentNode();
+
+    expect(loroDoc.toNodexNode(SKILL_NODE_IDS.SKILL_CREATOR_RULE_1)?.name).toBe(
+      'A skill is a #skill node whose children define the rules the AI follows when that skill is active. Built-in skills live in Library; user-created skills can live anywhere in the graph. Tag it #skill and add rule nodes as children.',
+    );
+    expect(loroDoc.toNodexNode(SKILL_NODE_IDS.SKILL_CREATOR_RULE_1)?.locked).toBe(true);
+    expect(loroDoc.hasNode(SKILL_NODE_IDS.SKILL_CREATOR_RULE_5)).toBe(true);
+    expect(loroDoc.toNodexNode(SKILL_NODE_IDS.SKILL_CREATOR_RULE_5)?.locked).toBe(true);
+    expect(loroDoc.hasNode('legacy_official_skill_rule')).toBe(false);
+    expect(loroDoc.getParentId('user_skill_rule')).toBe(SKILL_NODE_IDS.SKILL_CREATOR);
+    expect(loroDoc.toNodexNode('user_skill_rule')?.name).toBe('User-authored supplement');
+    expect(loroDoc.toNodexNode('user_skill_rule')?.locked).toBeUndefined();
+  });
+
+  it('syncs locked default prompt children while keeping user instructions separate', () => {
+    const promptLines = buildDefaultSystemPrompt(SYSTEM_NODE_IDS.AGENT)
+      .split('\n')
+      .filter((line) => line.trim().length > 0);
+
+    loroDoc.setNodeRichTextContent(AI_AGENT_NODE_IDS.PROMPT_LINE_0, 'Stale default prompt', [], []);
+    loroDoc.deleteNode(AI_AGENT_NODE_IDS.PROMPT_LINE_5);
+
+    loroDoc.createNode('legacy_locked_prompt', SYSTEM_NODE_IDS.AGENT);
+    loroDoc.setNodeRichTextContent('legacy_locked_prompt', 'Legacy locked prompt', [], []);
+    loroDoc.setNodeData('legacy_locked_prompt', 'locked', true);
+
+    loroDoc.createNode('user_prompt_note', SYSTEM_NODE_IDS.AGENT);
+    loroDoc.setNodeRichTextContent('user_prompt_note', 'User prompt addition', [], []);
+
+    ensureAgentNode();
+
+    const contentChildren = getContentChildren(SYSTEM_NODE_IDS.AGENT);
+    expect(contentChildren).toHaveLength(promptLines.length + 1);
+    expect(loroDoc.toNodexNode(AI_AGENT_NODE_IDS.PROMPT_LINE_0)?.name).toBe(promptLines[0]);
+    expect(loroDoc.toNodexNode(AI_AGENT_NODE_IDS.PROMPT_LINE_0)?.locked).toBe(true);
+    expect(loroDoc.hasNode(AI_AGENT_NODE_IDS.PROMPT_LINE_5)).toBe(true);
+    expect(loroDoc.toNodexNode(AI_AGENT_NODE_IDS.PROMPT_LINE_5)?.locked).toBe(true);
+    expect(loroDoc.hasNode('legacy_locked_prompt')).toBe(false);
+    expect(loroDoc.getParentId('user_prompt_note')).toBe(SYSTEM_NODE_IDS.AGENT);
+
     const config = readAgentNodeConfig();
 
-    expect(config.userInstructions).toBe('');
+    expect(config.userInstructions).toBe('User prompt addition');
     expect(config.skillIds).toEqual([SKILL_NODE_IDS.SKILL_CREATOR]);
   });
 

@@ -81,8 +81,8 @@ export function getNodeCapabilities(nodeId: string): NodeCapabilities {
     return {
       role: 'system',
       canEditNode: false,
-      canEditStructure: preset?.canEditStructure ?? false,
-      canEditFieldValues: preset?.canEditFieldValues ?? false,
+      canEditStructure: preset?.canEditStructure ?? true,
+      canEditFieldValues: preset?.canEditFieldValues ?? true,
       canMove: false,
       canDelete: false,
     };

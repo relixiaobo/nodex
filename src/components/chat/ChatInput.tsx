@@ -1,8 +1,35 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import { EditorState, TextSelection, type Plugin } from 'prosemirror-state';
+import { EditorView } from 'prosemirror-view';
+import { keymap } from 'prosemirror-keymap';
+import { chainCommands, exitCode } from 'prosemirror-commands';
 import type { ThinkingLevel } from '@mariozechner/pi-ai';
-import { ArrowUp, Brain, Check, ChevronDown, Plus, Settings, Square } from '../../lib/icons.js';
+import { ArrowUp, Brain, Check, ChevronDown, Settings, Square } from '../../lib/icons.js';
 import { useUIStore } from '../../stores/ui-store.js';
 import { DropdownPanel } from '../ui/DropdownPanel.js';
+import { pmSchema } from '../editor/pm-schema.js';
+import { docToMarks, marksToDoc } from '../../lib/pm-doc-utils.js';
+import {
+  isEditorViewAlive,
+  replaceEditorRangeWithInlineRef,
+  setEditorPlainTextContent,
+} from '../../lib/pm-editor-view.js';
+import { isImeComposingEvent } from '../../lib/ime-keyboard.js';
+import {
+  ReferenceSelector,
+  type ReferenceDropdownHandle,
+} from '../references/ReferenceSelector.js';
+import { useNodeStore } from '../../stores/node-store.js';
+import type { InlineRefEntry } from '../../types/index.js';
 
 export interface ChatInputModel {
   id: string;
@@ -98,6 +125,39 @@ function ThinkingLevelPicker({ level, onChange }: { level: ThinkingLevel; onChan
   );
 }
 
+// ─── Helpers ───
+
+const INLINE_REF_CHAR = '\uFFFC';
+
+/**
+ * Replace \uFFFC placeholders with @DisplayName for the prompt text.
+ */
+function buildPromptText(text: string, inlineRefs: InlineRefEntry[]): string {
+  if (inlineRefs.length === 0) return text;
+  let result = text;
+  // Replace from end to start to preserve offsets
+  const sorted = [...inlineRefs].sort((a, b) => b.offset - a.offset);
+  for (const ref of sorted) {
+    const name = ref.displayName || 'node';
+    result = result.slice(0, ref.offset) + `@${name}` + result.slice(ref.offset + 1);
+  }
+  return result;
+}
+
+function getCaretAnchorRect(
+  view: EditorView,
+  pos: number,
+): { left: number; top: number; bottom: number } | undefined {
+  try {
+    const rect = view.coordsAtPos(pos);
+    return { left: rect.left, top: rect.top, bottom: rect.bottom };
+  } catch {
+    return undefined;
+  }
+}
+
+// ─── Component ───
+
 export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function ChatInput({
   disabled,
   busy = false,
@@ -113,32 +173,36 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
   onModelChange,
   onThinkingChange,
 }, ref) {
+  // Draft state for canSend / canSteer computation
   const [draft, setDraftRaw] = useState('');
   const setChatDraft = useUIStore((s) => s.setChatDraft);
-  // Wrap setDraft to sync to ui-store so FloatingChatBar can show unsent text
+  const setPendingMentions = useUIStore((s) => s.setPendingMentions);
+
   const setDraft = useCallback((text: string) => {
     setDraftRaw(text);
     setChatDraft(text);
   }, [setChatDraft]);
 
-  useImperativeHandle(ref, () => ({
-    setDraft(text: string) {
-      setDraft(text);
-      requestAnimationFrame(() => {
-        const el = textareaRef.current;
-        if (!el) return;
-        el.focus();
-        el.selectionStart = el.selectionEnd = el.value.length;
-      });
-    },
-    getDraft() {
-      return draft;
-    },
-  }), [draft]);
+  // ProseMirror refs
+  const editorMountRef = useRef<HTMLDivElement>(null);
+  const viewRef = useRef<EditorView | null>(null);
+  const propsRef = useRef({ onSend, onStop, onSteer, disabled, busy });
+  propsRef.current = { onSend, onStop, onSteer, disabled, busy };
+
+  // Reference selector state
+  const [refOpen, setRefOpen] = useState(false);
+  const [refQuery, setRefQuery] = useState('');
+  const [refSelectedIndex, setRefSelectedIndex] = useState(0);
+  const [refAnchor, setRefAnchor] = useState<{ left: number; top: number; bottom: number } | undefined>();
+  const refAtPosRef = useRef(0); // Position of the '@' character in the doc
+  const refDropdownRef = useRef<ReferenceDropdownHandle>(null);
+  const refActiveRef = useRef(false);
+  const hasUserEditedRef = useRef(false);
+
+  // Other UI state
   const [menuOpen, setMenuOpen] = useState(false);
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
   const [moreModelsOpen, setMoreModelsOpen] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const modelMenuRef = useRef<HTMLDivElement>(null);
   const canSteer = disabled && !!onSteer;
@@ -150,7 +214,6 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
   const { featuredModels, moreModelGroups } = useMemo(() => {
     const featured: ChatInputModel[] = [];
     const moreGroups = new Map<string, ChatInputModel[]>();
-
     for (const model of availableModels ?? []) {
       if (model.featured) {
         featured.push(model);
@@ -163,61 +226,259 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
         }
       }
     }
-
-    return {
-      featuredModels: featured,
-      moreModelGroups: [...moreGroups.entries()],
-    };
+    return { featuredModels: featured, moreModelGroups: [...moreGroups.entries()] };
   }, [availableModels]);
 
   const hasMoreModels = moreModelGroups.length > 0;
 
-  useEffect(() => {
-    const el = textareaRef.current;
-    if (!el) return;
+  // ─── Send / steer ───
 
-    if (compact) {
-      el.style.height = '24px';
+  const handleSendRef = useRef<() => void>(() => {});
+  handleSendRef.current = () => {
+    const view = viewRef.current;
+    if (!view || view.isDestroyed) return;
+
+    const { text, inlineRefs } = docToMarks(view.state.doc);
+    const prompt = buildPromptText(text, inlineRefs).trim();
+    if (!prompt) return;
+
+    const p = propsRef.current;
+    if (p.disabled && !!p.onSteer) {
+      // Steering mode
+      setEditorPlainTextContent(view, '');
+      setDraft('');
+      p.onSteer!(prompt);
       return;
     }
-    el.style.height = '0px';
-    const nextHeight = Math.min(el.scrollHeight, 160);
-    el.style.height = `${Math.max(nextHeight, 24)}px`;
-  }, [draft, compact]);
+
+    if ((p.disabled || p.busy) && !p.onSteer) return;
+
+    // Write mentions to ui-store before sending
+    setPendingMentions(inlineRefs);
+
+    setEditorPlainTextContent(view, '');
+    setDraft('');
+    hasUserEditedRef.current = false;
+    void p.onSend(prompt);
+  };
+
+  // ─── Reference selector callbacks ───
+
+  const handleRefSelect = useCallback((nodeId: string) => {
+    const view = viewRef.current;
+    if (!view || view.isDestroyed) return;
+
+    const targetNode = useNodeStore.getState().getNode(nodeId);
+    const displayName = (targetNode?.name ?? '').replace(/<[^>]+>/g, '').trim() || nodeId;
+
+    replaceEditorRangeWithInlineRef(view, refAtPosRef.current, view.state.selection.from, nodeId, displayName);
+
+    setRefOpen(false);
+    refActiveRef.current = false;
+    view.focus();
+  }, []);
+
+  const handleRefClose = useCallback(() => {
+    setRefOpen(false);
+    refActiveRef.current = false;
+  }, []);
+
+  // ─── Trigger detection ───
+
+  const runTriggerDetection = useCallback((view: EditorView, docChanged: boolean) => {
+    if (docChanged) hasUserEditedRef.current = true;
+
+    const { from } = view.state.selection;
+    const $from = view.state.doc.resolve(from);
+    const textBefore = $from.parent.textBetween(0, $from.parentOffset, undefined, INLINE_REF_CHAR);
+
+    const refMatch = textBefore.match(/@([^\s]*)$/);
+    if (refMatch && hasUserEditedRef.current && (docChanged || refActiveRef.current)) {
+      refActiveRef.current = true;
+      const query = refMatch[1];
+      const atStart = from - refMatch[0].length;
+      refAtPosRef.current = atStart;
+      setRefQuery(query);
+      setRefSelectedIndex(0);
+      setRefAnchor(getCaretAnchorRect(view, from));
+      setRefOpen(true);
+    } else {
+      if (refActiveRef.current) {
+        setRefOpen(false);
+      }
+      refActiveRef.current = false;
+    }
+  }, []);
+
+  // ─── ProseMirror plugins ───
+
+  const plugins = useMemo<Plugin[]>(() => {
+    const isComposing = (): boolean => {
+      const dom = viewRef.current?.dom;
+      return dom instanceof HTMLElement && dom.dataset.composing === 'true';
+    };
+
+    const insertHardBreak: (state: EditorState, dispatch?: EditorView['dispatch']) => boolean =
+      chainCommands(exitCode, (state, dispatch) => {
+        if (dispatch) {
+          const br = state.schema.nodes.hard_break.create();
+          dispatch(state.tr.replaceSelectionWith(br).scrollIntoView());
+        }
+        return true;
+      });
+
+    return [
+      keymap({
+        'Enter': (state, dispatch, view) => {
+          if (isComposing()) return false;
+          if (refActiveRef.current) {
+            // Confirm selection in dropdown
+            const item = refDropdownRef.current?.getSelectedItem();
+            if (item && item.type === 'existing') {
+              handleRefSelect(item.id);
+            } else if (item && item.type === 'create') {
+              // Not supported in chat — just close
+              handleRefClose();
+            }
+            return true;
+          }
+          // Send message
+          handleSendRef.current();
+          return true;
+        },
+        'Shift-Enter': (state, dispatch, view) => {
+          if (isComposing()) return false;
+          return insertHardBreak(state, dispatch);
+        },
+        'Escape': () => {
+          if (refActiveRef.current) {
+            handleRefClose();
+            return true;
+          }
+          return false;
+        },
+        'ArrowDown': () => {
+          if (refActiveRef.current) {
+            setRefSelectedIndex((i) => {
+              const count = refDropdownRef.current?.getItemCount() ?? 0;
+              return count > 0 ? Math.min(i + 1, count - 1) : 0;
+            });
+            return true;
+          }
+          return false;
+        },
+        'ArrowUp': () => {
+          if (refActiveRef.current) {
+            setRefSelectedIndex((i) => Math.max(i - 1, 0));
+            return true;
+          }
+          return false;
+        },
+      }),
+    ];
+  }, [handleRefSelect, handleRefClose]);
+
+  // ─── Editor mount ───
+
+  useLayoutEffect(() => {
+    const mount = editorMountRef.current;
+    if (!mount) return;
+
+    const state = EditorState.create({
+      doc: marksToDoc('', [], []),
+      plugins,
+    });
+
+    const view = new EditorView(mount, {
+      state,
+      editable: () => !((propsRef.current.disabled || propsRef.current.busy) && !propsRef.current.onSteer),
+      dispatchTransaction(tr) {
+        const newState = view.state.apply(tr);
+        view.updateState(newState);
+
+        // Sync draft text
+        const text = newState.doc.textContent;
+        setDraftRaw(text);
+        setChatDraft(text);
+
+        // Trigger detection (only on user edits, not programmatic)
+        if (!isImeComposingEvent(tr.getMeta('uiEvent') as unknown as null)) {
+          runTriggerDetection(view, tr.docChanged);
+        }
+      },
+      handleDOMEvents: {
+        compositionstart: (view) => {
+          view.dom.dataset.composing = 'true';
+          return false;
+        },
+        compositionend: (view) => {
+          delete view.dom.dataset.composing;
+          // Run trigger detection after composition ends
+          runTriggerDetection(view, true);
+          return false;
+        },
+      },
+    });
+
+    viewRef.current = view;
+
+    return () => {
+      view.destroy();
+      viewRef.current = null;
+    };
+  }, [plugins, runTriggerDetection, setChatDraft]);
+
+  // Update editable state when props change
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view || view.isDestroyed) return;
+    // Force EditorView to re-evaluate editable()
+    view.setProps({
+      editable: () => !((propsRef.current.disabled || propsRef.current.busy) && !propsRef.current.onSteer),
+    });
+  }, [disabled, busy, onSteer]);
+
+  // ─── Imperative handle ───
+
+  useImperativeHandle(ref, () => ({
+    setDraft(text: string) {
+      const view = viewRef.current;
+      if (view && !view.isDestroyed) {
+        setEditorPlainTextContent(view, text);
+        setDraft(text);
+        requestAnimationFrame(() => {
+          if (isEditorViewAlive(viewRef.current)) {
+            viewRef.current!.focus();
+          }
+        });
+      }
+    },
+    getDraft() {
+      return draft;
+    },
+  }), [draft, setDraft]);
+
+  // ─── Menu close on outside click ───
 
   useEffect(() => {
     if (!menuOpen) return;
-
     function onPointerDown(event: PointerEvent) {
-      const target = event.target as Node;
-      if (menuRef.current?.contains(target)) return;
+      if (menuRef.current?.contains(event.target as Node)) return;
       setMenuOpen(false);
     }
-
     document.addEventListener('pointerdown', onPointerDown, true);
     return () => document.removeEventListener('pointerdown', onPointerDown, true);
   }, [menuOpen]);
 
   useEffect(() => {
-    if (!modelMenuOpen) {
-      setMoreModelsOpen(false);
-    }
+    if (!modelMenuOpen) setMoreModelsOpen(false);
   }, [modelMenuOpen]);
 
-  async function handleSend() {
-    const normalized = draft.trim();
-    if (!normalized) return;
+  // ─── Placeholder ───
 
-    if (canSteer) {
-      setDraft('');
-      onSteer!(normalized);
-      return;
-    }
+  const placeholder = canSteer ? 'Steer the conversation…' : disabled ? 'Responding…' : busy ? 'Working…' : 'Ask anything…';
 
-    if (inputDisabled) return;
-    setDraft('');
-    await onSend(normalized);
-  }
+  // ─── Model item renderer ───
 
   function handleSelectModel(model: ChatInputModel) {
     setModelMenuOpen(false);
@@ -250,20 +511,12 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
       )}
       <div className="rounded-xl border border-border bg-surface transition-colors focus-within:border-foreground/20">
         <div className={compact ? 'px-3 py-2' : 'px-3 pt-2.5 pb-1'}>
-          <textarea
-            ref={textareaRef}
-            value={draft}
-            disabled={inputDisabled}
-            rows={1}
-            placeholder={canSteer ? 'Steer the conversation…' : disabled ? 'Responding…' : busy ? 'Working…' : 'Ask anything…'}
-            className={`w-full resize-none bg-transparent text-base leading-6 outline-none placeholder:text-foreground-tertiary disabled:cursor-not-allowed disabled:opacity-60 ${compact ? 'text-foreground-tertiary' : 'text-foreground'}`}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
-                event.preventDefault();
-                void handleSend();
-              }
-            }}
+          <div
+            ref={editorMountRef}
+            style={{ '--chat-placeholder': `"${placeholder}"` } as React.CSSProperties}
+            className={`chat-input-editor w-full text-base leading-6 outline-none [&_.ProseMirror]:outline-none [&_.ProseMirror]:min-h-[24px] [&_.ProseMirror]:max-h-[160px] [&_.ProseMirror]:overflow-y-auto ${
+              compact ? 'text-foreground-tertiary [&_.ProseMirror]:max-h-[24px]' : 'text-foreground'
+            } ${inputDisabled ? 'cursor-not-allowed opacity-60' : ''}`}
           />
         </div>
         <div
@@ -386,7 +639,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
             ) : (
               <button
                 type="button"
-                onClick={() => void handleSend()}
+                onClick={() => handleSendRef.current()}
                 disabled={!canSend}
                 className={`flex h-7 w-7 items-center justify-center rounded-lg outline-none transition-colors ${
                   canSend
@@ -401,6 +654,17 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
           </div>
         </div>
       </div>
+
+      {/* Reference selector (portal-based) */}
+      <ReferenceSelector
+        ref={refDropdownRef}
+        open={refOpen}
+        onSelect={handleRefSelect}
+        query={refQuery}
+        selectedIndex={refSelectedIndex}
+        currentNodeId=""
+        anchor={refAnchor}
+      />
     </div>
   );
 });

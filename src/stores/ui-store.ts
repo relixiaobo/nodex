@@ -16,7 +16,7 @@ import { commitUIMarker, registerUndoUICallbacks } from '../lib/loro-doc.js';
 import {
   expandedNodeSetsEqual,
 } from '../lib/expanded-node-key.js';
-import { chatPanelSessionId, isAppPanel, isChatPanel } from '../types/index.js';
+import { chatPanelSessionId, isAppPanel, isChatPanel, type InlineRefEntry } from '../types/index.js';
 import { useNodeStore } from './node-store.js';
 
 const MAIN_OUTLINER_PANEL_ID = 'node-main';
@@ -81,6 +81,11 @@ interface UIStore {
   // Chat input draft (synced from ChatInput so FloatingChatBar can show it)
   chatDraft: string;
   setChatDraft(text: string): void;
+
+  // Pending @ mentions — set by ChatInput before onSend, read by ai-context.
+  // Overwritten on each send (empty array if no mentions). Not persisted.
+  pendingMentions: InlineRefEntry[];
+  setPendingMentions(mentions: InlineRefEntry[]): void;
 
   // Batch tag selector
   batchTagSelectorOpen: boolean;
@@ -469,6 +474,9 @@ export const useUIStore = create<UIStore>()(
 
       chatDraft: '',
       setChatDraft: (text) => set({ chatDraft: text }),
+
+      pendingMentions: [],
+      setPendingMentions: (mentions) => set({ pendingMentions: mentions }),
 
       dragNodeId: null,
       dropTargetId: null,

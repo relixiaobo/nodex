@@ -2,7 +2,6 @@ import { toggleMark } from 'prosemirror-commands';
 import { TextSelection } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 import { marksToDoc } from './pm-doc-utils.js';
-import { pmSchema } from '../components/editor/pm-schema.js';
 
 export function isEditorViewAlive(view: EditorView | null | undefined): view is EditorView {
   return !!view && !view.isDestroyed;
@@ -60,7 +59,7 @@ export function replaceEditorRangeWithInlineRef(
   displayName: string,
 ): void {
   const range = normalizeRange(view, from, to);
-  const inlineRefNode = pmSchema.nodes.inlineReference.create({
+  const inlineRefNode = view.state.schema.nodes.inlineReference.create({
     targetNodeId,
     displayName,
   });
@@ -73,7 +72,7 @@ export function replaceEditorRangeWithInlineRef(
 }
 
 export function toggleHeadingMark(view: EditorView): boolean {
-  return toggleMark(pmSchema.marks.headingMark)(view.state, view.dispatch, view);
+  return toggleMark(view.state.schema.marks.headingMark)(view.state, view.dispatch, view);
 }
 
 export function setEditorPlainTextContent(view: EditorView, text: string): void {

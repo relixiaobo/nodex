@@ -6,6 +6,7 @@ import { isOutlinerContentNodeType } from './node-type-utils.js';
 import { useUIStore } from '../stores/ui-store.js';
 import { isAppPanel } from '../types/index.js';
 import { buildMentionedNodeEditReminder } from './ai-mentioned-nodes.js';
+import { buildMentionContext } from './ai-mention-context.js';
 
 const RECENT_IMAGE_MESSAGES = 3;
 
@@ -133,6 +134,7 @@ function buildTimeContext(): string {
 
 export async function buildSystemReminder(): Promise<string> {
   const sections = [
+    buildMentionContext(),
     buildPanelContext(),
     await getPageContext(),
     buildTimeContext(),

@@ -16,7 +16,7 @@
 
 | 工作区 | 分支 | 任务 | 状态 |
 |--------|------|------|------|
-| nodex-claude | — | 空闲 | — |
+| nodex-claude | claude/chat-at-mention | @ 引用节点 (#179) | 待启动 |
 | nodex-gemini | — | 空闲 | — |
 | nodex-codex | codex/official-skill-sync | Official Skill Sync (#178) | 待启动 |
 

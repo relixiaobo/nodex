@@ -77,6 +77,7 @@ describe('ai agent skill bootstrap and prompt rendering', () => {
     expect(loroDoc.getParentId(SKILL_NODE_IDS.SKILL_CREATOR)).toBe(SYSTEM_NODE_IDS.LIBRARY);
     expect(loroDoc.toNodexNode(SKILL_NODE_IDS.SKILL_CREATOR)?.tags).toContain(SYS_T.SKILL);
     expect(loroDoc.toNodexNode(SKILL_NODE_IDS.SKILL_CREATOR)?.locked).toBe(true);
+    expect(loroDoc.toNodexNode(SKILL_NODE_IDS.SKILL_CREATOR)?.searchableWhenLocked).toBe(true);
     expect(loroDoc.toNodexNode(SKILL_NODE_IDS.SKILL_CREATOR_RULE_1)?.locked).toBe(true);
   });
 

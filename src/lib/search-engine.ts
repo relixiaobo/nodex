@@ -8,8 +8,8 @@
  */
 import { nanoid } from 'nanoid';
 import * as loroDoc from './loro-doc.js';
-import { SYSTEM_NODE_IDS, SYS_T } from '../types/index.js';
-import { isLockedNode, isWorkspaceHomeNode } from './node-capabilities.js';
+import { SYSTEM_NODE_IDS } from '../types/index.js';
+import { canSearchLockedNode, isLockedNode, isWorkspaceHomeNode } from './node-capabilities.js';
 import type { NodexNode, NodeType, QueryOp } from '../types/node.js';
 import { getFieldValue } from './filter-utils.js';
 import { computeBacklinks } from './backlinks.js';
@@ -47,7 +47,7 @@ function isCandidate(node: NodexNode, excludeNodeId: string): boolean {
   // Exclude structural types
   if (node.type && EXCLUDED_TYPES.has(node.type)) return false;
   if (isWorkspaceHomeNode(node.id)) return false;
-  if (isLockedNode(node.id) && !node.tags.includes(SYS_T.SKILL)) return false;
+  if (isLockedNode(node.id) && !canSearchLockedNode(node.id)) return false;
   // Exclude trashed nodes
   if (isInTrash(node.id)) return false;
   return true;

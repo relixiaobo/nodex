@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  canSearchLockedNode,
   canCreateChildrenUnder,
   canEditFieldEntryValue,
   getNodeCapabilities,
@@ -122,6 +123,24 @@ describe('node capabilities', () => {
       canDelete: false,
     });
     expect(canCreateChildrenUnder(SKILL_NODE_IDS.SKILL_CREATOR)).toBe(true);
+    expect(canSearchLockedNode(SKILL_NODE_IDS.SKILL_CREATOR)).toBe(true);
+  });
+
+  it('keeps non-skill locked content fully immutable by default', () => {
+    loroDoc.createNode('locked_note', 'ws_default');
+    loroDoc.setNodeDataBatch('locked_note', { name: 'Locked note', locked: true });
+    loroDoc.commitDoc('__seed__');
+
+    expect(getNodeCapabilities('locked_note')).toEqual({
+      role: 'system',
+      canEditNode: false,
+      canEditStructure: false,
+      canEditFieldValues: false,
+      canMove: false,
+      canDelete: false,
+    });
+    expect(canCreateChildrenUnder('locked_note')).toBe(false);
+    expect(canSearchLockedNode('locked_note')).toBe(false);
   });
 
   it('detects direct and nested nodes inside Trash via parent-chain walk', () => {

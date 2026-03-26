@@ -64,9 +64,11 @@ export function replaceEditorRangeWithInlineRef(
     displayName,
   });
 
+  const afterRef = range.from + inlineRefNode.nodeSize;
   let tr = view.state.tr.delete(range.from, range.to);
   tr = tr.insert(range.from, inlineRefNode);
-  tr = tr.setSelection(TextSelection.create(tr.doc, range.from + inlineRefNode.nodeSize));
+  tr = tr.insertText(' ', afterRef);
+  tr = tr.setSelection(TextSelection.create(tr.doc, afterRef + 1));
   view.dispatch(tr);
   view.focus();
 }

@@ -374,7 +374,28 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
       state,
       editable: () => !((propsRef.current.disabled || propsRef.current.busy) && !propsRef.current.onSteer),
       dispatchTransaction(tr) {
-        const newState = view.state.apply(tr);
+        let newState = view.state.apply(tr);
+
+        // Ensure every inlineReference is followed by at least a space.
+        // Without this, browsers render the cursor on a new visual line
+        // after a contenteditable=false inline node.
+        if (tr.docChanged) {
+          let fixTr = newState.tr;
+          let fixed = false;
+          newState.doc.descendants((node, pos) => {
+            if (node.type.name !== 'inlineReference') return;
+            const afterPos = pos + node.nodeSize;
+            const $after = fixTr.doc.resolve(afterPos);
+            if ($after.parentOffset >= $after.parent.content.size) {
+              fixTr = fixTr.insertText(' ', afterPos);
+              fixed = true;
+            }
+          });
+          if (fixed) {
+            newState = newState.apply(fixTr);
+          }
+        }
+
         view.updateState(newState);
 
         // Sync draft text

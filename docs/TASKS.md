@@ -16,7 +16,7 @@
 
 | 工作区 | 分支 | 任务 | 状态 |
 |--------|------|------|------|
-| nodex-claude | claude/chat-at-mention | @ 引用节点 (#179) | 待启动 |
+| nodex-claude | — | 空闲 | — |
 | nodex-claude-2 | claude-2/tana-import | Tana 数据智能导入 | 待启动 |
 | nodex-gemini | — | 空闲 | — |
 | nodex-codex | — | 空闲 | — |
@@ -35,7 +35,7 @@
 
 #### Chat 体验
 
-- [ ] **@ 引用节点** — Chat 输入框 `@` 触发节点选择器，精确注入上下文
+- [x] ~~**@ 引用节点**~~ (#179) — Chat 输入框 `@` 触发节点选择器，精确注入上下文
 - [x] ~~**View Context Injection**~~ (#174) — system reminder 注入可见树快照
 
 #### AI 能力
@@ -124,6 +124,7 @@
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-25 | @ 引用节点 — Chat 输入框 ProseMirror + @ mention + context injection | claude | #179 |
 | 2026-03-25 | Official Skill Sync — locked 规则 + 用户自定义共存 + system prompt 同步 | codex | #178 |
 | 2026-03-24 | 新图标 + 截图 + store 资产 — 三色立方体 + 真实 app 截图 | claude | #177 |
 | 2026-03-24 | 上架资料刷新 — store listing + landing page + 截图 + 定位统一 | claude | #176 |

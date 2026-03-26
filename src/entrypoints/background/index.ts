@@ -926,6 +926,28 @@ async function handleBrowserReadConsole(tabId: number, payload: BrowserReadConso
 }
 
 export default defineBackground(() => {
+  // ── Theme-aware icon ──
+  // Switch between light/dark icon sets based on system color scheme.
+  // Light mode: green bg + paper cat; Dark mode: paper bg + green cat.
+  function applyThemeIcon(isDark: boolean): void {
+    const suffix = isDark ? '-dark' : '';
+    chrome.action.setIcon({
+      path: {
+        16: `icon${suffix}/16.png`,
+        32: `icon${suffix}/32.png`,
+        48: `icon${suffix}/48.png`,
+        128: `icon${suffix}/128.png`,
+      },
+    });
+  }
+
+  // Detect initial theme + listen for changes (Service Worker has window.matchMedia)
+  if (typeof matchMedia !== 'undefined') {
+    const mq = matchMedia('(prefers-color-scheme: dark)');
+    applyThemeIcon(mq.matches);
+    mq.addEventListener('change', (e) => applyThemeIcon(e.matches));
+  }
+
   // Open Side Panel when action button is clicked
   chrome.action.onClicked.addListener(async (tab) => {
     if (tab.id) {

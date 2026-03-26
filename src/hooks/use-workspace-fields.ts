@@ -7,6 +7,7 @@
 import { useMemo } from 'react';
 import { useNodeStore } from '../stores/node-store';
 import { resolveDataType, SYSTEM_FIELD_ENTRIES } from '../lib/field-utils.js';
+import { SYSTEM_NODE_IDS } from '../types/index.js';
 import * as loroDoc from '../lib/loro-doc.js';
 
 const EMPTY = '[]';
@@ -15,7 +16,8 @@ export function useWorkspaceFields(): Array<{ id: string; name: string; dataType
   const json = useNodeStore((state) => {
     void state._version;
     const fields: Array<{ id: string; name: string; dataType: string }> = [];
-    for (const id of loroDoc.getAllNodeIds()) {
+    // Only traverse Schema children (tens of nodes), not all 40K nodes
+    for (const id of loroDoc.getChildren(SYSTEM_NODE_IDS.SCHEMA)) {
       const node = loroDoc.toNodexNode(id);
       if (node?.type === 'fieldDef' && node.locked !== true) {
         fields.push({

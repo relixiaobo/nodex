@@ -19,6 +19,7 @@ import {
 } from '../../src/lib/loro-doc.js';
 import { isLockedNode, isWorkspaceHomeNode } from '../../src/lib/node-capabilities.js';
 import { SYSTEM_NODE_IDS } from '../../src/types/index.js';
+import { buildPaletteSearchCandidates, buildReferenceSearchCandidates } from '../../src/hooks/use-node-search';
 
 /** Structural NodeTypes excluded from search (mirrors use-node-search.ts). */
 const SKIP_DOC_TYPES = new Set<string>([
@@ -117,5 +118,37 @@ describe('node search SKIP_DOC_TYPES filter', () => {
     const ids = searchNodes('Note', 'n1').map(r => r.id);
     expect(ids).not.toContain('n1');
     expect(ids).toContain('n2');
+  });
+});
+
+describe('buildPaletteSearchCandidates', () => {
+  it('includes content nodes and palette-searchable system nodes', () => {
+    const candidates = buildPaletteSearchCandidates(new Set());
+    const ids = candidates.map(c => c.id);
+    expect(ids).toContain('n1');
+    expect(ids).toContain('n2');
+    // SETTINGS is locked but paletteSearchable — should be included
+    expect(ids).toContain(SYSTEM_NODE_IDS.SETTINGS);
+  });
+
+  it('excludes quickNavIdSet entries', () => {
+    const quickNavIds = new Set(['n1']);
+    const candidates = buildPaletteSearchCandidates(quickNavIds);
+    const ids = candidates.map(c => c.id);
+    expect(ids).not.toContain('n1');
+    expect(ids).toContain('n2');
+  });
+});
+
+describe('buildReferenceSearchCandidates', () => {
+  it('includes content nodes but skips structural types', () => {
+    const candidates = buildReferenceSearchCandidates();
+    const ids = candidates.map(c => c.id);
+    expect(ids).toContain('n1');
+    expect(ids).toContain('n2');
+    expect(ids).not.toContain('td1'); // tagDef
+    expect(ids).not.toContain('fd1'); // fieldDef
+    expect(ids).not.toContain('fe1'); // fieldEntry
+    expect(ids).not.toContain('ref1'); // reference
   });
 });

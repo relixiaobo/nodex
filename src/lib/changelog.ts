@@ -7,6 +7,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.3.2',
+    date: '2026-03-26',
+    summary: '@ Mentions + Login Redesign',
+    items: [
+      'Type @ in chat to mention any node — its content is injected as AI context',
+      'Inline references show @Name format with consistent spacing everywhere',
+      'Redesigned login screen — logo, tagline, and clear value proposition',
+      'Auto-select default model after first API key setup',
+      'Sync startup fix — retries after LoroDoc initialization',
+    ],
+  },
+  {
     version: '0.3.1',
     date: '2026-03-25',
     summary: 'Smarter AI + New Logo',

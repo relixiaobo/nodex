@@ -694,7 +694,7 @@ describe('SyncManager', () => {
       expect(mockPullUpdates).toHaveBeenCalledTimes(1);
     });
 
-    it('nudge() triggers immediate syncOnce', async () => {
+    it('nudge() triggers syncOnce after debounce delay', async () => {
       await mgr.start('ws_1', 'tok_1', 'dev_1');
       await flushAsync();
 
@@ -704,6 +704,8 @@ describe('SyncManager', () => {
       mockGetPendingCount.mockResolvedValue(0);
 
       mgr.nudge();
+      // nudge is debounced (2 s) — advance past the debounce timer
+      await vi.advanceTimersByTimeAsync(2_000);
       await flushAsync();
 
       expect(mockPullUpdates).toHaveBeenCalledTimes(1);
@@ -784,6 +786,7 @@ describe('SyncManager', () => {
       const l1CountAfterUnsub = l1.length;
 
       mgr.nudge();
+      await vi.advanceTimersByTimeAsync(2_000);
       await flushAsync();
 
       expect(l1.length).toBe(l1CountAfterUnsub);

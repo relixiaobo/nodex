@@ -49,6 +49,7 @@ export class SyncManager {
   private intervalId: ReturnType<typeof setInterval> | null = null;
   private isSyncing = false;
   private nudgePending = false;
+  private nudgeTimer: ReturnType<typeof setTimeout> | null = null;
   private workspaceId: string | null = null;
   private accessToken: string | null = null;
   private deviceId: string | null = null;
@@ -133,6 +134,10 @@ export class SyncManager {
   /** Stop sync loop. Call on sign-out or workspace switch. */
   stop(): void {
     this.sessionToken += 1;
+    if (this.nudgeTimer) {
+      clearTimeout(this.nudgeTimer);
+      this.nudgeTimer = null;
+    }
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = null;
@@ -227,13 +232,27 @@ export class SyncManager {
     }
   }
 
-  /** Trigger sync immediately (called when local updates are enqueued). */
+  private static readonly NUDGE_DEBOUNCE_MS = 2_000;
+
+  /**
+   * Trigger a sync cycle after a debounce delay.
+   *
+   * Called on every local Loro commit (i.e. every keystroke).  Without the
+   * debounce the full push → pull → chat-push cycle would run on each
+   * keystroke, contributing to typing lag via IndexedDB + network overhead
+   * on the main thread.  A 2 s delay coalesces rapid edits into a single
+   * sync cycle.
+   */
   nudge(): void {
     if (this.isSyncing) {
       this.nudgePending = true;
       return;
     }
-    void this.syncOnce();
+    if (this.nudgeTimer !== null) return; // already scheduled
+    this.nudgeTimer = setTimeout(() => {
+      this.nudgeTimer = null;
+      void this.syncOnce();
+    }, SyncManager.NUDGE_DEBOUNCE_MS);
   }
 
   // -------------------------------------------------------------------------
@@ -433,6 +452,14 @@ export class SyncManager {
             const result = await importRemoteSession(remoteSession as any, remoteRevision);
             console.warn(`[sync] chat push conflict for ${session.id}: ${result}`);
             await this.updateInMemorySessionSync(session.id, remoteRevision);
+
+            // When local wins ('skipped'), the local content should be re-pushed.
+            // Update the stale revision in IndexedDB so the next push uses the
+            // correct baseRevision — otherwise the same 409 repeats every cycle.
+            if (result === 'skipped') {
+              const { updateSessionRevision } = await import('../ai-persistence.js');
+              await updateSessionRevision(session.id, remoteRevision);
+            }
           }
         }
       } catch (err) {

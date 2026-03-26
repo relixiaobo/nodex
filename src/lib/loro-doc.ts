@@ -669,13 +669,43 @@ function deduplicateSchemaTagDefs(): boolean {
 // ============================================================
 
 /**
- * Immediately notify all subscribers (invalidate cache + call callbacks).
- * Called explicitly from every doc-modifying exit point (commitDoc, importUpdates,
- * undoDoc, redoDoc, etc.) instead of from doc.subscribe() — which would trigger
- * a re-entrant WASM lock panic inside Loro's event handler dispatch.
+ * Notify subscribers (invalidate cache + call callbacks).
+ *
+ * For typing-related commits (`user:text`, `user:paste`) the subscriber
+ * callbacks are **deferred** to the next macrotask via `setTimeout(0)`.
+ * This prevents the O(N) selector cascade (~350 ms for 14 K nodes) from
+ * blocking the keystroke event handler — the key fix for typing lag.
+ * ProseMirror already updated the DOM, so the 1-frame delay is invisible.
+ *
+ * All other origins (undo, import, structural changes) notify synchronously
+ * so the UI reflects the change immediately.
+ *
+ * `invalidateCache()` always runs synchronously: code that reads via
+ * `getNode()` / `getChildren()` immediately after a commit sees fresh data
+ * regardless of whether the subscriber dispatch is deferred.
  */
-function notifySubscribers(): void {
+let _notifyTimer: ReturnType<typeof setTimeout> | null = null;
+
+function notifySubscribers(origin?: string): void {
   invalidateCache();
+
+  const defer = origin === 'user:text' || origin === 'user:paste';
+
+  if (defer) {
+    if (_notifyTimer !== null) return; // already scheduled
+    _notifyTimer = setTimeout(() => {
+      _notifyTimer = null;
+      for (const cb of subscribers) cb();
+    }, 0);
+    return;
+  }
+
+  // Synchronous path: flush any pending deferred notification first,
+  // then fire subscribers once (avoids double-notification).
+  if (_notifyTimer !== null) {
+    clearTimeout(_notifyTimer);
+    _notifyTimer = null;
+  }
   for (const cb of subscribers) cb();
 }
 
@@ -1343,7 +1373,7 @@ export function commitDoc(origin?: string): void {
   // Explicit notification — replaces doc.subscribe() which caused WASM re-entrant lock panic.
   // Safe to call synchronously here: doc.commit() has returned, no Loro lock is held.
   scheduleSave();
-  notifySubscribers();
+  notifySubscribers(resolvedOrigin);
 }
 
 export function withCommitOrigin<T>(origin: string, fn: () => T): T {

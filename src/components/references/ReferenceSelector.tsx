@@ -10,9 +10,8 @@
 import { useMemo, useEffect, useLayoutEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
 import { createPortal } from 'react-dom';
 import { AtSign, Calendar, Plus } from '../../lib/icons.js';
-import { useNodeSearch, type NodeSearchResult } from '../../hooks/use-node-search';
+import { useNodeSearch, buildReferenceSearchCandidates, type NodeSearchResult, type SearchCandidate } from '../../hooks/use-node-search';
 import { useUIStore } from '../../stores/ui-store';
-import { useNodeStore } from '../../stores/node-store';
 import { isLockedNode, isWorkspaceHomeNode } from '../../lib/node-capabilities.js';
 import { getSystemNodePreset } from '../../lib/system-node-presets.js';
 import * as loroDoc from '../../lib/loro-doc.js';
@@ -179,20 +178,28 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
   anchor,
  }, ref) {
   const anchorRef = useRef<HTMLSpanElement>(null);
-  const searchResults = useNodeSearch(query, currentNodeId);
   const listRef = useRef<HTMLDivElement>(null);
+
+  // Build search candidates once when selector opens (O(N) but not per keystroke)
+  const [candidates, setCandidates] = useState<SearchCandidate[]>([]);
+  useEffect(() => {
+   if (!open) return;
+   setCandidates(buildReferenceSearchCandidates());
+  }, [open]);
+
+  const searchResults = useNodeSearch(query, candidates, currentNodeId);
 
   // When query is empty, show recently used nodes:
   // navigation history first, then recently edited fallback.
   const nodeHistory = useUIStore((s) => s.nodeHistory);
   const nodeHistoryIndex = useUIStore((s) => s.nodeHistoryIndex);
-  const _version = useNodeStore((s) => s._version);
 
-  const recentNodes = useMemo(() => {
-   if (query.trim()) return [];
-   return collectRecentReferenceNodes({ currentNodeId, nodeHistory, nodeHistoryIndex, limit: 5 });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, nodeHistory, nodeHistoryIndex, _version, currentNodeId]);
+  // Build recent nodes once when selector opens (not on every _version bump)
+  const [recentNodes, setRecentNodes] = useState<NodeSearchResult[]>([]);
+  useEffect(() => {
+   if (!open || query.trim()) return;
+   setRecentNodes(collectRecentReferenceNodes({ currentNodeId, nodeHistory, nodeHistoryIndex, limit: 5 }));
+  }, [open, query, nodeHistory, nodeHistoryIndex, currentNodeId]);
 
   const dateMatches = useMemo(() => matchDateShortcuts(query), [query]);
   const items = query.trim() ? searchResults : recentNodes;

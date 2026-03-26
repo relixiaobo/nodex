@@ -6,6 +6,7 @@
  */
 import { useMemo } from 'react';
 import { useNodeStore } from '../stores/node-store';
+import { SYSTEM_NODE_IDS } from '../types/index.js';
 import * as loroDoc from '../lib/loro-doc.js';
 
 const EMPTY = '[]';
@@ -14,7 +15,8 @@ export function useWorkspaceTags(): Array<{ id: string; name: string }> {
   const json = useNodeStore((state) => {
     void state._version;
     const tags: Array<{ id: string; name: string }> = [];
-    for (const id of loroDoc.getAllNodeIds()) {
+    // Only traverse Schema children (tens of nodes), not all 40K nodes
+    for (const id of loroDoc.getChildren(SYSTEM_NODE_IDS.SCHEMA)) {
       const node = loroDoc.toNodexNode(id);
       if (node?.type === 'tagDef' && node.locked !== true) {
         tags.push({ id, name: node.name ?? 'Untitled' });

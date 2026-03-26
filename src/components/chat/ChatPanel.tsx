@@ -150,6 +150,11 @@ export function ChatPanel({ sessionId, hideHeader, debugOpen: externalDebugOpen 
     );
     if (selectedModel) return selectedModel;
 
+    // No explicit selection matches — auto-pick first featured model (or first available)
+    if (availableModels.length > 0) {
+      return availableModels.find((m) => m.featured) ?? availableModels[0]!;
+    }
+
     return {
       id: debug.modelId,
       name: agent.state.model?.name ?? '',

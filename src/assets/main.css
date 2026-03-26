@@ -460,6 +460,19 @@ html, body {
   font-weight: 500;
 }
 
+/* Keep ProseMirror separator as zero-width caret anchor after inline refs.
+   Same pattern as .editor-inline — prevents cursor from jumping to next line. */
+.chat-input-editor .ProseMirror p:has([data-inlineref-node])>img.ProseMirror-separator {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  overflow: hidden;
+}
+
 /* Chat input ProseMirror placeholder — show when doc paragraph is empty.
    Uses CSS custom property because attr() reads from the ::before's own element,
    not from a parent. The container sets --chat-placeholder via style. */

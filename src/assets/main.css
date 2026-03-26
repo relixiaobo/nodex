@@ -452,6 +452,13 @@ html, body {
   pointer-events: none;
 }
 
+/* Inline reference node in ProseMirror — ensure it stays inline and doesn't
+   cause cursor to visually jump to next line after insertion. */
+.chat-input-editor .inline-ref {
+  display: inline;
+  white-space: nowrap;
+}
+
 /* Chat input ProseMirror placeholder — show when doc paragraph is empty.
    Uses CSS custom property because attr() reads from the ::before's own element,
    not from a parent. The container sets --chat-placeholder via style. */

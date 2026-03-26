@@ -66,7 +66,12 @@ export function replaceEditorRangeWithInlineRef(
 
   let tr = view.state.tr.delete(range.from, range.to);
   tr = tr.insert(range.from, inlineRefNode);
-  tr = tr.setSelection(TextSelection.create(tr.doc, range.from + inlineRefNode.nodeSize));
+  // Insert a space after the reference so the cursor has a text node to
+  // sit in. Without this, browsers render the cursor on a new visual line
+  // after a contenteditable=false inline node.
+  const afterRef = range.from + inlineRefNode.nodeSize;
+  tr = tr.insertText(' ', afterRef);
+  tr = tr.setSelection(TextSelection.create(tr.doc, afterRef + 1));
   view.dispatch(tr);
   view.focus();
 }

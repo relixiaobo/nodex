@@ -179,3 +179,21 @@
 | #tag 与所在行文本垂直居中对齐 | — | — |
 | @ 创建 reference 后光标继续输入应转为 inline reference | — | — |
 | 2026-03-10 | 消除 Container Node — Container 变为 node + locked；Settings 标准页面 | codex | #119 |
+
+## v0.2.0 — v0.3.1 (2026-03-20 ~ 2026-03-23)
+
+| 日期 | 任务 | Agent | PR |
+|------|------|-------|-----|
+| 2026-03-21 | Toggle Layout — Chat/Node 双视角切换 + 状态保持 | codex | #171 |
+| 2026-03-21 | Node 工具重构 — Tana Paste 统一格式 + search node 创建 | codex | #170 |
+| 2026-03-20 | v0.2.0 发版 — Think with your AI | nodex | — |
+| 2026-03-20 | AI 人格设计文档 + system prompt 重写 + skills 升级 | nodex | — |
+| 2026-03-20 | 新用户引导 — 强制登录 + 内联 API key + 启动偏好 | codex | #163 |
+| 2026-03-20 | 工具调用分组折叠（单消息内） | claude | #164 |
+| 2026-03-20 | Chat 面板头部一致性 | codex | #162 |
+| 2026-03-20 | node_read 无参数浏览 + Settings AI 分组 | codex | #161 |
+| 2026-03-20 | extensible cite types (node/chat/url) | claude | #160 |
+| 2026-03-20 | past_chats fuzzy search 升级 | codex | #159 |
+| 2026-03-20 | Chat 节点展示 — ref/cite 浮窗 + node 内嵌 + 首屏 Chat | claude | #158 |
+| 2026-03-20 | past_chats 跨会话记忆工具 + prompt 架构重构 | codex | #157 |
+| 2026-03-20 | 多项 UI 修复 | nodex | — |

@@ -603,6 +603,27 @@ export async function markSessionSynced(sessionId: string, revision: number): Pr
 }
 
 /**
+ * Update only the revision field in IndexedDB (without touching syncedAt).
+ *
+ * Used after a push 409 conflict where local wins (importRemoteSession →
+ * 'skipped'): the local content is newer and should be re-pushed, but the
+ * stale revision must be updated so the next push uses the correct base
+ * revision and succeeds instead of looping on 409.
+ */
+export async function updateSessionRevision(sessionId: string, revision: number): Promise<void> {
+  const db = await getDB();
+  const tx = db.transaction(STORE_NAME, 'readwrite');
+  const store = tx.objectStore(STORE_NAME);
+  const session = await store.get(sessionId);
+  if (!session) {
+    await tx.done;
+    return;
+  }
+  await store.put({ ...session, revision });
+  await tx.done;
+}
+
+/**
  * Import a remote session into IndexedDB (from pull).
  * Only overwrites if local session has no unsynchronized changes.
  * P1-6: Read and write in the same transaction to avoid races.

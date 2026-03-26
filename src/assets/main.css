@@ -453,16 +453,12 @@ html, body {
 }
 
 /* Inline reference (@mention) in chat input — styled like WeChat mentions. */
-/* @mention in chat input.
-   - Trailing space inserted on selection handles cursor positioning.
-   - margin-right guarantees visual spacing even if user deletes the space. */
+/* @mention in chat input. Trailing space is part of the contenteditable=false
+   span (in toDOM), so it can't be deleted and always provides spacing. */
 .chat-input-editor .inline-ref {
-  display: inline-block;
-  vertical-align: baseline;
   white-space: nowrap;
   color: var(--inline-ref-accent, var(--color-primary));
   font-weight: 500;
-  margin-right: 0.25em;
 }
 
 /* ProseMirror separator as caret anchor after inline refs.

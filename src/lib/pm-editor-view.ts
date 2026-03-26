@@ -66,12 +66,7 @@ export function replaceEditorRangeWithInlineRef(
 
   let tr = view.state.tr.delete(range.from, range.to);
   tr = tr.insert(range.from, inlineRefNode);
-  // Insert trailing space after the reference — standard @mention pattern
-  // (WeChat, Slack, Notion all do this). Gives cursor a text node to sit
-  // in and provides natural spacing.
-  const afterRef = range.from + inlineRefNode.nodeSize;
-  tr = tr.insertText(' ', afterRef);
-  tr = tr.setSelection(TextSelection.create(tr.doc, afterRef + 1));
+  tr = tr.setSelection(TextSelection.create(tr.doc, range.from + inlineRefNode.nodeSize));
   view.dispatch(tr);
   view.focus();
 }

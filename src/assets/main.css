@@ -458,6 +458,7 @@ html, body {
   white-space: nowrap;
   color: var(--inline-ref-accent, var(--color-primary));
   font-weight: 500;
+  margin-right: 0.25em;
 }
 
 /* Keep ProseMirror separator as zero-width caret anchor after inline refs.

@@ -217,7 +217,7 @@ export function htmlToMarks(html: string): {
       inlineRefs.push({
         offset,
         targetNodeId: inlineRefTarget,
-        ...(el.textContent ? { displayName: el.textContent } : {}),
+        ...(el.textContent ? { displayName: el.textContent.replace(/^@/, '').trim() } : {}),
       });
       return;
     }

@@ -452,18 +452,15 @@ html, body {
   pointer-events: none;
 }
 
-/* Inline reference (@mention) in chat input — styled like WeChat mentions. */
-/* @mention in chat input. Trailing space is part of the contenteditable=false
-   span (in toDOM), so it can't be deleted and always provides spacing. */
+/* @mention in chat input. Trailing space is baked into the contenteditable=false
+   span (toDOM renders "@Name "), so spacing is always present. */
 .chat-input-editor .inline-ref {
   white-space: nowrap;
   color: var(--inline-ref-accent, var(--color-primary));
   font-weight: 500;
 }
 
-/* ProseMirror separator as caret anchor after inline refs.
-   Give it a small width so the cursor sits with natural spacing
-   from the @mention — same as a space between words. */
+/* Hide ProseMirror separator image after inline refs (same as .editor-inline). */
 .chat-input-editor .ProseMirror p:has([data-inlineref-node])>img.ProseMirror-separator {
   display: inline-block;
   width: 0;

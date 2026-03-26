@@ -19,7 +19,7 @@
 | nodex-claude | — | 空闲 | — |
 | nodex-claude-2 | — | 空闲 | — |
 | nodex-gemini | — | 空闲 | — |
-| nodex-codex | — | 空闲 | — |
+| nodex-codex | perf/structural-mutation-lag | #183 性能优化 Phase 2 | 待执行 |
 
 ---
 

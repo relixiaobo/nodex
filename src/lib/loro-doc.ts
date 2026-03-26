@@ -178,6 +178,16 @@ function invalidateCacheForNode(nodexId: string): void {
   _nodeCache.delete(nodexId);
 }
 
+/**
+ * Invalidate a node's data cache AND its children list cache.
+ * Used by structural mutations to selectively invalidate the parent(s)
+ * whose children list changed (e.g., after createNode/deleteNode/moveNode).
+ */
+function invalidateNodeAndChildrenCache(nodexId: string): void {
+  _nodeCache.delete(nodexId);   // NodexNode.children is stale
+  _childrenCache.delete(nodexId); // getChildren() result is stale
+}
+
 /** 在读取前调用 — 若版本变化则清空缓存 */
 function checkCache(): void {
   if (_lastCacheVer !== _cacheVer) {
@@ -690,14 +700,17 @@ function deduplicateSchemaTagDefs(): boolean {
  * undoDoc, redoDoc, etc.) instead of from doc.subscribe() — which would
  * trigger a re-entrant WASM lock panic inside Loro's event handler dispatch.
  *
- * Cache invalidation is NOT done here — it is the responsibility of the
- * mutation function that precedes commitDoc (selective for data changes,
- * full for structural changes).  This separation is what makes typing
- * fast: data-only edits invalidate only the edited node's cache entry,
- * so all other selectors return the same cached reference → Object.is
- * true → no re-render.
+ * For text-editing commits (`user:text`, `user:paste`) cache invalidation
+ * is skipped: the mutation function already selectively invalidated the
+ * edited node, and a full flush would clear 14K entries — the very thing
+ * that caused 350ms typing lag.
+ *
+ * For all other commits (structural changes, undo, import, intermediate
+ * commits inside multi-step store actions) a full invalidateCache() is
+ * called to guarantee no stale reads persist across commit boundaries.
  */
-function notifySubscribers(): void {
+function notifySubscribers(skipCacheFlush?: boolean): void {
+  if (!skipCacheFlush) invalidateCache();
   for (const cb of subscribers) cb();
 }
 
@@ -895,7 +908,8 @@ export function createNode(
 ): string {
   const id = nodexId ?? nanoid();
   if (!canApplyMutation('createNode')) return id;
-  invalidateCache();
+  // Selective: only the parent's NodexNode.children and getChildren() are stale.
+  if (parentNodexId) invalidateNodeAndChildrenCache(parentNodexId);
   const tree = getTree();
   const parentTreeId = parentNodexId ? nodexToTree.get(parentNodexId) : undefined;
   const treeNode = tree.createNode(parentTreeId, index);
@@ -909,7 +923,11 @@ export function createNode(
 
 export function moveNode(nodexId: string, newParentNodexId: string, index?: number): void {
   if (!canApplyMutation('moveNode')) return;
-  invalidateCache();
+  // Selective: invalidate old parent, new parent, and moved node.
+  const oldParentId = getParentId(nodexId);
+  if (oldParentId) invalidateNodeAndChildrenCache(oldParentId);
+  invalidateNodeAndChildrenCache(newParentNodexId);
+  invalidateCacheForNode(nodexId); // NodexNode.children unchanged, but parent ref may differ
   const tree = getTree();
   const treeId = nodexToTree.get(nodexId);
   const parentTreeId = nodexToTree.get(newParentNodexId);
@@ -927,13 +945,20 @@ function collectDescendants(nodexId: string): string[] {
 
 export function deleteNode(nodexId: string): void {
   if (!canApplyMutation('deleteNode')) return;
-  invalidateCache();
   const tree = getTree();
   const treeId = nodexToTree.get(nodexId);
   if (!treeId) return;
+  // Collect descendants and parent BEFORE the tree mutation.
+  const parentId = getParentId(nodexId);
   const toRemove = [nodexId, ...collectDescendants(nodexId)];
   tree.delete(treeId);
   for (const id of toRemove) removeMapping(id);
+  // Selective: invalidate parent + all deleted nodes' caches.
+  if (parentId) invalidateNodeAndChildrenCache(parentId);
+  for (const id of toRemove) {
+    _nodeCache.delete(id);
+    _childrenCache.delete(id);
+  }
 }
 
 // ============================================================
@@ -1365,7 +1390,11 @@ export function commitDoc(origin?: string): void {
   // Explicit notification — replaces doc.subscribe() which caused WASM re-entrant lock panic.
   // Safe to call synchronously here: doc.commit() has returned, no Loro lock is held.
   scheduleSave();
-  notifySubscribers();
+  // For text edits, skip the full cache flush — the mutation function already
+  // selectively invalidated the edited node.  Full flush would clear 14K entries
+  // and trigger O(N) WASM reads from useSyncExternalStore selectors (~350ms).
+  const skipFlush = resolvedOrigin === 'user:text' || resolvedOrigin === 'user:paste';
+  notifySubscribers(skipFlush);
 }
 
 export function withCommitOrigin<T>(origin: string, fn: () => T): T {

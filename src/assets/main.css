@@ -452,11 +452,12 @@ html, body {
   pointer-events: none;
 }
 
-/* Inline reference node in ProseMirror — ensure it stays inline and doesn't
-   cause cursor to visually jump to next line after insertion. */
+/* Inline reference (@mention) in chat input — styled like WeChat mentions. */
 .chat-input-editor .inline-ref {
   display: inline;
   white-space: nowrap;
+  color: var(--inline-ref-accent, var(--color-primary));
+  font-weight: 500;
 }
 
 /* Chat input ProseMirror placeholder — show when doc paragraph is empty.

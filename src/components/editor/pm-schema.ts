@@ -44,7 +44,7 @@ export const pmSchema = new Schema({
           const el = dom as HTMLElement;
           return {
             targetNodeId: el.getAttribute('data-inlineref-node') ?? '',
-            displayName: el.textContent ?? '',
+            displayName: (el.textContent ?? '').replace(/^@/, '').trim(),
           };
         },
       }],

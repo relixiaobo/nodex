@@ -1,4 +1,5 @@
 import { combineMarks, docToMarks, marksToDoc, splitMarks } from '../../src/lib/pm-doc-utils.js';
+import { pmSchema } from '../../src/components/editor/pm-schema.js';
 
 describe('pm-doc-utils', () => {
   it('converts plain text + marks into pm doc and back', () => {
@@ -36,6 +37,22 @@ describe('pm-doc-utils', () => {
 
     const combined = combineMarks(before, after, 3);
     expect(combined).toEqual([{ start: 0, end: 6, type: 'bold' }]);
+  });
+
+  it('converts hard_break nodes to newlines in docToMarks', () => {
+    // Build a doc: "line1" + hard_break + "line2"
+    const doc = pmSchema.node('doc', null, [
+      pmSchema.node('paragraph', null, [
+        pmSchema.text('line1'),
+        pmSchema.nodes.hard_break.create(),
+        pmSchema.text('line2'),
+      ]),
+    ]);
+
+    const result = docToMarks(doc);
+    expect(result.text).toBe('line1\nline2');
+    expect(result.marks).toEqual([]);
+    expect(result.inlineRefs).toEqual([]);
   });
 });
 

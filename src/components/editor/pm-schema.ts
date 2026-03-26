@@ -12,6 +12,15 @@ export const pmSchema = new Schema({
       },
     },
     text: { group: 'inline' },
+    hard_break: {
+      group: 'inline',
+      inline: true,
+      selectable: false,
+      parseDOM: [{ tag: 'br' }],
+      toDOM() {
+        return ['br'];
+      },
+    },
     inlineReference: {
       group: 'inline',
       inline: true,

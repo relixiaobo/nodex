@@ -21,10 +21,10 @@ import { resolveDataType, getFieldTypeIcon } from '../../lib/field-utils.js';
 import { isLockedNode, isWorkspaceHomeNode } from '../../lib/node-capabilities.js';
 import {
   getSystemNodePreset,
-  isPaletteSearchableSystemNode,
   QUICK_NAV_SYSTEM_NODES,
   type SystemNodeIconKey,
 } from '../../lib/system-node-presets.js';
+import { buildPaletteSearchCandidates } from '../../hooks/use-node-search';
 import { useUIStore } from '../../stores/ui-store';
 import { useNodeStore } from '../../stores/node-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
@@ -208,17 +208,7 @@ export function CommandPalette() {
   const [searchableNodes, setSearchableNodes] = useState<Array<{ id: string; name: string }>>([]);
   useEffect(() => {
     if (!searchOpen) return;
-    const items: Array<{ id: string; name: string }> = [];
-    for (const id of loroDoc.getAllNodeIds()) {
-      if (quickNavIdSet.has(id) || isWorkspaceHomeNode(id)) continue;
-      if (isLockedNode(id) && !isPaletteSearchableSystemNode(id)) continue;
-      const node = loroDoc.toNodexNode(id);
-      if (!node) continue;
-      const name = (node.name ?? '').replace(/<[^>]+>/g, '').trim();
-      if (!name) continue;
-      items.push({ id, name });
-    }
-    setSearchableNodes(items);
+    setSearchableNodes(buildPaletteSearchCandidates(quickNavIdSet));
   }, [searchOpen, quickNavIdSet]);
 
   // Usage boost: frequent + recent items get a score bonus.

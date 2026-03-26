@@ -10,7 +10,7 @@
 import { useMemo, useEffect, useLayoutEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
 import { createPortal } from 'react-dom';
 import { AtSign, Calendar, Plus } from '../../lib/icons.js';
-import { useNodeSearch, buildSearchCandidates, type NodeSearchResult, type SearchCandidate } from '../../hooks/use-node-search';
+import { useNodeSearch, buildReferenceSearchCandidates, type NodeSearchResult, type SearchCandidate } from '../../hooks/use-node-search';
 import { useUIStore } from '../../stores/ui-store';
 import { isLockedNode, isWorkspaceHomeNode } from '../../lib/node-capabilities.js';
 import { getSystemNodePreset } from '../../lib/system-node-presets.js';
@@ -184,8 +184,7 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
   const [candidates, setCandidates] = useState<SearchCandidate[]>([]);
   useEffect(() => {
    if (!open) return;
-   const SKIP_TYPES = new Set<string>(['fieldEntry', 'fieldDef', 'tagDef', 'reference', 'queryCondition']);
-   setCandidates(buildSearchCandidates({ skipTypes: SKIP_TYPES }));
+   setCandidates(buildReferenceSearchCandidates());
   }, [open]);
 
   const searchResults = useNodeSearch(query, candidates, currentNodeId);

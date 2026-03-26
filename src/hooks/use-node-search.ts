@@ -8,6 +8,8 @@
  */
 import { useMemo } from 'react';
 import * as loroDoc from '../lib/loro-doc.js';
+import { isLockedNode, isWorkspaceHomeNode } from '../lib/node-capabilities.js';
+import { isPaletteSearchableSystemNode } from '../lib/system-node-presets.js';
 
 export interface SearchCandidate {
   id: string;
@@ -80,20 +82,43 @@ export function useNodeSearch(
 }
 
 /**
- * Build search candidates from the entire LoroDoc.
- * Called once when a panel/selector opens — O(N) but not on every keystroke.
+ * Build search candidates for ⌘K palette / DeskLanding.
+ * Excludes quick-nav system nodes (shown separately), workspace home,
+ * and locked nodes (except palette-searchable ones like Schema).
+ *
+ * Called once when palette opens — O(N) but not on every keystroke.
  */
-export function buildSearchCandidates(opts?: {
-  excludeIds?: Set<string>;
-  skipTypes?: Set<string>;
-}): SearchCandidate[] {
-  const { excludeIds, skipTypes } = opts ?? {};
+export function buildPaletteSearchCandidates(quickNavIdSet: Set<string>): SearchCandidate[] {
   const items: SearchCandidate[] = [];
   for (const id of loroDoc.getAllNodeIds()) {
-    if (excludeIds?.has(id)) continue;
+    if (quickNavIdSet.has(id) || isWorkspaceHomeNode(id)) continue;
+    if (isLockedNode(id) && !isPaletteSearchableSystemNode(id)) continue;
     const node = loroDoc.toNodexNode(id);
     if (!node) continue;
-    if (skipTypes && node.type && skipTypes.has(node.type)) continue;
+    const name = (node.name ?? '').replace(/<[^>]+>/g, '').trim();
+    if (!name) continue;
+    items.push({ id, name });
+  }
+  return items;
+}
+
+/** Structural node types to skip in reference search (not meaningful as targets). */
+const REFERENCE_SKIP_TYPES = new Set<string>([
+  'fieldEntry', 'fieldDef', 'tagDef', 'reference', 'queryCondition',
+]);
+
+/**
+ * Build search candidates for @ reference selector.
+ * Skips structural node types that aren't useful as reference targets.
+ *
+ * Called once when selector opens — O(N) but not on every keystroke.
+ */
+export function buildReferenceSearchCandidates(): SearchCandidate[] {
+  const items: SearchCandidate[] = [];
+  for (const id of loroDoc.getAllNodeIds()) {
+    const node = loroDoc.toNodexNode(id);
+    if (!node) continue;
+    if (node.type && REFERENCE_SKIP_TYPES.has(node.type)) continue;
     const name = (node.name ?? '').replace(/<[^>]+>/g, '').trim();
     if (!name) continue;
     items.push({ id, name });

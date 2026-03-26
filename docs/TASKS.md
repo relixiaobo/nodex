@@ -127,25 +127,11 @@
 | 2026-03-26 | Tana 数据导入 + Sync 启动修复 | claude-2 | #180 |
 | 2026-03-25 | @ 引用节点 — Chat 输入框 ProseMirror + @ mention + context injection | claude | #179 |
 | 2026-03-25 | Official Skill Sync — locked 规则 + 用户自定义共存 + system prompt 同步 | codex | #178 |
-| 2026-03-24 | 新图标 + 截图 + store 资产 — 三色立方体 + 真实 app 截图 | claude | #177 |
-| 2026-03-24 | 上架资料刷新 — store listing + landing page + 截图 + 定位统一 | claude | #176 |
+| 2026-03-24 | 新图标 + 截图 + store 资产 | claude | #177 |
+| 2026-03-24 | 上架资料刷新 — store listing + landing page + 定位统一 | claude | #176 |
 | 2026-03-24 | View Context Injection — AI 看到用户可见的 outliner 树 | codex | #174 |
-| 2026-03-24 | Chat Embed 交互修复 — NodeEmbed 限高 + dropdown portal 迁移 + focus 隔离 | codex | #175 |
-| 2026-03-23 | Expand key 作用域隔离 — chat embed 和 outliner 独立展开状态 | codex | #173 |
-| 2026-03-23 | Chat Drawer 布局 — Outliner 底层 + Chat 底部抽屉 + 单层 full-bleed | codex | #172 |
-| 2026-03-21 | Toggle Layout — Chat/Node 双视角切换 + 状态保持 | codex | #171 |
-| 2026-03-21 | Node 工具重构 — Tana Paste 统一格式 + search node 创建 | codex | #170 |
-| 2026-03-20 | v0.2.0 发版 — Think with your AI | nodex | — |
-| 2026-03-20 | AI 人格设计文档 + system prompt 重写 + skills 升级 | nodex | — |
-| 2026-03-20 | 新用户引导 — 强制登录 + 内联 API key + 启动偏好 | codex | #163 |
-| 2026-03-20 | 工具调用分组折叠（单消息内） | claude | #164 |
-| 2026-03-20 | Chat 面板头部一致性 | codex | #162 |
-| 2026-03-20 | node_read 无参数浏览 + Settings AI 分组 | codex | #161 |
-| 2026-03-20 | extensible cite types (node/chat/url) | claude | #160 |
-| 2026-03-20 | past_chats fuzzy search 升级 | codex | #159 |
-| 2026-03-20 | Chat 节点展示 — ref/cite 浮窗 + `<node />` 内嵌 + 首屏 Chat | claude | #158 |
-| 2026-03-20 | past_chats 跨会话记忆工具 + prompt 架构重构 | codex | #157 |
-| 2026-03-20 | 多项 UI 修复 — citation 对齐/浮窗边框/dropdown 对齐/search node 图标去重/模型选择持久化/onboarding 同步闪烁/options picker | nodex | — |
+| 2026-03-24 | Chat Embed 交互修复 — focus 隔离 + dropdown portal | codex | #175 |
+| 2026-03-23 | Chat Drawer 布局 + Expand key 隔离 | codex | #172 #173 |
 
 > 更早的已完成记录见 `docs/_archive/COMPLETED-HISTORY.md`
 

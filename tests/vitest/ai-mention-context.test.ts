@@ -1,30 +1,11 @@
 /**
- * Tests for ai-mention-context.ts — buildMentionContext() and buildPromptText helper.
+ * Tests for ai-mention-context.ts — buildPromptText helper.
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
+import { buildPromptText } from '../../src/lib/ai-mention-context.js';
+import type { InlineRefEntry } from '../../src/types/index.js';
 
-// ─── buildPromptText (pure function, no store dependency) ───
-
-// Re-implement the function locally for testing since it's not exported.
-// Must match the implementation in ChatInput.tsx.
 const INLINE_REF_CHAR = '\uFFFC';
-
-interface InlineRefEntry {
-  offset: number;
-  targetNodeId: string;
-  displayName?: string;
-}
-
-function buildPromptText(text: string, inlineRefs: InlineRefEntry[]): string {
-  if (inlineRefs.length === 0) return text;
-  let result = text;
-  const sorted = [...inlineRefs].sort((a, b) => b.offset - a.offset);
-  for (const ref of sorted) {
-    const name = ref.displayName || 'node';
-    result = result.slice(0, ref.offset) + `@${name}` + result.slice(ref.offset + 1);
-  }
-  return result;
-}
 
 describe('buildPromptText', () => {
   it('returns text unchanged when there are no inline refs', () => {

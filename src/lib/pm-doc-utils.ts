@@ -117,6 +117,11 @@ export function docToMarks(doc: PMNode): {
       return;
     }
 
+    if (node.type.name === 'hard_break') {
+      text += '\n';
+      return;
+    }
+
     if (!node.isText || !node.text) return;
 
     const start = text.length;

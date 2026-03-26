@@ -16,6 +16,25 @@ import { useNodeStore } from '../stores/node-store.js';
 import { useUIStore } from '../stores/ui-store.js';
 import { getTagDisplayNames } from './ai-tools/shared.js';
 
+// ─── Prompt text ───
+
+const INLINE_REF_CHAR = '\uFFFC';
+
+/**
+ * Replace \uFFFC placeholders with @DisplayName for the prompt text.
+ */
+export function buildPromptText(text: string, inlineRefs: InlineRefEntry[]): string {
+  if (inlineRefs.length === 0) return text;
+  let result = text;
+  // Replace from end to start to preserve offsets
+  const sorted = [...inlineRefs].sort((a, b) => b.offset - a.offset);
+  for (const ref of sorted) {
+    const name = ref.displayName || 'node';
+    result = result.slice(0, ref.offset) + `@${name}` + result.slice(ref.offset + 1);
+  }
+  return result;
+}
+
 // ─── Limits ───
 
 const MAX_MENTION_NODES = 5;
@@ -33,7 +52,8 @@ function escapeXml(text: string): string {
   return text
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 function isContentChild(childId: string): boolean {

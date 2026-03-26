@@ -27,6 +27,7 @@ import {
   type ReferenceDropdownHandle,
 } from '../references/ReferenceSelector.js';
 import { useNodeStore } from '../../stores/node-store.js';
+import { buildPromptText } from '../../lib/ai-mention-context.js';
 import type { InlineRefEntry } from '../../types/index.js';
 
 export interface ChatInputModel {
@@ -124,23 +125,6 @@ function ThinkingLevelPicker({ level, onChange }: { level: ThinkingLevel; onChan
 }
 
 // ─── Helpers ───
-
-const INLINE_REF_CHAR = '\uFFFC';
-
-/**
- * Replace \uFFFC placeholders with @DisplayName for the prompt text.
- */
-function buildPromptText(text: string, inlineRefs: InlineRefEntry[]): string {
-  if (inlineRefs.length === 0) return text;
-  let result = text;
-  // Replace from end to start to preserve offsets
-  const sorted = [...inlineRefs].sort((a, b) => b.offset - a.offset);
-  for (const ref of sorted) {
-    const name = ref.displayName || 'node';
-    result = result.slice(0, ref.offset) + `@${name}` + result.slice(ref.offset + 1);
-  }
-  return result;
-}
 
 function getCaretAnchorRect(
   view: EditorView,
@@ -287,7 +271,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
 
     const { from } = view.state.selection;
     const $from = view.state.doc.resolve(from);
-    const textBefore = $from.parent.textBetween(0, $from.parentOffset, undefined, INLINE_REF_CHAR);
+    const textBefore = $from.parent.textBetween(0, $from.parentOffset, undefined, '\uFFFC');
 
     const refMatch = textBefore.match(/@([^\s]*)$/);
     if (refMatch && hasUserEditedRef.current && (docChanged || refActiveRef.current)) {

@@ -19,7 +19,7 @@
 | nodex-claude | — | 空闲 | — |
 | nodex-claude-2 | — | 空闲 | — |
 | nodex-gemini | — | 空闲 | — |
-| nodex-codex | — | 空闲 | — |
+| nodex-codex | codex/perf-40k | 性能优化 40K 节点 (#181) | 待启动 |
 
 ---
 

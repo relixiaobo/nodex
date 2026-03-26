@@ -17,7 +17,7 @@
 | 工作区 | 分支 | 任务 | 状态 |
 |--------|------|------|------|
 | nodex-claude | — | 空闲 | — |
-| nodex-claude-2 | claude-2/tana-import | Tana 数据智能导入 | 待启动 |
+| nodex-claude-2 | — | 空闲 | — |
 | nodex-gemini | — | 空闲 | — |
 | nodex-codex | — | 空闲 | — |
 
@@ -124,6 +124,7 @@
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-26 | Tana 数据导入 + Sync 启动修复 | claude-2 | #180 |
 | 2026-03-25 | @ 引用节点 — Chat 输入框 ProseMirror + @ mention + context injection | claude | #179 |
 | 2026-03-25 | Official Skill Sync — locked 规则 + 用户自定义共存 + system prompt 同步 | codex | #178 |
 | 2026-03-24 | 新图标 + 截图 + store 资产 — 三色立方体 + 真实 app 截图 | claude | #177 |

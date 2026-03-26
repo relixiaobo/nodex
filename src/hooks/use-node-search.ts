@@ -1,16 +1,18 @@
 /**
  * In-memory node search hook.
  *
- * Filters Loro nodes by name, skipping structural/system types.
- * Returns results with breadcrumb paths.
+ * Accepts a pre-built candidate list (constructed once when a panel opens)
+ * and filters it by query. No O(N) scan on every keystroke.
  *
- * Uses JSON-string selector pattern to avoid React 19 infinite re-render.
+ * Callers (CommandPalette, ReferenceSelector) build candidates at open-time.
  */
 import { useMemo } from 'react';
-import { useNodeStore } from '../stores/node-store';
 import * as loroDoc from '../lib/loro-doc.js';
-import { isLockedNode, isWorkspaceHomeNode } from '../lib/node-capabilities.js';
-import { getSystemNodePreset } from '../lib/system-node-presets.js';
+
+export interface SearchCandidate {
+  id: string;
+  name: string;
+}
 
 export interface NodeSearchResult {
   id: string;
@@ -19,40 +21,27 @@ export interface NodeSearchResult {
   updatedAt: number;
 }
 
-/** Structural node types to skip in search results (not meaningful as search targets). */
-const SKIP_DOC_TYPES = new Set<string>([
-  'fieldEntry', 'fieldDef', 'tagDef', 'reference', 'queryCondition',
-]);
 const MAX_RESULTS = 15;
-// Bound broad queries so large workspaces don't scan all nodes on every keystroke.
-// We still sort by updatedAt within this candidate pool, preserving recency behavior.
+// Bound broad queries so large workspaces don't scan all candidates on every keystroke.
 const MAX_MATCH_CANDIDATES = 120;
 
-export function useNodeSearch(query: string, excludeId?: string): NodeSearchResult[] {
-  const json = useNodeStore((state) => {
-    void state._version;
+/**
+ * Search pre-built candidates by query. No store subscription — pure computation.
+ */
+export function useNodeSearch(
+  query: string,
+  candidates: SearchCandidate[],
+  excludeId?: string,
+): NodeSearchResult[] {
+  return useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return '[]';
+    if (!q || candidates.length === 0) return [];
 
     const matches: NodeSearchResult[] = [];
-    const allIds = loroDoc.getAllNodeIds();
 
-    for (const id of allIds) {
+    for (const { id, name } of candidates) {
       if (id === excludeId) continue;
-
-      const node = loroDoc.toNodexNode(id);
-      if (!node) continue;
-
-      if (getSystemNodePreset(id) || isWorkspaceHomeNode(id) || isLockedNode(id)) continue;
-      if (node.type && SKIP_DOC_TYPES.has(node.type)) continue;
-
-      // Skip nodes with no name
-      const rawName = node.name ?? '';
-      const plainText = rawName.replace(/<[^>]+>/g, '').trim();
-      if (!plainText) continue;
-
-      // Match by name
-      if (!plainText.toLowerCase().includes(q)) continue;
+      if (!name.toLowerCase().includes(q)) continue;
 
       // Build breadcrumb by walking parent chain (max 3 levels)
       const crumbs: string[] = [];
@@ -67,11 +56,12 @@ export function useNodeSearch(query: string, excludeId?: string): NodeSearchResu
         depth++;
       }
 
+      const node = loroDoc.toNodexNode(id);
       matches.push({
         id,
-        name: plainText,
+        name,
         breadcrumb: crumbs.join(' / '),
-        updatedAt: node.updatedAt ?? 0,
+        updatedAt: node?.updatedAt ?? 0,
       });
 
       if (matches.length >= MAX_MATCH_CANDIDATES) break;
@@ -85,8 +75,28 @@ export function useNodeSearch(query: string, excludeId?: string): NodeSearchResu
     });
 
     if (matches.length > MAX_RESULTS) matches.length = MAX_RESULTS;
-    return JSON.stringify(matches);
-  });
+    return matches;
+  }, [query, candidates, excludeId]);
+}
 
-  return useMemo(() => JSON.parse(json) as NodeSearchResult[], [json]);
+/**
+ * Build search candidates from the entire LoroDoc.
+ * Called once when a panel/selector opens — O(N) but not on every keystroke.
+ */
+export function buildSearchCandidates(opts?: {
+  excludeIds?: Set<string>;
+  skipTypes?: Set<string>;
+}): SearchCandidate[] {
+  const { excludeIds, skipTypes } = opts ?? {};
+  const items: SearchCandidate[] = [];
+  for (const id of loroDoc.getAllNodeIds()) {
+    if (excludeIds?.has(id)) continue;
+    const node = loroDoc.toNodexNode(id);
+    if (!node) continue;
+    if (skipTypes && node.type && skipTypes.has(node.type)) continue;
+    const name = (node.name ?? '').replace(/<[^>]+>/g, '').trim();
+    if (!name) continue;
+    items.push({ id, name });
+  }
+  return items;
 }

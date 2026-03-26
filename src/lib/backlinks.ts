@@ -264,3 +264,12 @@ export function buildBacklinkCountMap(version: number): Map<string, number> {
   _countMapCache = counts;
   return counts;
 }
+
+/**
+ * Read a single node's backlink count from the cache without triggering a rebuild.
+ * Returns 0 if the cache hasn't been built yet. Used by useBacklinkCount badge
+ * to avoid O(N) scans on every keystroke.
+ */
+export function getCachedBacklinkCount(nodeId: string): number {
+  return _countMapCache?.get(nodeId) ?? 0;
+}

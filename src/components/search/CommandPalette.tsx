@@ -123,7 +123,6 @@ export function CommandPalette() {
   const searchQuery = useUIStore((s) => s.searchQuery);
   const setSearchQuery = useUIStore((s) => s.setSearchQuery);
   const navigateTo = useUIStore((s) => s.navigateTo);
-  const _version = useNodeStore((s) => s._version);
   const createChild = useNodeStore((s) => s.createChild);
   const authUser = useWorkspaceStore((s) => s.authUser);
   const signInWithGoogle = useWorkspaceStore((s) => s.signInWithGoogle);
@@ -205,8 +204,10 @@ export function CommandPalette() {
       })),
     [commands, ctx, trackPaletteUsage]);
 
-  // Cache searchable nodes (rebuild only when node data changes, not per keystroke)
-  const searchableNodes = useMemo(() => {
+  // Build searchable nodes snapshot once when palette opens (not on every keystroke)
+  const [searchableNodes, setSearchableNodes] = useState<Array<{ id: string; name: string }>>([]);
+  useEffect(() => {
+    if (!searchOpen) return;
     const items: Array<{ id: string; name: string }> = [];
     for (const id of loroDoc.getAllNodeIds()) {
       if (quickNavIdSet.has(id) || isWorkspaceHomeNode(id)) continue;
@@ -217,9 +218,8 @@ export function CommandPalette() {
       if (!name) continue;
       items.push({ id, name });
     }
-    return items;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [_version, quickNavIdSet]);
+    setSearchableNodes(items);
+  }, [searchOpen, quickNavIdSet]);
 
   // Usage boost: frequent + recent items get a score bonus.
   // Max boost = 15 (count) + 10 (recency) = 25 points.

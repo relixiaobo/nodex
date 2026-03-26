@@ -104,7 +104,6 @@ export function DeskLanding() {
 
   const replaceCurrentNode = useUIStore((s) => s.replaceCurrentNode);
   const createChild = useNodeStore((s) => s.createChild);
-  const _version = useNodeStore((s) => s._version);
   const paletteUsage = useUIStore((s) => s.paletteUsage);
   const trackPaletteUsage = useUIStore((s) => s.trackPaletteUsage);
   const authUser = useWorkspaceStore((s) => s.authUser);
@@ -174,8 +173,10 @@ export function DeskLanding() {
     return freqBoost + recencyBoost;
   }, [paletteUsage]);
 
-  // Searchable nodes cache
-  const searchableNodes = useMemo(() => {
+  // Build searchable nodes snapshot once when dropdown opens (not on every keystroke)
+  const [searchableNodes, setSearchableNodes] = useState<Array<{ id: string; name: string }>>([]);
+  useEffect(() => {
+    if (!open) return;
     const items: Array<{ id: string; name: string }> = [];
     for (const id of loroDoc.getAllNodeIds()) {
       if (quickNavIdSet.has(id) || isWorkspaceHomeNode(id)) continue;
@@ -186,9 +187,8 @@ export function DeskLanding() {
       if (!name) continue;
       items.push({ id, name });
     }
-    return items;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [_version, quickNavIdSet]);
+    setSearchableNodes(items);
+  }, [open, quickNavIdSet]);
 
   // Fuzzy search results
   const searchResults = useMemo(() => {

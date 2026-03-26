@@ -6,7 +6,7 @@
  */
 import { useMemo } from 'react';
 import { useNodeStore } from '../stores/node-store';
-import { computeBacklinks, buildBacklinkCountMap, type BacklinksResult } from '../lib/backlinks.js';
+import { computeBacklinks, getCachedBacklinkCount, type BacklinksResult } from '../lib/backlinks.js';
 
 // ─── Constants for stable empty references ───
 
@@ -35,13 +35,14 @@ export function useBacklinks(nodeId: string): BacklinksResult {
 // ─── useBacklinkCount (single node) ───
 
 /**
- * Subscribe to the backlink count for a single node.
- * Returns a primitive number — only re-renders when this node's count changes.
- * Uses the cached global count map (computed once per _version).
+ * Return the backlink count for a single node.
+ * Does NOT subscribe to _version — uses the cached count map if available,
+ * otherwise returns 0. The map is built by view-pipeline when refCount sort
+ * is active, or on navigation. This avoids O(N) scans on every keystroke.
  */
 export function useBacklinkCount(nodeId: string): number {
-  return useNodeStore((state) => {
-    const map = buildBacklinkCountMap(state._version);
-    return map.get(nodeId) ?? 0;
+  return useNodeStore(() => {
+    // Read from cache without triggering a rebuild — O(1)
+    return getCachedBacklinkCount(nodeId);
   });
 }

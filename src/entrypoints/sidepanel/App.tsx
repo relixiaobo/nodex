@@ -128,6 +128,15 @@ function useBootstrap(skip: boolean): BootstrapResult {
 
    const { hadSnapshot } = await seedWorkspace(currentWsId);
 
+   // LoroDoc 现已初始化 — 如果 initAuth 中的 sync 启动因时序问题失败，在此重试
+   if (useWorkspaceStore.getState().isAuthenticated) {
+    const { syncManager } = await import('../../lib/sync/sync-manager.js');
+    if (syncManager.getState().status === 'local-only') {
+     const { startSync } = await import('../../stores/workspace-store.js');
+     void startSync();
+    }
+   }
+
    // Wait for UIStore persist hydration before checking node-view validity
    // (persist.getItem is async, so the initial render may have stale default state)
    if (!useUIStore.persist.hasHydrated()) {

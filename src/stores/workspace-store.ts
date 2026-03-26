@@ -34,7 +34,9 @@ interface WorkspaceStore {
   initAuth(): Promise<() => void>;
 }
 
-/** Start sync if signed in with a workspace. */
+/** Start sync if signed in with a workspace. Exported for retry after LoroDoc init. */
+export async function startSync(): Promise<void> { return startSyncIfReady(); }
+
 async function startSyncIfReady(): Promise<void> {
   const { currentWorkspaceId, isAuthenticated } = useWorkspaceStore.getState();
   if (!isAuthenticated || !currentWorkspaceId) return;

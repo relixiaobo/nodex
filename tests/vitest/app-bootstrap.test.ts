@@ -119,7 +119,7 @@ describe('App bootstrap', () => {
 
     await vi.waitFor(() => {
       expect(container.textContent).toContain('Sign in with Google');
-      expect(container.textContent).toContain('Sign in to continue');
+      expect(container.textContent).toContain('Sign in to sync');
     });
   });
 

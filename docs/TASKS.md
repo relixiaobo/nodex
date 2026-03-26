@@ -16,10 +16,10 @@
 
 | 工作区 | 分支 | 任务 | 状态 |
 |--------|------|------|------|
-| nodex-claude | — | 空闲 | — |
+| nodex-claude | claude/perf-40k | 性能优化 40K 节点 (#182) | 待启动 |
 | nodex-claude-2 | — | 空闲 | — |
 | nodex-gemini | — | 空闲 | — |
-| nodex-codex | codex/perf-40k | 性能优化 40K 节点 (#181) | 待启动 |
+| nodex-codex | — | 空闲 | — |
 
 ---
 

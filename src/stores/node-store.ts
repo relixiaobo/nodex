@@ -732,7 +732,6 @@ export function syncTemplateMutationsNoCommit(nodeId: string): boolean {
 // （loro-doc 层缓存了 string[]，但 map+filter 每次创建新数组）
 // ============================================================
 
-let _childrenNodesCacheVer = -1;
 const _childrenNodesCache = new Map<string, NodexNode[]>();
 const INLINE_REF_CHAR = '\uFFFC';
 
@@ -941,17 +940,20 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     getNode: (id) => loroDoc.toNodexNode(id),
 
     getChildren: (parentId) => {
-      const ver = get()._version;
-      if (ver !== _childrenNodesCacheVer) {
-        _childrenNodesCache.clear();
-        _childrenNodesCacheVer = ver;
-      }
-      const cached = _childrenNodesCache.get(parentId);
-      if (cached) return cached;
+      // Recompute from loro-doc caches (fast: cached IDs + cached NodexNode refs).
+      // Compare with previous result to return a stable array reference —
+      // prevents useChildren from re-rendering when only unrelated nodes changed.
+      // With selective cache invalidation, unchanged nodes return the same cached
+      // object, so the .every() check succeeds for data-only edits → stable ref
+      // → Object.is true → no re-render.
       const ids = loroDoc.getChildren(parentId);
-      const result = ids.map(id => loroDoc.toNodexNode(id)).filter((n): n is NodexNode => n !== null);
-      _childrenNodesCache.set(parentId, result);
-      return result;
+      const nodes = ids.map(id => loroDoc.toNodexNode(id)).filter((n): n is NodexNode => n !== null);
+      const cached = _childrenNodesCache.get(parentId);
+      if (cached && cached.length === nodes.length && cached.every((n, i) => n === nodes[i])) {
+        return cached;
+      }
+      _childrenNodesCache.set(parentId, nodes);
+      return nodes;
     },
 
     // ─── 树操作 ───

@@ -235,23 +235,27 @@ export class SyncManager {
   private static readonly NUDGE_DEBOUNCE_MS = 2_000;
 
   /**
-   * Trigger a sync cycle after a debounce delay.
+   * Trigger a sync cycle after a trailing-edge debounce delay.
    *
-   * Called on every local Loro commit (i.e. every keystroke).  Without the
-   * debounce the full push → pull → chat-push cycle would run on each
-   * keystroke, contributing to typing lag via IndexedDB + network overhead
-   * on the main thread.  A 2 s delay coalesces rapid edits into a single
-   * sync cycle.
+   * Called on every local Loro commit (i.e. every keystroke).  Each call
+   * resets the 2 s timer so sync only fires 2 s after the user *stops*
+   * editing — no sync runs while the user is actively typing.  The 30 s
+   * periodic interval still syncs independently during long editing sessions.
    */
   nudge(): void {
     if (this.isSyncing) {
       this.nudgePending = true;
       return;
     }
-    if (this.nudgeTimer !== null) return; // already scheduled
+    // Trailing-edge: reset timer on each call
+    if (this.nudgeTimer !== null) clearTimeout(this.nudgeTimer);
     this.nudgeTimer = setTimeout(() => {
       this.nudgeTimer = null;
-      void this.syncOnce();
+      if (this.isSyncing) {
+        this.nudgePending = true;
+      } else {
+        void this.syncOnce();
+      }
     }, SyncManager.NUDGE_DEBOUNCE_MS);
   }
 

@@ -454,12 +454,10 @@ html, body {
 
 /* Inline reference (@mention) in chat input — styled like WeChat mentions. */
 .chat-input-editor .inline-ref {
-  display: inline-block;
-  vertical-align: baseline;
+  display: inline;
   white-space: nowrap;
   color: var(--inline-ref-accent, var(--color-primary));
   font-weight: 500;
-  margin-right: 0.25em;
 }
 
 /* ProseMirror separator as caret anchor after inline refs.

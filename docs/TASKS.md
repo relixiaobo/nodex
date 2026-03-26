@@ -16,7 +16,7 @@
 
 | 工作区 | 分支 | 任务 | 状态 |
 |--------|------|------|------|
-| nodex-claude | claude/perf-40k | 性能优化 40K 节点 (#182) | 待启动 |
+| nodex-claude | — | 空闲 | — |
 | nodex-claude-2 | — | 空闲 | — |
 | nodex-gemini | — | 空闲 | — |
 | nodex-codex | — | 空闲 | — |
@@ -124,6 +124,7 @@
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-26 | 性能优化 40K 节点 — O(N) 热点消除 | claude | #182 |
 | 2026-03-26 | Tana 数据导入 + Sync 启动修复 | claude-2 | #180 |
 | 2026-03-25 | @ 引用节点 — Chat 输入框 ProseMirror + @ mention + context injection | claude | #179 |
 | 2026-03-25 | Official Skill Sync — locked 规则 + 用户自定义共存 + system prompt 同步 | codex | #178 |

@@ -458,6 +458,7 @@ html, body {
   white-space: nowrap;
   color: var(--inline-ref-accent, var(--color-primary));
   font-weight: 500;
+  padding-right: 0.25em;
 }
 
 /* ProseMirror separator as caret anchor after inline refs.
@@ -465,7 +466,7 @@ html, body {
    from the @mention — same as a space between words. */
 .chat-input-editor .ProseMirror p:has([data-inlineref-node])>img.ProseMirror-separator {
   display: inline-block;
-  width: 0.25em;
+  width: 0;
   height: 0;
   margin: 0;
   padding: 0;

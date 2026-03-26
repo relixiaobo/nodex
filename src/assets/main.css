@@ -453,13 +453,12 @@ html, body {
 }
 
 /* Inline reference (@mention) in chat input — styled like WeChat mentions. */
+/* @mention in chat input. Spacing is handled by a trailing space character
+   inserted on selection (standard @mention pattern: WeChat/Slack/Notion). */
 .chat-input-editor .inline-ref {
-  display: inline-block;
-  vertical-align: baseline;
   white-space: nowrap;
   color: var(--inline-ref-accent, var(--color-primary));
   font-weight: 500;
-  margin-right: 0.25em;
 }
 
 /* ProseMirror separator as caret anchor after inline refs.

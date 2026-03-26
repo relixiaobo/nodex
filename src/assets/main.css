@@ -460,6 +460,8 @@ html, body {
   content: var(--chat-placeholder, "");
   color: var(--color-foreground-tertiary);
   pointer-events: none;
+  float: left;
+  height: 0;
 }
 
 /* Always hide trailingBreak in inline editor to prevent tag line-wrapping.

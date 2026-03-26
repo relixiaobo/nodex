@@ -36,7 +36,7 @@ export const pmSchema = new Schema({
           'data-inlineref-node': node.attrs.targetNodeId,
           contenteditable: 'false',
           style: `color:${refColor};--inline-ref-accent:${refColor};`,
-        }, node.attrs.displayName || '...'];
+        }, `@${node.attrs.displayName || '...'}`];
       },
       parseDOM: [{
         tag: 'span[data-inlineref-node]',

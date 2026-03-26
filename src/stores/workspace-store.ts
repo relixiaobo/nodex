@@ -63,6 +63,10 @@ async function startSyncIfReady(): Promise<void> {
 
     await syncManager.start(currentWorkspaceId, token, deviceId);
   } catch (err) {
+    // LoroDoc not yet initialized is a benign race: initAuth() can resolve
+    // before the async snapshot restore in App.tsx.  App.tsx will call
+    // startSync() again after LoroDoc is ready.
+    if (err instanceof Error && err.message.includes('未初始化')) return;
     console.error('[sync] startSyncIfReady failed:', err);
   }
 }

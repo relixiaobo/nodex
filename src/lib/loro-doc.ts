@@ -160,8 +160,23 @@ let _lastCacheVer = -1;
 const _nodeCache = new Map<string, NodexNode | null>();
 const _childrenCache = new Map<string, string[]>();
 
-/** 标记缓存失效（每次 Loro 数据变更时调用） */
+/**
+ * Full cache invalidation — clears all entries on next read via checkCache().
+ * Used by structural mutations (create/move/delete), rebuildMappings, and reset.
+ */
 function invalidateCache(): void { _cacheVer++; }
+
+/**
+ * Selective cache invalidation — removes only the given node's cached entry.
+ * Does NOT bump _cacheVer, so other entries remain valid and return stable
+ * references to useSyncExternalStore selectors → no unnecessary re-renders.
+ *
+ * Used by data-only mutations (setNodeData, setNodeRichTextContent, tags, etc.)
+ * where no structural change (children order) can occur.
+ */
+function invalidateCacheForNode(nodexId: string): void {
+  _nodeCache.delete(nodexId);
+}
 
 /** 在读取前调用 — 若版本变化则清空缓存 */
 function checkCache(): void {
@@ -669,43 +684,20 @@ function deduplicateSchemaTagDefs(): boolean {
 // ============================================================
 
 /**
- * Notify subscribers (invalidate cache + call callbacks).
+ * Notify all subscribers synchronously.
  *
- * For typing-related commits (`user:text`, `user:paste`) the subscriber
- * callbacks are **deferred** to the next macrotask via `setTimeout(0)`.
- * This prevents the O(N) selector cascade (~350 ms for 14 K nodes) from
- * blocking the keystroke event handler — the key fix for typing lag.
- * ProseMirror already updated the DOM, so the 1-frame delay is invisible.
+ * Called from every doc-modifying exit point (commitDoc, importUpdates,
+ * undoDoc, redoDoc, etc.) instead of from doc.subscribe() — which would
+ * trigger a re-entrant WASM lock panic inside Loro's event handler dispatch.
  *
- * All other origins (undo, import, structural changes) notify synchronously
- * so the UI reflects the change immediately.
- *
- * `invalidateCache()` always runs synchronously: code that reads via
- * `getNode()` / `getChildren()` immediately after a commit sees fresh data
- * regardless of whether the subscriber dispatch is deferred.
+ * Cache invalidation is NOT done here — it is the responsibility of the
+ * mutation function that precedes commitDoc (selective for data changes,
+ * full for structural changes).  This separation is what makes typing
+ * fast: data-only edits invalidate only the edited node's cache entry,
+ * so all other selectors return the same cached reference → Object.is
+ * true → no re-render.
  */
-let _notifyTimer: ReturnType<typeof setTimeout> | null = null;
-
-function notifySubscribers(origin?: string): void {
-  invalidateCache();
-
-  const defer = origin === 'user:text' || origin === 'user:paste';
-
-  if (defer) {
-    if (_notifyTimer !== null) return; // already scheduled
-    _notifyTimer = setTimeout(() => {
-      _notifyTimer = null;
-      for (const cb of subscribers) cb();
-    }, 0);
-    return;
-  }
-
-  // Synchronous path: flush any pending deferred notification first,
-  // then fire subscribers once (avoids double-notification).
-  if (_notifyTimer !== null) {
-    clearTimeout(_notifyTimer);
-    _notifyTimer = null;
-  }
+function notifySubscribers(): void {
   for (const cb of subscribers) cb();
 }
 
@@ -965,7 +957,7 @@ export function setNodeRichTextContent(
   inlineRefs: NodexNode['inlineRefs'] = [],
 ): void {
   if (!canApplyMutation('setNodeRichTextContent')) return;
-  invalidateCache();
+  invalidateCacheForNode(nodexId);
   const tree = getTree();
   const treeId = nodexToTree.get(nodexId);
   if (!treeId) return;
@@ -984,7 +976,7 @@ export function setNodeRichTextContent(
 
 export function setNodeData(nodexId: string, key: string, value: unknown): void {
   if (!canApplyMutation('setNodeData')) return;
-  invalidateCache();
+  invalidateCacheForNode(nodexId);
   const tree = getTree();
   const treeId = nodexToTree.get(nodexId);
   if (!treeId) return;
@@ -997,7 +989,7 @@ export function setNodeData(nodexId: string, key: string, value: unknown): void 
 
 export function setNodeDataBatch(nodexId: string, data: Record<string, unknown>): void {
   if (!canApplyMutation('setNodeDataBatch')) return;
-  invalidateCache();
+  invalidateCacheForNode(nodexId);
   const tree = getTree();
   const treeId = nodexToTree.get(nodexId);
   if (!treeId) return;
@@ -1012,7 +1004,7 @@ export function setNodeDataBatch(nodexId: string, data: Record<string, unknown>)
 
 export function deleteNodeData(nodexId: string, key: string): void {
   if (!canApplyMutation('deleteNodeData')) return;
-  invalidateCache();
+  invalidateCacheForNode(nodexId);
   const tree = getTree();
   const treeId = nodexToTree.get(nodexId);
   if (!treeId) return;
@@ -1036,7 +1028,7 @@ function getTagsContainer(nodexId: string): LoroList | null {
 
 export function addTag(nodexId: string, tagDefId: string): void {
   if (!canApplyMutation('addTag')) return;
-  invalidateCache();
+  invalidateCacheForNode(nodexId);
   const tags = getTagsContainer(nodexId);
   if (!tags) return;
   const arr = tags.toArray() as string[];
@@ -1045,7 +1037,7 @@ export function addTag(nodexId: string, tagDefId: string): void {
 
 export function removeTag(nodexId: string, tagDefId: string): void {
   if (!canApplyMutation('removeTag')) return;
-  invalidateCache();
+  invalidateCacheForNode(nodexId);
   const tags = getTagsContainer(nodexId);
   if (!tags) return;
   const arr = tags.toArray() as string[];
@@ -1373,7 +1365,7 @@ export function commitDoc(origin?: string): void {
   // Explicit notification — replaces doc.subscribe() which caused WASM re-entrant lock panic.
   // Safe to call synchronously here: doc.commit() has returned, no Loro lock is held.
   scheduleSave();
-  notifySubscribers(resolvedOrigin);
+  notifySubscribers();
 }
 
 export function withCommitOrigin<T>(origin: string, fn: () => T): T {
@@ -1664,7 +1656,7 @@ export function getNodeText(nodexId: string): LoroText | null {
  */
 export function getOrCreateNodeText(nodexId: string): LoroText | null {
   if (!canApplyMutation('getOrCreateNodeText')) return getNodeText(nodexId);
-  invalidateCache();
+  invalidateCacheForNode(nodexId);
   const treeId = nodexToTree.get(nodexId);
   if (!treeId) return null;
   const node = getTree().getNodeByID(treeId);

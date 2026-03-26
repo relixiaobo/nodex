@@ -460,11 +460,12 @@ html, body {
   font-weight: 500;
 }
 
-/* Keep ProseMirror separator as zero-width caret anchor after inline refs.
-   Same pattern as .editor-inline — prevents cursor from jumping to next line. */
+/* ProseMirror separator as caret anchor after inline refs.
+   Give it a small width so the cursor sits with natural spacing
+   from the @mention — same as a space between words. */
 .chat-input-editor .ProseMirror p:has([data-inlineref-node])>img.ProseMirror-separator {
   display: inline-block;
-  width: 0;
+  width: 0.25em;
   height: 0;
   margin: 0;
   padding: 0;

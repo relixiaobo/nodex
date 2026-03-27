@@ -5,7 +5,7 @@ import '../../assets/main.css';
 
 // ── Theme-aware toolbar icon ──
 // Side panel has matchMedia (Service Worker does not).
-// Light mode: green cat; Dark mode: warm-paper cat.
+// Persist to chrome.storage so background can restore on startup.
 function applyThemeIcon(isDark: boolean): void {
   const suffix = isDark ? '-dark' : '';
   chrome.action.setIcon({
@@ -16,6 +16,7 @@ function applyThemeIcon(isDark: boolean): void {
       128: `icon${suffix}/128.png`,
     },
   });
+  chrome.storage.local.set({ __iconThemeDark: isDark });
 }
 
 const mq = matchMedia('(prefers-color-scheme: dark)');

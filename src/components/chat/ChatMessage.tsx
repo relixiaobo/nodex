@@ -2,11 +2,12 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { AssistantMessage, ToolCall, ToolResultMessage } from '@mariozechner/pi-ai';
 import { toast } from 'sonner';
 import type { ChatConversationMessage, ChatConversationEntry, ChatMessageEntry, ChatTurnPhase } from '../../hooks/use-agent.js';
-import { AlertTriangle, Brain, Check, ChevronLeft, ChevronRight, Copy, Pencil, RefreshCw } from '../../lib/icons.js';
+import { AlertTriangle, Brain, ChevronLeft, ChevronRight, Pencil, RefreshCw } from '../../lib/icons.js';
 import { CollapsibleIndicator } from './CollapsibleIndicator.js';
 import { MarkdownContent } from './MarkdownRenderer.js';
 import { ToolCallBlock } from './ToolCallBlock.js';
 import { ToolCallGroup } from './ToolCallGroup.js';
+import { CopyIconButton } from './CopyIconButton.js';
 
 interface ChatMessageProps {
   entry: ChatMessageEntry;
@@ -223,8 +224,6 @@ export function ChatMessage({
   const hasInlineError = assistantResult?.hasError ?? false;
   const inlineErrorText = assistantResult?.errorText ?? '';
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const copyResetRef = useRef<number | null>(null);
-  const [copied, setCopied] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(text);
 
@@ -251,36 +250,8 @@ export function ChatMessage({
     el.style.height = `${Math.max(el.scrollHeight, 40)}px`;
   }, [editText, isEditing]);
 
-  useEffect(() => {
-    return () => {
-      if (copyResetRef.current !== null) {
-        window.clearTimeout(copyResetRef.current);
-      }
-    };
-  }, []);
-
   if (!isUser && (!assistantBlocks || assistantBlocks.length === 0) && !hasInlineError && !turnActive) {
     return null;
-  }
-
-  async function handleCopy() {
-    try {
-      if (onCopy) {
-        await onCopy(text);
-      } else {
-        await navigator.clipboard.writeText(text);
-      }
-      setCopied(true);
-      if (copyResetRef.current !== null) {
-        window.clearTimeout(copyResetRef.current);
-      }
-      copyResetRef.current = window.setTimeout(() => {
-        setCopied(false);
-        copyResetRef.current = null;
-      }, 1500);
-    } catch {
-      // Clipboard access can fail in extension contexts; keep the action silent.
-    }
   }
 
   async function handleSubmitEdit() {
@@ -448,14 +419,12 @@ export function ChatMessage({
                 <RefreshCw size={14} strokeWidth={1.8} />
               </button>
             )}
-            <button
-              type="button"
-              onClick={() => void handleCopy()}
+            <CopyIconButton
+              text={text}
+              ariaLabel="Copy message"
               className={ACTION_BUTTON}
-              aria-label="Copy message"
-            >
-              {copied ? <Check size={14} strokeWidth={2} /> : <Copy size={14} strokeWidth={1.8} />}
-            </button>
+              onCopy={onCopy}
+            />
             {branches && branches.ids.length > 1 && (
               <>
                 <div className="mx-0.5 h-4 w-px bg-border" />

@@ -837,6 +837,32 @@ describe('ai-service', () => {
     expect(agentB.sessionId).toBe(sessionB?.id);
   });
 
+  it('carries the selected thinking level into a newly created chat session', async () => {
+    const {
+      createAgent,
+      createNewChatSession,
+      getCurrentSession,
+      getThinkingLevel,
+      selectThinkingLevel,
+    } = await import('../../src/lib/ai-service.js');
+
+    const agent = createAgent();
+
+    await createNewChatSession(agent);
+    const firstSessionId = getCurrentSession(agent)?.id;
+
+    await selectThinkingLevel('high', agent);
+
+    expect(getCurrentSession(agent)?.selectedThinkingLevel).toBe('high');
+    expect(getThinkingLevel(agent)).toBe('high');
+
+    await createNewChatSession(agent);
+
+    expect(getCurrentSession(agent)?.id).not.toBe(firstSessionId);
+    expect(getCurrentSession(agent)?.selectedThinkingLevel).toBe('high');
+    expect(getThinkingLevel(agent)).toBe('high');
+  });
+
   it('streamChat trims input and stopStreaming aborts the agent', async () => {
     const { streamChat, stopStreaming } = await import('../../src/lib/ai-service.js');
 

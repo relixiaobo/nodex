@@ -1,8 +1,11 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { createRoot, type Root } from 'react-dom/client';
+import { flushSync } from 'react-dom';
 import type { ToolCall, ToolResultMessage } from '@mariozechner/pi-ai';
 import { ChatMessage } from '../../src/components/chat/ChatMessage.js';
 import { ToolCallGroup } from '../../src/components/chat/ToolCallGroup.js';
+import { ToolCallBlock } from '../../src/components/chat/ToolCallBlock.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -121,6 +124,64 @@ describe('ToolCallGroup', () => {
 
     expect(html).toContain('group-hover/toolgroup:opacity-0');
     expect(html).toContain('group-hover/toolgroup:opacity-100');
+  });
+
+  it('copies tool input and output payloads from an expanded tool block', async () => {
+    const clipboardWriteText = vi.fn<(_: string) => Promise<void>>().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: clipboardWriteText },
+    });
+
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root: Root = createRoot(container);
+
+    try {
+      const toolCall = makeToolCall('tc1', 'node_create', { parentId: 'p1', text: '- hello' });
+      const result = {
+        role: 'toolResult' as const,
+        toolCallId: 'tc1',
+        toolName: 'node_create',
+        content: [{ type: 'text' as const, text: '{"status":"created"}' }],
+        isError: false,
+        timestamp: 1,
+      };
+
+      flushSync(() => {
+        root.render(React.createElement(ToolCallBlock, { toolCall, result }));
+      });
+
+      const toggleButton = container.querySelector('button');
+      flushSync(() => {
+        toggleButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+
+      const copyInputButton = container.querySelector('button[aria-label="Copy tool input"]');
+      const copyOutputButton = container.querySelector('button[aria-label="Copy tool output"]');
+
+      expect(copyInputButton).not.toBeNull();
+      expect(copyOutputButton).not.toBeNull();
+
+      flushSync(() => {
+        copyInputButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+      await vi.waitFor(() => {
+        expect(clipboardWriteText).toHaveBeenCalledWith(JSON.stringify(toolCall.arguments, null, 2));
+      });
+
+      flushSync(() => {
+        copyOutputButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+      await vi.waitFor(() => {
+        expect(clipboardWriteText).toHaveBeenLastCalledWith('{"status":"created"}');
+      });
+    } finally {
+      flushSync(() => {
+        root.unmount();
+      });
+      container.remove();
+    }
   });
 });
 

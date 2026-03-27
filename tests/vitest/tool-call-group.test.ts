@@ -47,7 +47,7 @@ function makeAssistantEntry(content: (ToolCall | { type: 'text'; text: string })
 // ---------------------------------------------------------------------------
 
 describe('ToolCallGroup', () => {
-  it('renders collapsed with latest step summary while executing', () => {
+  it('renders collapsed with stable progress copy while executing', () => {
     const toolCalls = [
       makeToolCall('tc1', 'browser', { action: 'navigate', url: 'https://google.com' }),
       makeToolCall('tc2', 'browser', { action: 'click', elementDescription: 'Search' }),
@@ -63,8 +63,8 @@ describe('ToolCallGroup', () => {
       React.createElement(ToolCallGroup, { toolCalls, results }),
     );
 
-    // Collapsed — title shows latest step summary, children NOT visible
-    expect(html).toContain('step 3');
+    expect(html).toContain('Working through 3 steps');
+    expect(html).not.toContain('Read page text');
     expect(html).not.toContain('Navigated to');
   });
 
@@ -105,7 +105,7 @@ describe('ToolCallGroup', () => {
     expect(html).toContain('2 failed');
   });
 
-  it('renders hover interaction (chevron on group hover) when completed', () => {
+  it('renders overlayed hover interaction without layout-swapping display rules', () => {
     const toolCalls = [
       makeToolCall('tc1', 'node_read'),
       makeToolCall('tc2', 'node_read'),
@@ -118,9 +118,8 @@ describe('ToolCallGroup', () => {
       React.createElement(ToolCallGroup, { toolCalls, results }),
     );
 
-    // Completed → collapsed → icon hidden on hover, chevron shown on hover
-    expect(html).toContain('group-hover/toolgroup:hidden');
-    expect(html).toContain('group-hover/toolgroup:block');
+    expect(html).toContain('group-hover/toolgroup:opacity-0');
+    expect(html).toContain('group-hover/toolgroup:opacity-100');
   });
 });
 
@@ -136,8 +135,7 @@ describe('ChatMessage tool call grouping', () => {
       React.createElement(ChatMessage, { entry }),
     );
 
-    // Should contain group indicator (collapsed — shows latest step summary)
-    expect(html).toContain('step 3');
+    expect(html).toContain('Working through 3 steps');
     // Individual steps should NOT be visible (collapsed)
     expect(html).not.toContain('Navigating to');
   });
@@ -170,10 +168,9 @@ describe('ChatMessage tool call grouping', () => {
 
     // Text block should break groups — two groups of 2
     expect(html).toContain('Found some info.');
-    // Both groups collapsed — show "step 2" (latest step in each group)
-    const stepMatches = html.match(/step 2/g);
-    expect(stepMatches).not.toBeNull();
-    expect(stepMatches!.length).toBe(2);
+    const groupMatches = html.match(/Working through 2 steps/g);
+    expect(groupMatches).not.toBeNull();
+    expect(groupMatches!.length).toBe(2);
   });
 
   it('renders single toolCall normally when text breaks would leave it alone', () => {

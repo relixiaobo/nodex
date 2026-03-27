@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { AssistantMessage, ToolCall, ToolResultMessage } from '@mariozechner/pi-ai';
 import { toast } from 'sonner';
-import type { ChatConversationMessage, ChatMessageEntry } from '../../hooks/use-agent.js';
-import { AlertTriangle, Brain, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, Pencil, RefreshCw } from '../../lib/icons.js';
+import type { ChatConversationMessage, ChatMessageEntry, ChatTurnPhase } from '../../hooks/use-agent.js';
+import { AlertTriangle, Brain, Check, ChevronLeft, ChevronRight, Copy, Pencil, RefreshCw } from '../../lib/icons.js';
+import { CollapsibleIndicator } from './CollapsibleIndicator.js';
 import { MarkdownContent } from './MarkdownRenderer.js';
 import { ToolCallBlock } from './ToolCallBlock.js';
 import { ToolCallGroup } from './ToolCallGroup.js';
@@ -11,6 +12,7 @@ interface ChatMessageProps {
   entry: ChatMessageEntry;
   toolResults?: Map<string, ToolResultMessage>;
   streaming?: boolean;
+  turnPhase?: ChatTurnPhase;
   grouped?: boolean;
   busy?: boolean;
   /** True when this is the last message in a consecutive same-role group.
@@ -83,18 +85,14 @@ function ThinkingBlock({ text, streaming }: { text: string; streaming: boolean }
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
-        className="group/thinking flex max-w-full items-center gap-1.5 py-0.5 text-foreground-tertiary transition-colors hover:text-foreground-secondary"
+        className="group/thinking flex max-w-full items-center gap-1.5 py-0.5 text-left text-foreground-tertiary transition-colors hover:text-foreground-secondary"
       >
-        <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center">
-          {expanded ? (
-            <ChevronDown size={14} strokeWidth={1.8} className="rotate-180" />
-          ) : (
-            <>
-              <Brain size={14} strokeWidth={1.5} className="group-hover/thinking:hidden" />
-              <ChevronDown size={14} strokeWidth={1.8} className="hidden group-hover/thinking:block" />
-            </>
-          )}
-        </span>
+        <CollapsibleIndicator
+          expanded={expanded}
+          hoverScopeClass="group-hover/thinking"
+          sizeClassName="h-3.5 w-3.5"
+          icon={<Brain size={14} strokeWidth={1.5} />}
+        />
         <span className="text-xs">
           {streaming && !text ? 'Thinking…' : 'Thought'}
         </span>
@@ -104,6 +102,18 @@ function ThinkingBlock({ text, streaming }: { text: string; streaming: boolean }
           {text}
         </pre>
       )}
+    </div>
+  );
+}
+
+function StreamingIndicator() {
+  return (
+    <div
+      data-testid="chat-message-streaming-indicator"
+      className="flex items-center py-1"
+      aria-label="Assistant is responding"
+    >
+      <span className="chat-streaming-capsule" />
     </div>
   );
 }
@@ -191,6 +201,7 @@ export function ChatMessage({
   entry,
   toolResults,
   streaming = false,
+  turnPhase = 'idle',
   grouped = false,
   busy = false,
   isLastInTurn = true,
@@ -202,6 +213,7 @@ export function ChatMessage({
   const { message, nodeId, branches } = entry;
   const text = getMessageText(message);
   const isUser = message.role === 'user';
+  const turnActive = turnPhase !== 'idle';
   const assistantResult = message.role === 'assistant'
     ? renderAssistantBlocks(message, streaming, toolResults)
     : null;
@@ -326,7 +338,7 @@ export function ChatMessage({
     );
   }
 
-  const showToolbar = nodeId !== null && !streaming && !isEditing && (isUser || isLastInTurn);
+  const showToolbar = nodeId !== null && !turnActive && !isEditing && (isUser || isLastInTurn);
 
   return (
     <div className={`${isUser ? 'group/message' : ''} flex w-full ${isUser ? 'justify-end' : 'justify-start'} ${grouped ? 'mt-1' : 'mt-4 first:mt-0'}`}>
@@ -402,6 +414,7 @@ export function ChatMessage({
                 </div>
               </div>
             )}
+            {turnActive && <StreamingIndicator />}
           </div>
         )}
         {showToolbar && (

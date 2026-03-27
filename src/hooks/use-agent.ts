@@ -2,6 +2,7 @@ import { startTransition, useEffect, useLayoutEffect, useMemo, useState } from '
 import type { Agent } from '@mariozechner/pi-agent-core';
 import type { AgentMessage, AgentTool } from '@mariozechner/pi-agent-core';
 import type { AssistantMessage, Message, ThinkingLevel, ToolResultMessage, UserMessage } from '@mariozechner/pi-ai';
+import { getCompressedPath } from '../lib/ai-compress.js';
 import { getBranches, getLinearPath } from '../lib/ai-chat-tree.js';
 import type { ChatTurnDebugRecord } from '../lib/ai-debug.js';
 import {
@@ -32,6 +33,8 @@ export interface ChatMessageEntry {
   message: ChatConversationMessage;
   branches: { ids: string[]; currentIndex: number } | null;
 }
+
+export type ChatTurnPhase = 'idle' | 'streaming_text' | 'waiting_for_tool' | 'resuming_after_tool';
 
 export interface AgentDebugState {
   revision: number;
@@ -64,7 +67,37 @@ function isConversationMessage(message: unknown): message is ChatConversationMes
       || (message as { role: string }).role === 'assistant');
 }
 
-function getConversationMessages(agent: Agent): ChatMessageEntry[] {
+function sameConversationMessage(a: ChatConversationMessage | null | undefined, b: ChatConversationMessage | null | undefined): boolean {
+  if (!a || !b) return false;
+  if (a.role !== b.role) return false;
+  return a.timestamp === b.timestamp;
+}
+
+function assistantHasVisibleText(message: AssistantMessage): boolean {
+  return message.content.some((block) => block.type === 'text' && block.text.trim().length > 0);
+}
+
+function assistantHasPendingToolCalls(
+  message: AssistantMessage,
+  toolResults: Map<string, ToolResultMessage>,
+): boolean {
+  let sawToolCall = false;
+
+  for (const block of message.content) {
+    if (block.type !== 'toolCall') continue;
+    sawToolCall = true;
+    if (!toolResults.has(block.id)) {
+      return true;
+    }
+  }
+
+  return sawToolCall ? false : false;
+}
+
+function getConversationState(
+  agent: Agent,
+  toolResults: Map<string, ToolResultMessage>,
+): { messages: ChatMessageEntry[]; turnPhase: ChatTurnPhase } {
   const session = getCurrentSession(agent);
   const pathEntries = session
     ? getLinearPath(session)
@@ -87,18 +120,51 @@ function getConversationMessages(agent: Agent): ChatMessageEntry[] {
     : [];
 
   const streamingMessage = agent.state.streamMessage;
-  if (!isConversationMessage(streamingMessage)) {
-    return pathEntries;
-  }
+  const compressedPath = session ? getCompressedPath(session) : [];
+  const transientEntries = agent.state.messages
+    .slice(compressedPath.length)
+    .flatMap((message) =>
+      isConversationMessage(message)
+        ? [{
+          nodeId: null,
+          message,
+          branches: null,
+        } satisfies ChatMessageEntry]
+        : [],
+    );
 
-  return [
+  const lastPersisted = pathEntries[pathEntries.length - 1]?.message ?? null;
+  const lastTransient = transientEntries[transientEntries.length - 1]?.message ?? null;
+  const entries = [
     ...pathEntries,
-    {
+    ...transientEntries,
+  ];
+
+  if (isConversationMessage(streamingMessage) && !sameConversationMessage(streamingMessage, lastTransient ?? lastPersisted)) {
+    entries.push({
       nodeId: null,
       message: streamingMessage,
       branches: null,
-    },
-  ];
+    });
+  }
+
+  if (!agent.state.isStreaming) {
+    return { messages: entries, turnPhase: 'idle' };
+  }
+
+  if (streamingMessage?.role === 'assistant') {
+    return {
+      messages: entries,
+      turnPhase: assistantHasVisibleText(streamingMessage) ? 'streaming_text' : 'resuming_after_tool',
+    };
+  }
+
+  const latestAssistant = [...entries].reverse().find((entry) => entry.message.role === 'assistant')?.message as AssistantMessage | undefined;
+  if (latestAssistant && assistantHasPendingToolCalls(latestAssistant, toolResults)) {
+    return { messages: entries, turnPhase: 'waiting_for_tool' };
+  }
+
+  return { messages: entries, turnPhase: 'resuming_after_tool' };
 }
 
 export function useAgent(agent: Agent = getAIAgent(), sessionId?: string) {
@@ -148,8 +214,8 @@ export function useAgent(agent: Agent = getAIAgent(), sessionId?: string) {
   return useMemo(() => {
     void revision;
 
-    const messages = getConversationMessages(agent);
     const toolResults = buildToolResultMap(agent.state.messages);
+    const { messages, turnPhase } = getConversationState(agent, toolResults);
     const lastMessage = messages[messages.length - 1]?.message;
     const error = lastMessage?.role === 'assistant' && lastMessage.stopReason === 'aborted'
       ? undefined
@@ -164,6 +230,7 @@ export function useAgent(agent: Agent = getAIAgent(), sessionId?: string) {
       messages,
       toolResults,
       isStreaming: agent.state.isStreaming,
+      turnPhase,
       error,
       debug: {
         revision,

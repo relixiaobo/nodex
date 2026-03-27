@@ -13,7 +13,7 @@ import { DrawerLayout } from '../../src/components/layout/DrawerLayout.js';
 import { appendMessage, createSession, editMessage, getLinearPath, linearToTree, switchBranch as switchChatBranch } from '../../src/lib/ai-chat-tree.js';
 import { resetChatPersistenceForTests, saveChatSession } from '../../src/lib/ai-persistence.js';
 import { resetAIAgentForTests } from '../../src/lib/ai-service.js';
-import { shouldAppendActiveAssistantPlaceholder } from '../../src/hooks/use-agent.js';
+import { shouldAppendActiveAssistantPlaceholder, type ChatMessageEntry } from '../../src/hooks/use-agent.js';
 import { findProviderOptionNodeId, getApiKeyForProvider } from '../../src/lib/ai-provider-config.js';
 import { ensureTodayNode } from '../../src/lib/journal.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
@@ -167,6 +167,46 @@ function createToolResultMessage(toolCallId: string, timestamp: number, text: st
   };
 }
 
+function createChatEntry(message: ReturnType<typeof createUserMessage> | ReturnType<typeof createAssistantMessage>): ChatMessageEntry {
+  return {
+    kind: 'message',
+    nodeId: `entry_${message.timestamp}`,
+    message,
+    branches: null,
+  };
+}
+
+function createUserEntry(content: string, timestamp: number, nodeId: string, branches: ChatMessageEntry extends infer _T ? { ids: string[]; currentIndex: number } | null : never = null): ChatMessageEntry {
+  return {
+    kind: 'message',
+    nodeId,
+    message: createUserMessage(content, timestamp),
+    branches,
+  };
+}
+
+function createAssistantEntry(
+  text: string,
+  timestamp: number,
+  nodeId: string,
+  options: {
+    stopReason?: 'stop' | 'error';
+    errorMessage?: string;
+    branches?: { ids: string[]; currentIndex: number } | null;
+  } = {},
+): ChatMessageEntry {
+  return {
+    kind: 'message',
+    nodeId,
+    message: {
+      ...createAssistantMessage(text, timestamp),
+      stopReason: options.stopReason ?? 'stop',
+      ...(options.errorMessage ? { errorMessage: options.errorMessage } : {}),
+    },
+    branches: options.branches ?? null,
+  };
+}
+
 describe('chat ui', () => {
   const originalInnerWidth = window.innerWidth;
   const originalResizeObserver = globalThis.ResizeObserver;
@@ -211,42 +251,22 @@ describe('chat ui', () => {
 
   it('shows an active assistant placeholder as soon as a user-authored tail becomes in-flight', () => {
     expect(shouldAppendActiveAssistantPlaceholder([
-      {
-        nodeId: 'msg_user',
-        message: createUserMessage('Need help', 1),
-        branches: null,
-      },
+      createChatEntry(createUserMessage('Need help', 1)),
     ], 'resuming_after_tool')).toBe(true);
 
     expect(shouldAppendActiveAssistantPlaceholder([
-      {
-        nodeId: 'msg_assistant',
-        message: createAssistantMessage('Already responding', 2),
-        branches: null,
-      },
+      createChatEntry(createAssistantMessage('Already responding', 2)),
     ], 'streaming_text')).toBe(false);
 
     expect(shouldAppendActiveAssistantPlaceholder([
-      {
-        nodeId: 'msg_user',
-        message: createUserMessage('Need help', 1),
-        branches: null,
-      },
+      createChatEntry(createUserMessage('Need help', 1)),
     ], 'idle')).toBe(false);
   });
 
   it('renders user toolbar on hover and assistant toolbar always visible', () => {
     const userHtml = renderToStaticMarkup(
       React.createElement(ChatMessage, {
-        entry: {
-          nodeId: 'msg_1',
-          message: {
-            role: 'user',
-            content: 'User message',
-            timestamp: 1,
-          },
-          branches: { ids: ['msg_1', 'msg_2'], currentIndex: 0 },
-        },
+        entry: createUserEntry('User message', 1, 'msg_1', { ids: ['msg_1', 'msg_2'], currentIndex: 0 }),
       }),
     );
 
@@ -258,20 +278,7 @@ describe('chat ui', () => {
 
     const assistantHtml = renderToStaticMarkup(
       React.createElement(ChatMessage, {
-        entry: {
-          nodeId: 'msg_2',
-          message: {
-            role: 'assistant',
-            content: [{ type: 'text', text: 'AI reply' }],
-            api: 'anthropic-messages',
-            provider: 'anthropic',
-            model: 'test',
-            usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
-            stopReason: 'stop',
-            timestamp: 2,
-          },
-          branches: null,
-        },
+        entry: createAssistantEntry('AI reply', 2, 'msg_2'),
       }),
     );
 
@@ -283,20 +290,7 @@ describe('chat ui', () => {
     // Mid-turn assistant messages (isLastInTurn=false) hide toolbar
     const midTurnHtml = renderToStaticMarkup(
       React.createElement(ChatMessage, {
-        entry: {
-          nodeId: 'msg_3',
-          message: {
-            role: 'assistant',
-            content: [{ type: 'text', text: 'Intermediate step' }],
-            api: 'anthropic-messages',
-            provider: 'anthropic',
-            model: 'test',
-            usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
-            stopReason: 'stop',
-            timestamp: 3,
-          },
-          branches: null,
-        },
+        entry: createAssistantEntry('Intermediate step', 3, 'msg_3'),
         isLastInTurn: false,
       }),
     );
@@ -308,18 +302,8 @@ describe('chat ui', () => {
       React.createElement(ChatMessage, {
         turnPhase: 'waiting_for_tool',
         entry: {
+          ...createAssistantEntry('Partial answer', 2, 'msg_partial'),
           nodeId: null,
-          message: {
-            role: 'assistant',
-            content: [{ type: 'text', text: 'Partial answer' }],
-            api: 'anthropic-messages',
-            provider: 'anthropic',
-            model: 'test',
-            usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
-            stopReason: 'stop',
-            timestamp: 2,
-          },
-          branches: null,
         },
       }),
     );
@@ -334,18 +318,8 @@ describe('chat ui', () => {
       React.createElement(ChatMessage, {
         turnPhase: 'resuming_after_tool',
         entry: {
-          nodeId: null,
-          message: {
-            role: 'assistant',
-            content: [],
-            api: 'anthropic-messages',
-            provider: 'anthropic',
-            model: 'test',
-            usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
-            stopReason: 'stop',
-            timestamp: 3,
-          },
-          branches: null,
+          kind: 'active_assistant_placeholder',
+          timestamp: 3,
         },
       }),
     );
@@ -358,15 +332,7 @@ describe('chat ui', () => {
     // User messages still use plain text
     const userHtml = renderToStaticMarkup(
       React.createElement(ChatMessage, {
-        entry: {
-          nodeId: 'msg_1',
-          message: {
-            role: 'user',
-            content: 'Readable body text',
-            timestamp: 1,
-          },
-          branches: null,
-        },
+        entry: createUserEntry('Readable body text', 1, 'msg_1'),
       }),
     );
     expect(userHtml).toContain('text-base leading-6 text-foreground');
@@ -374,20 +340,7 @@ describe('chat ui', () => {
     // Assistant messages use chat-prose (markdown renderer)
     const assistantHtml = renderToStaticMarkup(
       React.createElement(ChatMessage, {
-        entry: {
-          nodeId: 'msg_2',
-          message: {
-            role: 'assistant',
-            content: [{ type: 'text', text: 'Hello **bold** and `code`' }],
-            api: 'anthropic-messages',
-            provider: 'anthropic',
-            model: 'test',
-            usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
-            stopReason: 'stop',
-            timestamp: 2,
-          },
-          branches: null,
-        },
+        entry: createAssistantEntry('Hello **bold** and `code`', 2, 'msg_2'),
       }),
     );
     expect(assistantHtml).toContain('chat-prose');
@@ -410,20 +363,7 @@ describe('chat ui', () => {
   it('renders code blocks with syntax highlighting', () => {
     const html = renderToStaticMarkup(
       React.createElement(ChatMessage, {
-        entry: {
-          nodeId: 'msg_code',
-          message: {
-            role: 'assistant',
-            content: [{ type: 'text', text: '```typescript\nconst x: number = 42;\n```' }],
-            api: 'anthropic-messages',
-            provider: 'anthropic',
-            model: 'test',
-            usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
-            stopReason: 'stop',
-            timestamp: 2,
-          },
-          branches: null,
-        },
+        entry: createAssistantEntry('```typescript\nconst x: number = 42;\n```', 2, 'msg_code'),
       }),
     );
     expect(html).toContain('chat-code-block');
@@ -434,21 +374,10 @@ describe('chat ui', () => {
   it('renders error messages as inline error footer with retry button', () => {
     const html = renderToStaticMarkup(
       React.createElement(ChatMessage, {
-        entry: {
-          nodeId: 'msg_err',
-          message: {
-            role: 'assistant',
-            content: [{ type: 'text', text: 'Something **went** wrong' }],
-            api: 'anthropic-messages',
-            provider: 'anthropic',
-            model: 'test',
-            usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
-            stopReason: 'error',
-            errorMessage: 'API error',
-            timestamp: 2,
-          },
-          branches: null,
-        },
+        entry: createAssistantEntry('Something **went** wrong', 2, 'msg_err', {
+          stopReason: 'error',
+          errorMessage: 'API error',
+        }),
       }),
     );
     // Partial text before error is still rendered as markdown
@@ -464,6 +393,7 @@ describe('chat ui', () => {
     const html = renderToStaticMarkup(
       React.createElement(ChatMessage, {
         entry: {
+          kind: 'message',
           nodeId: 'msg_json_err',
           message: {
             role: 'assistant',
@@ -491,20 +421,7 @@ describe('chat ui', () => {
   it('renders the message-level breathing capsule instead of the legacy inline cursor hack', () => {
     const html = renderToStaticMarkup(
       React.createElement(ChatMessage, {
-        entry: {
-          nodeId: 'msg_stream',
-          message: {
-            role: 'assistant',
-            content: [{ type: 'text', text: 'Streaming response...' }],
-            api: 'anthropic-messages',
-            provider: 'anthropic',
-            model: 'test',
-            usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
-            stopReason: 'stop',
-            timestamp: 2,
-          },
-          branches: null,
-        },
+        entry: createAssistantEntry('Streaming response...', 2, 'msg_stream'),
         turnPhase: 'waiting_for_tool',
       }),
     );

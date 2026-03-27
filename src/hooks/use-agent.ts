@@ -28,12 +28,19 @@ import {
 
 export type ChatConversationMessage = UserMessage | AssistantMessage;
 
-export interface ChatMessageEntry {
+export interface ChatConversationEntry {
+  kind: 'message';
   nodeId: string | null;
   message: ChatConversationMessage;
   branches: { ids: string[]; currentIndex: number } | null;
-  displayKind?: 'message' | 'active_assistant_placeholder';
 }
+
+export interface ActiveAssistantPlaceholderEntry {
+  kind: 'active_assistant_placeholder';
+  timestamp: number;
+}
+
+export type ChatMessageEntry = ChatConversationEntry | ActiveAssistantPlaceholderEntry;
 
 export type ChatTurnPhase = 'idle' | 'streaming_text' | 'waiting_for_tool' | 'resuming_after_tool';
 
@@ -47,6 +54,14 @@ export interface AgentDebugState {
   reasoning: boolean;
   thinkingLevel: ThinkingLevel | null;
   turns: ChatTurnDebugRecord[];
+}
+
+function getEntryRole(entry: ChatMessageEntry): 'user' | 'assistant' {
+  return entry.kind === 'message' ? entry.message.role : 'assistant';
+}
+
+function getEntryTimestamp(entry: ChatMessageEntry): number {
+  return entry.kind === 'message' ? entry.message.timestamp : entry.timestamp;
 }
 
 /** Extract a map of toolCallId → result text from all messages. */
@@ -103,35 +118,15 @@ export function shouldAppendActiveAssistantPlaceholder(
     return false;
   }
 
-  return messages[messages.length - 1]!.message.role !== 'assistant';
+  return getEntryRole(messages[messages.length - 1]!) !== 'assistant';
 }
 
 function createActiveAssistantPlaceholderEntry(
   timestamp: number,
-  provider: string,
-  modelId: string,
 ): ChatMessageEntry {
   return {
-    nodeId: null,
-    branches: null,
-    displayKind: 'active_assistant_placeholder',
-    message: {
-      role: 'assistant',
-      content: [],
-      api: 'anthropic-messages',
-      provider,
-      model: modelId,
-      usage: {
-        input: 0,
-        output: 0,
-        cacheRead: 0,
-        cacheWrite: 0,
-        totalTokens: 0,
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-      },
-      stopReason: 'stop',
-      timestamp,
-    },
+    kind: 'active_assistant_placeholder',
+    timestamp,
   };
 }
 
@@ -144,14 +139,10 @@ function appendActiveAssistantPlaceholder(
     return messages;
   }
 
-  const lastTimestamp = messages[messages.length - 1]?.message.timestamp ?? 0;
+  const lastTimestamp = getEntryTimestamp(messages[messages.length - 1] ?? { kind: 'active_assistant_placeholder', timestamp: 0 });
   return [
     ...messages,
-    createActiveAssistantPlaceholderEntry(
-      lastTimestamp,
-      agent.state.model?.provider ?? 'anthropic',
-      agent.state.model?.id ?? 'pending',
-    ),
+    createActiveAssistantPlaceholderEntry(lastTimestamp),
   ];
 }
 
@@ -171,13 +162,13 @@ function getConversationState(
         const currentIndex = branchIds.indexOf(node.id);
 
         return [{
+          kind: 'message',
           nodeId: node.id,
           message: node.message,
           branches: branchIds.length > 1 && currentIndex >= 0
             ? { ids: branchIds, currentIndex }
             : null,
-          displayKind: 'message',
-        } satisfies ChatMessageEntry];
+        } satisfies ChatConversationEntry];
       })
     : [];
 
@@ -188,11 +179,11 @@ function getConversationState(
     .flatMap((message) =>
       isConversationMessage(message)
         ? [{
+          kind: 'message',
           nodeId: null,
           message,
           branches: null,
-          displayKind: 'message',
-        } satisfies ChatMessageEntry]
+        } satisfies ChatConversationEntry]
         : [],
     );
 
@@ -205,10 +196,10 @@ function getConversationState(
 
   if (isConversationMessage(streamingMessage) && !sameConversationMessage(streamingMessage, lastTransient ?? lastPersisted)) {
     entries.push({
+      kind: 'message',
       nodeId: null,
       message: streamingMessage,
       branches: null,
-      displayKind: 'message',
     });
   }
 
@@ -218,7 +209,9 @@ function getConversationState(
   } else if (streamingMessage?.role === 'assistant') {
     turnPhase = assistantHasVisibleText(streamingMessage) ? 'streaming_text' : 'resuming_after_tool';
   } else {
-    const latestAssistant = [...entries].reverse().find((entry) => entry.message.role === 'assistant')?.message as AssistantMessage | undefined;
+    const latestAssistant = [...entries]
+      .reverse()
+      .find((entry) => entry.kind === 'message' && entry.message.role === 'assistant')?.message as AssistantMessage | undefined;
     turnPhase = latestAssistant && assistantHasPendingToolCalls(latestAssistant, toolResults)
       ? 'waiting_for_tool'
       : 'resuming_after_tool';
@@ -279,7 +272,9 @@ export function useAgent(agent: Agent = getAIAgent(), sessionId?: string) {
 
     const toolResults = buildToolResultMap(agent.state.messages);
     const { messages, turnPhase } = getConversationState(agent, toolResults);
-    const lastMessage = messages[messages.length - 1]?.message;
+    const lastMessage = [...messages]
+      .reverse()
+      .find((entry): entry is ChatConversationEntry => entry.kind === 'message')?.message;
     const error = lastMessage?.role === 'assistant' && lastMessage.stopReason === 'aborted'
       ? undefined
       : agent.state.error;

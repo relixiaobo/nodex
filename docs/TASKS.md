@@ -19,13 +19,13 @@
 | nodex-claude | — | 空闲 | — |
 | nodex-claude-2 | — | 空闲 | — |
 | nodex-gemini | — | 空闲 | — |
-| nodex-codex | perf/chat-drawer-lag | #184 Chat 性能优化 | 待执行 |
+| nodex-codex | — | 空闲 | — |
 
 ---
 
 ## 进行中
 
-- [ ] **#184 Chat 抽屉性能优化 — 打开/切换模型卡顿** → nodex-codex
+（无）
 
 ---
 
@@ -126,6 +126,8 @@
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-27 | Chat tool-call/streaming UI 稳定化 — turn-phase 模型 + 呼吸胶囊 | codex | #185 |
+| 2026-03-27 | Chat 抽屉性能优化 — shell/body 分离 + 模型切换防抖 | codex | #184 |
 | 2026-03-27 | 性能优化 Phase 2 — 细粒度订阅消除结构操作卡顿 | codex | #183 |
 | 2026-03-26 | 性能优化 40K 节点 — O(N) 热点消除 | claude | #182 |
 | 2026-03-26 | Tana 数据导入 + Sync 启动修复 | claude-2 | #180 |

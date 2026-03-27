@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { AssistantMessage, ToolCall, ToolResultMessage } from '@mariozechner/pi-ai';
 import { toast } from 'sonner';
 import type { ChatConversationMessage, ChatMessageEntry, ChatTurnPhase } from '../../hooks/use-agent.js';
-import { Brain, Check, ChevronLeft, ChevronRight, Copy, Pencil, RefreshCw } from '../../lib/icons.js';
+import { AlertTriangle, Brain, Check, ChevronLeft, ChevronRight, Copy, Pencil, RefreshCw } from '../../lib/icons.js';
 import { CollapsibleIndicator } from './CollapsibleIndicator.js';
 import { MarkdownContent } from './MarkdownRenderer.js';
 import { ToolCallBlock } from './ToolCallBlock.js';
@@ -34,6 +34,28 @@ function getActionErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
+/** Try to extract a human-readable message from an error string that may be raw JSON. */
+function parseErrorMessage(raw: string): string {
+  const trimmed = raw.trim();
+  if (trimmed.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      const msg = parsed?.error?.message ?? parsed?.message;
+      if (typeof msg === 'string' && msg.length > 0) return msg;
+    } catch {
+      // not valid JSON — use as-is
+    }
+  }
+  // Strip common prefixes like "Error: Proxy error: "
+  return trimmed.replace(/^Error:\s*/i, '').replace(/^Proxy error:\s*/i, '');
+}
+
+/** Check if a text string looks like raw JSON (API error payload). */
+function looksLikeJsonError(text: string): boolean {
+  const trimmed = text.trim();
+  return trimmed.startsWith('{') && trimmed.includes('"error"');
+}
+
 function getMessageText(message: ChatConversationMessage): string {
   if (message.role === 'user') {
     if (typeof message.content === 'string') return message.content;
@@ -43,8 +65,10 @@ function getMessageText(message: ChatConversationMessage): string {
       .join('\n\n');
   }
 
+  const isError = !!(message.errorMessage && message.stopReason !== 'aborted');
   const textContent = message.content
     .filter((block) => block.type === 'text')
+    .filter((block) => !(isError && looksLikeJsonError(block.text)))
     .map((block) => block.text)
     .join('\n\n');
 
@@ -94,9 +118,16 @@ function StreamingIndicator() {
   );
 }
 
-function renderAssistantBlocks(message: AssistantMessage, streaming: boolean, toolResults?: Map<string, ToolResultMessage>): ReactNode[] {
+interface AssistantBlocksResult {
+  blocks: ReactNode[];
+  hasError: boolean;
+  errorText: string;
+}
+
+function renderAssistantBlocks(message: AssistantMessage, streaming: boolean, toolResults?: Map<string, ToolResultMessage>): AssistantBlocksResult {
   const result: ReactNode[] = [];
   const blocks = message.content;
+  const isError = !!(message.errorMessage && message.stopReason !== 'aborted');
   let i = 0;
 
   while (i < blocks.length) {
@@ -138,30 +169,32 @@ function renderAssistantBlocks(message: AssistantMessage, streaming: boolean, to
       continue;
     }
 
-    // Text block
-    const hasLaterText = blocks.slice(i + 1).some((candidate) => candidate.type === 'text');
-    const isError = message.errorMessage && message.stopReason !== 'aborted';
-
-    if (isError) {
-      result.push(
-        <div key={`text-${i}`} className="whitespace-pre-wrap text-base leading-6 text-destructive">
-          {block.text}
-        </div>,
-      );
-    } else {
-      result.push(
-        <MarkdownContent
-          key={`text-${i}`}
-          text={block.text}
-          streaming={streaming && !hasLaterText}
-          keyPrefix={`assistant-${i}`}
-        />,
-      );
+    // Text block — skip raw JSON error payloads
+    if (isError && block.type === 'text' && looksLikeJsonError(block.text)) {
+      i++;
+      continue;
     }
+
+    const hasLaterText = blocks.slice(i + 1).some((candidate) => candidate.type === 'text');
+    result.push(
+      <MarkdownContent
+        key={`text-${i}`}
+        text={block.text}
+        streaming={streaming && !hasLaterText}
+        keyPrefix={`assistant-${i}`}
+      />,
+    );
     i++;
   }
 
-  return result;
+  // Build user-friendly error message
+  let errorText = '';
+  if (isError) {
+    errorText = parseErrorMessage(message.errorMessage ?? '');
+    if (!errorText) errorText = 'Something went wrong';
+  }
+
+  return { blocks: result, hasError: isError, errorText };
 }
 
 export function ChatMessage({
@@ -181,9 +214,12 @@ export function ChatMessage({
   const text = getMessageText(message);
   const isUser = message.role === 'user';
   const turnActive = turnPhase !== 'idle';
-  const assistantBlocks = message.role === 'assistant'
+  const assistantResult = message.role === 'assistant'
     ? renderAssistantBlocks(message, streaming, toolResults)
     : null;
+  const assistantBlocks = assistantResult?.blocks ?? null;
+  const hasInlineError = assistantResult?.hasError ?? false;
+  const inlineErrorText = assistantResult?.errorText ?? '';
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const copyResetRef = useRef<number | null>(null);
   const [copied, setCopied] = useState(false);
@@ -221,7 +257,7 @@ export function ChatMessage({
     };
   }, []);
 
-  if (!isUser && (!assistantBlocks || assistantBlocks.length === 0) && !streaming) {
+  if (!isUser && (!assistantBlocks || assistantBlocks.length === 0) && !hasInlineError && !streaming) {
     return null;
   }
 
@@ -361,6 +397,23 @@ export function ChatMessage({
         ) : (
           <div className="flex w-full flex-col gap-2">
             {assistantBlocks}
+            {hasInlineError && (
+              <div className="flex items-start gap-2 rounded-lg border border-destructive/15 bg-destructive/5 px-3 py-2">
+                <AlertTriangle size={14} strokeWidth={1.8} className="mt-0.5 shrink-0 text-destructive" />
+                <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                  <span className="text-sm leading-5 text-destructive">{inlineErrorText}</span>
+                  <button
+                    type="button"
+                    onClick={() => void handleRegenerate()}
+                    disabled={busy}
+                    className="inline-flex w-fit items-center gap-1.5 rounded-full border border-destructive/20 px-2.5 py-1 text-xs font-medium text-destructive transition-colors hover:bg-destructive/5 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <RefreshCw size={12} strokeWidth={2} />
+                    Retry
+                  </button>
+                </div>
+              </div>
+            )}
             {turnActive && <StreamingIndicator />}
           </div>
         )}

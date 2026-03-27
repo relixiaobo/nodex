@@ -28,6 +28,7 @@ import { getWorkspaceHomeNodeId } from '../lib/system-node-presets.js';
 import type { ParsedPasteNode } from '../lib/paste-parser.js';
 import { resolveEffectiveId } from '../lib/node-type-utils.js';
 import { resolveChildSupertags } from '../lib/field-utils.js';
+import { beginStructuralProfile } from '../lib/dev-structural-profiler.js';
 
 // ============================================================
 // Store 接口
@@ -860,6 +861,20 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     return canEditFieldEntryValue(fieldEntryId);
   }
 
+  function withStructuralProfile<T>(
+    name: string,
+    meta: Record<string, unknown>,
+    fn: () => T,
+  ): T {
+    const finish = beginStructuralProfile(name, meta);
+    const t0 = performance.now();
+    try {
+      return fn();
+    } finally {
+      finish(performance.now() - t0);
+    }
+  }
+
   function setFieldOptionValue(fieldEntryId: string, optionNodeId: string, applyReverseDoneMapping: boolean) {
     const oldChildren = loroDoc.getChildren(fieldEntryId);
     for (const oldId of oldChildren) loroDoc.deleteNode(oldId);
@@ -958,63 +973,71 @@ export const useNodeStore = create<NodeStore>((set, get) => {
 
     // ─── 树操作 ───
 
-    createChild: (parentId, index, data, options) => {
-      if (!canMutate('createChild')) return detachedNodeFallback(parentId);
-      if (!canEditStructure(parentId)) return detachedNodeFallback(parentId);
-      const id = nanoid();
-      loroDoc.createNode(id, parentId, index);
-      if (data) {
-        const { type, name, description, marks, inlineRefs, ...rest } = data;
-        const batch: Record<string, unknown> = {};
-        if (type !== undefined) batch.type = type;
-        const supportsRichText = type === undefined || type === 'codeBlock';
-        const shouldPersistLegacyName = !supportsRichText && name !== undefined && marks === undefined && inlineRefs === undefined;
-        if (shouldPersistLegacyName) batch.name = name;
-        if (description !== undefined) batch.description = description;
-        Object.assign(batch, rest);
-        if (Object.keys(batch).length > 0) {
-          loroDoc.setNodeDataBatch(id, batch);
+    createChild: (parentId, index, data, options) => withStructuralProfile(
+      'createChild',
+      { parentId, index: index ?? null, type: data?.type ?? 'content', commit: options?.commit ?? true },
+      () => {
+        if (!canMutate('createChild')) return detachedNodeFallback(parentId);
+        if (!canEditStructure(parentId)) return detachedNodeFallback(parentId);
+        const id = nanoid();
+        loroDoc.createNode(id, parentId, index);
+        if (data) {
+          const { type, name, description, marks, inlineRefs, ...rest } = data;
+          const batch: Record<string, unknown> = {};
+          if (type !== undefined) batch.type = type;
+          const supportsRichText = type === undefined || type === 'codeBlock';
+          const shouldPersistLegacyName = !supportsRichText && name !== undefined && marks === undefined && inlineRefs === undefined;
+          if (shouldPersistLegacyName) batch.name = name;
+          if (description !== undefined) batch.description = description;
+          Object.assign(batch, rest);
+          if (Object.keys(batch).length > 0) {
+            loroDoc.setNodeDataBatch(id, batch);
+          }
+
+          const shouldWriteRichText = supportsRichText && (name !== undefined || marks !== undefined || inlineRefs !== undefined);
+          if (shouldWriteRichText) {
+            loroDoc.setNodeRichTextContent(
+              id,
+              name ?? '',
+              marks ?? [],
+              inlineRefs ?? [],
+            );
+          }
         }
 
-        const shouldWriteRichText = supportsRichText && (name !== undefined || marks !== undefined || inlineRefs !== undefined);
-        if (shouldWriteRichText) {
-          loroDoc.setNodeRichTextContent(
-            id,
-            name ?? '',
-            marks ?? [],
-            inlineRefs ?? [],
-          );
+        // Auto-apply default child supertags from the parent node or field definition.
+        for (const tagId of resolveChildSupertags(parentId)) {
+          applyTagMutationsNoCommit(id, tagId);
         }
-      }
 
-      // Auto-apply default child supertags from the parent node or field definition.
-      for (const tagId of resolveChildSupertags(parentId)) {
-        applyTagMutationsNoCommit(id, tagId);
-      }
+        if (options?.commit !== false) {
+          loroDoc.commitDoc();
+        }
+        return loroDoc.toNodexNode(id)!;
+      },
+    ),
 
-      if (options?.commit !== false) {
-        loroDoc.commitDoc();
-      }
-      return loroDoc.toNodexNode(id)!;
-    },
+    createSibling: (siblingId, data) => withStructuralProfile(
+      'createSibling',
+      { siblingId, type: data?.type ?? 'content' },
+      () => {
+        const parentId = loroDoc.getParentId(siblingId);
+        if (!parentId) throw new Error('[createSibling] no parent');
+        if (!canEditStructure(parentId)) return detachedNodeFallback(parentId);
 
-    createSibling: (siblingId, data) => {
-      const parentId = loroDoc.getParentId(siblingId);
-      if (!parentId) throw new Error('[createSibling] no parent');
-      if (!canEditStructure(parentId)) return detachedNodeFallback(parentId);
+        const siblings = loroDoc.getChildren(parentId);
+        const idx = siblings.indexOf(siblingId);
+        const insertAt = idx >= 0 ? idx + 1 : siblings.length;
 
-      const siblings = loroDoc.getChildren(parentId);
-      const idx = siblings.indexOf(siblingId);
-      const insertAt = idx >= 0 ? idx + 1 : siblings.length;
+        // Use the sibling's raw Loro tree index for accurate insertion.
+        // getChildren() filters out unmapped nodes, but createNode() operates
+        // on the raw tree — using filtered index causes misplacement.
+        const rawIdx = loroDoc.getRawChildIndex(parentId, siblingId);
+        const rawInsertAt = rawIdx >= 0 ? rawIdx + 1 : insertAt;
 
-      // Use the sibling's raw Loro tree index for accurate insertion.
-      // getChildren() filters out unmapped nodes, but createNode() operates
-      // on the raw tree — using filtered index causes misplacement.
-      const rawIdx = loroDoc.getRawChildIndex(parentId, siblingId);
-      const rawInsertAt = rawIdx >= 0 ? rawIdx + 1 : insertAt;
-
-      return get().createChild(parentId, rawInsertAt, data);
-    },
+        return get().createChild(parentId, rawInsertAt, data);
+      },
+    ),
 
     createSiblingNodesFromPaste: (afterNodeId, nodes, options) => {
       if (!canMutate('createSiblingNodesFromPaste')) return null;
@@ -1050,63 +1073,75 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       return lastId;
     },
 
-    moveNodeTo: (nodeId, newParentId, index, options) => {
-      if (!getNodeCapabilities(nodeId).canMove) return;
-      if (!canEditStructure(newParentId)) return;
-      // Guard: no self-move
-      if (nodeId === newParentId) return;
-      // Guard: no descendant move (prevent cycle)
-      let cursor: string | null = newParentId;
-      while (cursor) {
-        if (cursor === nodeId) return;
-        cursor = loroDoc.getParentId(cursor);
-      }
-      // Same-parent reordering: adjust index for removal offset
-      const currentParent = loroDoc.getParentId(nodeId);
-      let adjustedIndex = index;
-      if (currentParent === newParentId && adjustedIndex !== undefined) {
-        const siblings = loroDoc.getChildren(currentParent);
-        const currentIdx = siblings.indexOf(nodeId);
-        if (currentIdx !== -1 && currentIdx < adjustedIndex) {
-          adjustedIndex = adjustedIndex - 1;
+    moveNodeTo: (nodeId, newParentId, index, options) => withStructuralProfile(
+      'moveNodeTo',
+      { nodeId, newParentId, index: index ?? null, commit: options?.commit ?? true },
+      () => {
+        if (!getNodeCapabilities(nodeId).canMove) return;
+        if (!canEditStructure(newParentId)) return;
+        // Guard: no self-move
+        if (nodeId === newParentId) return;
+        // Guard: no descendant move (prevent cycle)
+        let cursor: string | null = newParentId;
+        while (cursor) {
+          if (cursor === nodeId) return;
+          cursor = loroDoc.getParentId(cursor);
         }
-      }
-      loroDoc.moveNode(nodeId, newParentId, adjustedIndex);
-      if (options?.commit !== false) {
+        // Same-parent reordering: adjust index for removal offset
+        const currentParent = loroDoc.getParentId(nodeId);
+        let adjustedIndex = index;
+        if (currentParent === newParentId && adjustedIndex !== undefined) {
+          const siblings = loroDoc.getChildren(currentParent);
+          const currentIdx = siblings.indexOf(nodeId);
+          if (currentIdx !== -1 && currentIdx < adjustedIndex) {
+            adjustedIndex = adjustedIndex - 1;
+          }
+        }
+        loroDoc.moveNode(nodeId, newParentId, adjustedIndex);
+        if (options?.commit !== false) {
+          loroDoc.commitDoc();
+        }
+      },
+    ),
+
+    indentNode: (nodeId) => withStructuralProfile(
+      'indentNode',
+      { nodeId },
+      () => {
+        if (!getNodeCapabilities(nodeId).canMove) return;
+        const parentId = loroDoc.getParentId(nodeId);
+        if (!parentId) return;
+        const siblings = loroDoc.getChildren(parentId);
+        const idx = siblings.indexOf(nodeId);
+        if (idx <= 0) return; // no previous sibling
+        const newParentId = siblings[idx - 1];
+        if (!canEditStructure(newParentId)) return;
+        // Move to end of previous sibling's children
+        const newParentChildren = loroDoc.getChildren(newParentId);
+        loroDoc.moveNode(nodeId, newParentId, newParentChildren.length);
         loroDoc.commitDoc();
-      }
-    },
+      },
+    ),
 
-    indentNode: (nodeId) => {
-      if (!getNodeCapabilities(nodeId).canMove) return;
-      const parentId = loroDoc.getParentId(nodeId);
-      if (!parentId) return;
-      const siblings = loroDoc.getChildren(parentId);
-      const idx = siblings.indexOf(nodeId);
-      if (idx <= 0) return; // no previous sibling
-      const newParentId = siblings[idx - 1];
-      if (!canEditStructure(newParentId)) return;
-      // Move to end of previous sibling's children
-      const newParentChildren = loroDoc.getChildren(newParentId);
-      loroDoc.moveNode(nodeId, newParentId, newParentChildren.length);
-      loroDoc.commitDoc();
-    },
+    outdentNode: (nodeId) => withStructuralProfile(
+      'outdentNode',
+      { nodeId },
+      () => {
+        if (!getNodeCapabilities(nodeId).canMove) return;
+        const parentId = loroDoc.getParentId(nodeId);
+        if (!parentId) return;
+        if (isLockedNode(parentId)) return;
+        const grandParentId = loroDoc.getParentId(parentId);
+        if (!grandParentId) return;
+        if (!canEditStructure(grandParentId)) return;
 
-    outdentNode: (nodeId) => {
-      if (!getNodeCapabilities(nodeId).canMove) return;
-      const parentId = loroDoc.getParentId(nodeId);
-      if (!parentId) return;
-      if (isLockedNode(parentId)) return;
-      const grandParentId = loroDoc.getParentId(parentId);
-      if (!grandParentId) return;
-      if (!canEditStructure(grandParentId)) return;
-
-      // Insert after parent in grandparent's children
-      const gpChildren = loroDoc.getChildren(grandParentId);
-      const parentIdx = gpChildren.indexOf(parentId);
-      loroDoc.moveNode(nodeId, grandParentId, parentIdx + 1);
-      loroDoc.commitDoc();
-    },
+        // Insert after parent in grandparent's children
+        const gpChildren = loroDoc.getChildren(grandParentId);
+        const parentIdx = gpChildren.indexOf(parentId);
+        loroDoc.moveNode(nodeId, grandParentId, parentIdx + 1);
+        loroDoc.commitDoc();
+      },
+    ),
 
     moveNodeUp: (nodeId) => {
       if (!getNodeCapabilities(nodeId).canMove) return;

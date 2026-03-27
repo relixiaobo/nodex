@@ -1,4 +1,4 @@
-import { Component, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Component, Profiler, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
@@ -46,6 +46,7 @@ import {
   type HighlightUnresolvablePayload,
 } from '../../lib/highlight-messaging.js';
 import { ensureSystemNodes } from '../../lib/bootstrap-system-nodes.js';
+import { installDevStructuralProfiler, onStructuralProfilerCommit } from '../../lib/dev-structural-profiler.js';
 import { Toaster, toast } from 'sonner';
 import { TooltipProvider } from '../../components/ui/Tooltip';
 import { isAppPanel, isChatPanel } from '../../types/index.js';
@@ -457,6 +458,7 @@ export function App({ skipBootstrap = false }: AppProps) {
 
  useEffect(() => {
   if (!import.meta.env.DEV) return;
+  installDevStructuralProfiler();
   const conflicts = findUnexpectedShortcutConflicts();
   if (conflicts.length > 0) {
    console.warn('[shortcut-registry] unexpected conflicts detected', conflicts);
@@ -482,9 +484,7 @@ export function App({ skipBootstrap = false }: AppProps) {
   );
  }
 
- return (
-  <ErrorBoundary>
-   <TooltipProvider>
+  const appShell = (
     <div
      className="flex h-screen w-full flex-col overflow-hidden bg-background text-foreground"
      onPointerDownCapture={selectionDismissHandlers.onPointerDownCapture}
@@ -508,7 +508,17 @@ export function App({ skipBootstrap = false }: AppProps) {
       }}
      />
     </div>
-   </TooltipProvider>
-  </ErrorBoundary>
- );
+  );
+
+	 return (
+	  <ErrorBoundary>
+	   <TooltipProvider>
+      {import.meta.env.DEV ? (
+        <Profiler id="SidePanelRoot" onRender={onStructuralProfilerCommit}>
+          {appShell}
+        </Profiler>
+      ) : appShell}
+	   </TooltipProvider>
+	  </ErrorBoundary>
+	 );
 }

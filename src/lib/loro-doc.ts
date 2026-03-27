@@ -12,6 +12,7 @@ import { SYSTEM_NODE_IDS } from '../types/index.js';
 import { saveSnapshotRecord, loadSnapshotRecord } from './loro-persistence.js';
 import { resetAwareness } from './awareness.js';
 import { readRichTextFromLoroText, writeRichTextToLoroText } from './loro-text-bridge.js';
+import { recordStructuralCommitOrigin } from './dev-structural-profiler.js';
 import { enqueuePendingUpdate } from './sync/pending-queue.js';
 import { syncManager } from './sync/sync-manager.js';
 
@@ -1502,6 +1503,7 @@ export function commitDoc(origin?: string): void {
   if (!resolvedOrigin.startsWith('system:') && resolvedOrigin !== '__seed__') {
     redoRestoreUIMetaStack.length = 0;
   }
+  recordStructuralCommitOrigin(resolvedOrigin);
   try {
     doc.commit({ origin: resolvedOrigin });
   } catch (e) {

@@ -28,6 +28,8 @@ import { navigateToSiblingRow } from '../../lib/outliner-navigation.js';
 import { ViewToolbar } from './ViewToolbar.js';
 import { readViewConfig, applyViewPipeline } from '../../lib/view-pipeline.js';
 import { canCreateChildrenUnder } from '../../lib/node-capabilities.js';
+import { useStructuralRenderTrace } from '../../lib/dev-structural-profiler.js';
+import { clearRootScopeRowIds, setRootScopeRowIds } from '../../lib/root-scope-row-registry.js';
 
 interface OutlinerViewProps {
   rootNodeId: string;
@@ -47,6 +49,7 @@ export function getDragSelectableRootIds(
 }
 
 export function OutlinerView({ rootNodeId, showTemplateFields, panelId }: OutlinerViewProps) {
+  useStructuralRenderTrace('OutlinerView', rootNodeId);
   const node = useNode(rootNodeId);
   useChildren(rootNodeId);
 
@@ -154,6 +157,11 @@ export function OutlinerView({ rootNodeId, showTemplateFields, panelId }: Outlin
     [visibleChildren, expandedHiddenFields, rootNodeId],
   );
 
+  useEffect(() => {
+    setRootScopeRowIds(rootNodeId, panelId, dragSelectableRootIds);
+    return () => clearRootScopeRowIds(rootNodeId, panelId);
+  }, [dragSelectableRootIds, panelId, rootNodeId]);
+
   // All hidden fields (including ALWAYS): shown as compact pills, click to temporarily reveal
   const hiddenRevealableFields = useMemo(
     () => visibleChildren
@@ -211,7 +219,6 @@ export function OutlinerView({ rootNodeId, showTemplateFields, panelId }: Outlin
             <FieldRow
               nodeId={rootNodeId}
               {...toFieldRowEntryProps(fieldMap.get(row.id)!)}
-              rootChildIds={dragSelectableRootIds}
               rootNodeId={rootNodeId}
               panelId={panelId}
               isLastInGroup={i === rows.length - 1 || rows[i + 1].type !== 'field'}
@@ -231,7 +238,6 @@ export function OutlinerView({ rootNodeId, showTemplateFields, panelId }: Outlin
           <OutlinerItem
             nodeId={row.id}
             depth={0}
-            rootChildIds={dragSelectableRootIds}
             parentId={rootNodeId}
             rootNodeId={rootNodeId}
             panelId={panelId}

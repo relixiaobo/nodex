@@ -80,8 +80,8 @@ interface RichTextEditorProps {
   readOnly?: boolean;
   onBlur: () => void;
   onEnter: (afterContent?: EditorContentPayload) => void;
-  onIndent: () => void;
-  onOutdent: () => void;
+  onIndent: (cursorOffset?: number) => void;
+  onOutdent: (cursorOffset?: number) => void;
   onDelete: () => boolean;
   onBackspaceAtStart?: () => boolean;
   onBackspaceAtEndSingleInlineRef?: () => boolean;
@@ -601,16 +601,18 @@ export function RichTextEditor(props: RichTextEditorProps) {
         },
         Tab: (_state, _dispatch, view) => {
           if (readOnlyRef.current) return true;
-          if (isComposing(view)) return false;
+          if (!view || isComposing(view)) return false;
           saveContent();
-          propsRef.current.onIndent();
+          const textOffset = Math.max(0, view.state.selection.from - 1);
+          propsRef.current.onIndent(textOffset);
           return true;
         },
         'Shift-Tab': (_state, _dispatch, view) => {
           if (readOnlyRef.current) return true;
-          if (isComposing(view)) return false;
+          if (!view || isComposing(view)) return false;
           saveContent();
-          propsRef.current.onOutdent();
+          const textOffset = Math.max(0, view.state.selection.from - 1);
+          propsRef.current.onOutdent(textOffset);
           return true;
         },
         Backspace: (_state, _dispatch, view) => {

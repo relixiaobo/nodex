@@ -7,6 +7,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.3.3',
+    date: '2026-03-27',
+    summary: 'Performance + New Icon',
+    items: [
+      'Typing no longer lags — selective cache invalidation reduces re-renders from ~100 to 1 per keystroke',
+      'Enter, Tab indent, drag & drop are snappy — fine-grained subscriptions replace global version counter',
+      'Cursor stays in place during Tab indent/outdent',
+      'Sync no longer fires on every keystroke (2s debounce) — fixes chat session 409 conflict loop',
+      'New simplified cat icon — crisp at all sizes, toolbar-optimized 16/24/32px',
+      'Silence benign sync startup error in console',
+    ],
+  },
+  {
     version: '0.3.2',
     date: '2026-03-26',
     summary: '@ Mentions + Login Redesign',

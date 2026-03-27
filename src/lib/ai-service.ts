@@ -752,6 +752,11 @@ function createOverflowRecoveryCoordinator(session: ChatSession, agent: Agent) {
       queue = recovery.catch(() => {});
       recoveries.push(recovery);
     },
+    enqueueCompact(fn: () => Promise<boolean>): void {
+      const task = queue.then(() => fn()).catch(() => {});
+      queue = task.then(() => {});
+      recoveries.push(task.then(() => {}));
+    },
     async waitForAll(): Promise<void> {
       for (const recovery of recoveries) {
         await recovery;
@@ -790,9 +795,6 @@ async function runAgentTurn(session: ChatSession, agent: Agent, input: AgentTurn
       if (event.message.role === 'assistant') {
         overflowRecovery.handleAssistantMessage(event.message);
         syncSessionFromAgent(session, agent.state.messages);
-        // Check if context is approaching the limit mid-turn (e.g. after
-        // multiple tool calls) and compact before the next API call.
-        void compactIfNeeded(session, agent);
         return;
       }
 
@@ -807,6 +809,10 @@ async function runAgentTurn(session: ChatSession, agent: Agent, input: AgentTurn
       });
       if (overflowRecovery.shouldSkipTurnSync()) return;
       syncSessionFromAgent(session, agent.state.messages);
+      // Check if context is approaching the limit mid-loop (e.g. after
+      // multiple tool calls). Queue behind any overflow recovery to avoid
+      // racing with replaceMessages.
+      overflowRecovery.enqueueCompact(() => compactIfNeeded(session, agent));
       void persistChatSession(agent);
     }
   });

@@ -63,10 +63,37 @@ export function normalizeProviderId(provider: string | null | undefined): string
   return provider?.trim().toLowerCase() ?? '';
 }
 
+const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
+  anthropic: 'Anthropic',
+  openai: 'OpenAI',
+  google: 'Google',
+  'google-vertex': 'Google Vertex',
+  'google-antigravity': 'Google Antigravity',
+  'google-gemini-cli': 'Google Gemini CLI',
+  groq: 'Groq',
+  mistral: 'Mistral',
+  xai: 'xAI',
+  openrouter: 'OpenRouter',
+  deepseek: 'DeepSeek',
+  'amazon-bedrock': 'Amazon Bedrock',
+  'azure-openai-responses': 'Azure OpenAI',
+  cerebras: 'Cerebras',
+  huggingface: 'Hugging Face',
+  'kimi-coding': 'Kimi',
+  minimax: 'MiniMax',
+  'minimax-cn': 'MiniMax CN',
+  'openai-codex': 'OpenAI Codex',
+  zai: 'z.ai',
+};
+
+export function formatProviderName(provider: string): string {
+  return PROVIDER_DISPLAY_NAMES[normalizeProviderId(provider)] ?? provider;
+}
+
 function getProviderDisplayName(provider: string): string {
   const providerOptionNodeId = findProviderOptionNodeId(provider);
-  if (!providerOptionNodeId) return provider;
-  return loroDoc.toNodexNode(providerOptionNodeId)?.name?.trim() || provider;
+  if (!providerOptionNodeId) return formatProviderName(provider);
+  return loroDoc.toNodexNode(providerOptionNodeId)?.name?.trim() || formatProviderName(provider);
 }
 
 function findFieldEntry(nodeId: string, fieldDefId: string): string | null {

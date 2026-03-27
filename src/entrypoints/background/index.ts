@@ -926,24 +926,6 @@ async function handleBrowserReadConsole(tabId: number, payload: BrowserReadConso
 }
 
 export default defineBackground(() => {
-  // ── Theme-aware icon (restore from storage) ──
-  // matchMedia is unavailable in Service Workers. The side panel detects
-  // the system theme and persists it to chrome.storage.local. On startup
-  // we read the stored value to set the correct icon immediately.
-  chrome.storage.local.get('__iconThemeDark', (result) => {
-    if (result.__iconThemeDark != null) {
-      const suffix = result.__iconThemeDark ? '-dark' : '';
-      chrome.action.setIcon({
-        path: {
-          16: `icon${suffix}/16.png`,
-          32: `icon${suffix}/32.png`,
-          48: `icon${suffix}/48.png`,
-          128: `icon${suffix}/128.png`,
-        },
-      });
-    }
-  });
-
   // Open Side Panel when action button is clicked
   chrome.action.onClicked.addListener(async (tab) => {
     if (tab.id) {

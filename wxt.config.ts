@@ -54,6 +54,15 @@ export default defineConfig({
     },
     action: {
       default_title: 'Open soma',
+      // Toolbar icons fill the canvas edge-to-edge (Chrome adds its own
+      // spacing). 16/24/32 cover 1x, 1.5x, and 2x display scaling.
+      // These are separate from manifest.icons which use padding for the
+      // extensions page and Web Store.
+      default_icon: {
+        '16':  `${iconDir}/16.png`,
+        '24':  `${iconDir}/24.png`,
+        '32':  `${iconDir}/32.png`,
+      },
     },
   },
   vite: () => ({

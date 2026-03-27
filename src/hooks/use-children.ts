@@ -1,15 +1,19 @@
 /**
  * Hook to subscribe to a node's children.
- * Reads from LoroDoc synchronously; re-renders when _version changes.
+ * Re-renders only when this render scope changes.
  */
+import { useSyncExternalStore } from 'react';
 import type { NodexNode } from '../types/index.js';
+import * as loroDoc from '../lib/loro-doc.js';
 import { useNodeStore } from '../stores/node-store';
 
 const EMPTY: NodexNode[] = [];
 
 export function useChildren(nodeId: string | null) {
-  return useNodeStore((s) => {
-    void s._version; // subscribe for re-renders on Loro changes
-    return nodeId ? s.getChildren(nodeId) : EMPTY;
-  });
+  const getSnapshot = () => (nodeId ? useNodeStore.getState().getChildren(nodeId) : EMPTY);
+  return useSyncExternalStore(
+    (callback) => (nodeId ? loroDoc.subscribeScope(nodeId, callback) : () => {}),
+    getSnapshot,
+    getSnapshot,
+  );
 }

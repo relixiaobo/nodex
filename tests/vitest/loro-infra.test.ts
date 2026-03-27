@@ -16,6 +16,10 @@ import { LoroDoc, LoroText } from 'loro-crdt';
 import {
   // ② Fine-grained subscriptions
   subscribeNode,
+  subscribeScope,
+  subscribeSchema,
+  getScopeRevision,
+  getSchemaRevision,
   // ⑤ Incremental Sync
   getVersionVector,
   exportFrom,
@@ -486,6 +490,45 @@ describe('② Fine-grained subscriptions', () => {
 
     unsub1();
     unsub2();
+  });
+
+  it('直接子节点变化会触发父 scope 订阅并递增 revision', async () => {
+    const parent = createNode('parent', null);
+    const child = createNode('child', parent);
+    commitDoc('__seed__');
+
+    let calls = 0;
+    const before = getScopeRevision(parent);
+    const unsub = subscribeScope(parent, () => calls++);
+
+    setNodeData(child, 'name', 'child updated');
+    commitDoc();
+    await new Promise(r => setTimeout(r, 50));
+
+    expect(calls).toBeGreaterThan(0);
+    expect(getScopeRevision(parent)).toBeGreaterThan(before);
+    unsub();
+  });
+
+  it('schema 子树变化会触发 schema 订阅并递增 revision', async () => {
+    const root = createNode('ws', null);
+    const schema = createNode('SCHEMA', root);
+    const tag = createNode('tag_task', schema);
+    setNodeData(tag, 'type', 'tagDef');
+    setNodeData(tag, 'name', 'task');
+    commitDoc('__seed__');
+
+    let calls = 0;
+    const before = getSchemaRevision();
+    const unsub = subscribeSchema(() => calls++);
+
+    setNodeData(tag, 'name', 'task updated');
+    commitDoc();
+    await new Promise(r => setTimeout(r, 50));
+
+    expect(calls).toBeGreaterThan(0);
+    expect(getSchemaRevision()).toBeGreaterThan(before);
+    unsub();
   });
 });
 

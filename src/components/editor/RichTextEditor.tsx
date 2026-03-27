@@ -26,6 +26,7 @@ import type { HighlightNodeStore } from '../../lib/highlight-service.js';
 import { parseMultiLinePaste, type ParsedPasteNode } from '../../lib/paste-parser.js';
 import { logPasteDebug, previewMultiline, summarizePasteNodes } from '../../lib/paste-debug.js';
 import { parseNodeLinkFromHtml } from '../../lib/node-clipboard.js';
+import { useStructuralRenderTrace } from '../../lib/structural-profiler.js';
 
 /**
  * Detect whether a string looks like a URL for smart paste.
@@ -160,6 +161,7 @@ function contentEquals(
 }
 
 export function RichTextEditor(props: RichTextEditorProps) {
+  useStructuralRenderTrace('RichTextEditor', props.nodeId);
   const [toolbarTick, setToolbarTick] = useState(0);
   const mountRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);

@@ -1,12 +1,15 @@
 /**
  * Hook to subscribe to a single node by ID.
- * Reads from LoroDoc synchronously; re-renders when _version changes.
+ * Reads from LoroDoc synchronously; re-renders only when this node snapshot changes.
  */
-import { useNodeStore } from '../stores/node-store';
+import { useSyncExternalStore } from 'react';
+import * as loroDoc from '../lib/loro-doc.js';
 
 export function useNode(nodeId: string | null) {
-  return useNodeStore((s) => {
-    void s._version; // subscribe for re-renders on Loro changes
-    return nodeId ? s.getNode(nodeId) : null;
-  });
+  const getSnapshot = () => (nodeId ? loroDoc.toNodexNode(nodeId) : null);
+  return useSyncExternalStore(
+    (callback) => (nodeId ? loroDoc.subscribeNode(nodeId, callback) : () => {}),
+    getSnapshot,
+    getSnapshot,
+  );
 }

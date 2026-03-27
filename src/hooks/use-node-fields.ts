@@ -6,7 +6,8 @@
  * Uses JSON.stringify as the Zustand selector return (primitive = stable reference)
  * to avoid React 19 infinite re-render loops with useSyncExternalStore.
  */
-import { useMemo } from 'react';
+import { useMemo, useSyncExternalStore } from 'react';
+import * as loroDoc from '../lib/loro-doc.js';
 import { useNodeStore } from '../stores/node-store';
 import {
   resolveDataType, resolveHideField, resolveRequired, resolveConfigValueWithDefault,
@@ -194,12 +195,26 @@ export function computeNodeFields(
 const EMPTY = '[]';
 
 export function useNodeFields(nodeId: string): FieldEntry[] {
-  const json = useNodeStore((state) => {
-    void state._version;
+  const getSnapshot = () => {
+    const state = useNodeStore.getState();
     const fields = computeNodeFields(state.getNode, state.getChildren, nodeId);
     if (fields.length === 0) return EMPTY;
     return JSON.stringify(fields);
-  });
+  };
+  const json = useSyncExternalStore(
+    (callback) => {
+      const unsubNode = loroDoc.subscribeNode(nodeId, callback);
+      const unsubScope = loroDoc.subscribeScope(nodeId, callback);
+      const unsubSchema = loroDoc.subscribeSchema(callback);
+      return () => {
+        unsubNode();
+        unsubScope();
+        unsubSchema();
+      };
+    },
+    getSnapshot,
+    getSnapshot,
+  );
 
   return useMemo(() => (json === EMPTY ? [] : JSON.parse(json) as FieldEntry[]), [json]);
 }

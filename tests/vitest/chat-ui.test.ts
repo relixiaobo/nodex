@@ -7,7 +7,7 @@ import { flushSync } from 'react-dom';
 import { ChatInput } from '../../src/components/chat/ChatInput.js';
 import { ChatPanelHeader } from '../../src/components/chat/ChatPanelHeader.js';
 import { ChatMessage } from '../../src/components/chat/ChatMessage.js';
-import { ChatPanel, shouldStickChatScroll } from '../../src/components/chat/ChatPanel.js';
+import { ChatPanel, shouldRenderActiveAssistantPlaceholder, shouldStickChatScroll } from '../../src/components/chat/ChatPanel.js';
 import { extractInlineMarkup, splitMarkdownBlocks } from '../../src/components/chat/MarkdownRenderer.js';
 import { DrawerLayout } from '../../src/components/layout/DrawerLayout.js';
 import { appendMessage, createSession, editMessage, getLinearPath, linearToTree, switchBranch as switchChatBranch } from '../../src/lib/ai-chat-tree.js';
@@ -208,6 +208,32 @@ describe('chat ui', () => {
     })).toBe(false);
   });
 
+  it('shows an active assistant placeholder as soon as a user-authored tail becomes in-flight', () => {
+    expect(shouldRenderActiveAssistantPlaceholder([
+      {
+        nodeId: 'msg_user',
+        message: createUserMessage('Need help', 1),
+        branches: null,
+      },
+    ], 'resuming_after_tool')).toBe(true);
+
+    expect(shouldRenderActiveAssistantPlaceholder([
+      {
+        nodeId: 'msg_assistant',
+        message: createAssistantMessage('Already responding', 2),
+        branches: null,
+      },
+    ], 'streaming_text')).toBe(false);
+
+    expect(shouldRenderActiveAssistantPlaceholder([
+      {
+        nodeId: 'msg_user',
+        message: createUserMessage('Need help', 1),
+        branches: null,
+      },
+    ], 'idle')).toBe(false);
+  });
+
   it('renders user toolbar on hover and assistant toolbar always visible', () => {
     const userHtml = renderToStaticMarkup(
       React.createElement(ChatMessage, {
@@ -300,6 +326,31 @@ describe('chat ui', () => {
     expect(html).toContain('data-testid="chat-message-streaming-indicator"');
     expect(html).toContain('chat-streaming-capsule');
     expect(html).not.toContain('chat-streaming-status');
+  });
+
+  it('renders the breathing capsule for an empty active assistant placeholder', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(ChatMessage, {
+        turnPhase: 'resuming_after_tool',
+        entry: {
+          nodeId: null,
+          message: {
+            role: 'assistant',
+            content: [],
+            api: 'anthropic-messages',
+            provider: 'anthropic',
+            model: 'test',
+            usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+            stopReason: 'stop',
+            timestamp: 3,
+          },
+          branches: null,
+        },
+      }),
+    );
+
+    expect(html).toContain('data-testid="chat-message-streaming-indicator"');
+    expect(html).toContain('chat-streaming-capsule');
   });
 
   it('renders assistant messages with chat-prose markdown and user messages with text-base', () => {

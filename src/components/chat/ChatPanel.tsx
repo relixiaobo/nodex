@@ -11,7 +11,7 @@ import { useNodeStore } from '../../stores/node-store.js';
 import { useSyncStore } from '../../stores/sync-store.js';
 import { useUIStore } from '../../stores/ui-store.js';
 import { SYSTEM_NODE_IDS } from '../../types/index.js';
-import type { ChatConversationMessage, ChatMessageEntry } from '../../hooks/use-agent.js';
+import type { ChatConversationMessage, ChatMessageEntry, ChatTurnPhase } from '../../hooks/use-agent.js';
 import { ChatDebugPanel } from './ChatDebugPanel.js';
 import { ChatOnboarding } from './ChatOnboarding.js';
 import { ChatPanelHeader } from './ChatPanelHeader.js';
@@ -124,6 +124,7 @@ export function ChatPanel({ sessionId, hideHeader, debugOpen: externalDebugOpen 
     messages,
     toolResults,
     isStreaming,
+    turnPhase,
     error,
     ready,
     messagesReady,
@@ -384,12 +385,16 @@ export function ChatPanel({ sessionId, hideHeader, debugOpen: externalDebugOpen 
     const rendered: Array<ReturnType<typeof ChatMessage>> = [];
 
     const renderMessage = (entry: ChatMessageEntry, startIndex: number, endIndex: number, key?: string) => {
+      const isLastAssistantMessage = endIndex === messages.length - 1 && entry.message.role === 'assistant';
+      const streamingText = isLastAssistantMessage && turnPhase === 'streaming_text';
+      const activeTurnPhase: ChatTurnPhase = isLastAssistantMessage ? turnPhase : 'idle';
       rendered.push(
         <ChatMessage
           key={key ?? entry.nodeId ?? `stream-${entry.message.timestamp}-${startIndex}`}
           entry={entry}
           toolResults={toolResults}
-          streaming={isStreaming && endIndex === messages.length - 1 && entry.message.role === 'assistant'}
+          streaming={streamingText}
+          turnPhase={activeTurnPhase}
           grouped={startIndex > 0 && messages[startIndex - 1]?.message.role === entry.message.role}
           busy={chatBusy}
           isLastInTurn={endIndex === messages.length - 1 || messages[endIndex + 1]?.message.role !== entry.message.role}
@@ -537,11 +542,6 @@ export function ChatPanel({ sessionId, hideHeader, debugOpen: externalDebugOpen 
                   </div>
                 ) : (
                   renderConversationMessages()
-                )}
-                {isStreaming && (
-                  <div className="sticky bottom-0 flex h-8 items-center bg-inherit pl-1">
-                    <span className="inline-block h-3.5 w-1.5 animate-pulse rounded-sm bg-primary" />
-                  </div>
                 )}
               </div>
               <div className="relative">

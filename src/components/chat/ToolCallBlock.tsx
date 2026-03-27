@@ -4,10 +4,11 @@ import type { AppIcon } from '../../lib/icons.js';
 import { IMAGE_PLACEHOLDER } from '../../lib/ai-message-images.js';
 import { highlightCode } from '../../lib/code-highlight.js';
 import {
-  ArrowUpDown, Camera, ChevronDown, Clock, Code2, FileText, Globe, History, Image,
+  ArrowUpDown, Camera, Clock, Code2, FileText, Globe, History, Image,
   Info, Keyboard, MousePointer, Move, PanelTop, Pencil, Plus, RotateCcw,
   Search, Terminal, Trash2, Wand2,
 } from '../../lib/icons.js';
+import { CollapsibleIndicator } from './CollapsibleIndicator.js';
 
 interface ToolCallBlockProps {
   toolCall: ToolCall;
@@ -272,19 +273,13 @@ export function ToolCallBlock({ toolCall, result }: ToolCallBlockProps) {
       <button
         type="button"
         onClick={() => setExpanded((value) => !value)}
-        className="group/tool flex max-w-[62%] items-center gap-1.5 py-0.5 text-foreground-tertiary transition-colors hover:text-foreground-secondary"
+        className="group/tool flex max-w-[62%] items-center gap-1.5 py-0.5 text-left text-foreground-tertiary transition-colors hover:text-foreground-secondary"
       >
-        {/* Icon area: tool icon by default, chevron on hover / when expanded */}
-        <span className="flex h-4 w-3.5 shrink-0 items-center justify-center">
-          {expanded ? (
-            <ChevronDown size={14} strokeWidth={1.8} className="rotate-180" />
-          ) : (
-            <>
-              <Icon size={14} strokeWidth={1.6} className={`group-hover/tool:hidden ${status === 'error' ? 'text-destructive' : ''}`} />
-              <ChevronDown size={14} strokeWidth={1.8} className="hidden group-hover/tool:block" />
-            </>
-          )}
-        </span>
+        <CollapsibleIndicator
+          expanded={expanded}
+          hoverScopeClass="group-hover/tool"
+          icon={<Icon size={14} strokeWidth={1.6} className={status === 'error' ? 'text-destructive' : ''} />}
+        />
         <span className="min-w-0 truncate text-xs">
           {summarizeToolCall(toolCall, status)}
         </span>

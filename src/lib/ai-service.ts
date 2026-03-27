@@ -789,6 +789,7 @@ async function runAgentTurn(session: ChatSession, agent: Agent, input: AgentTurn
     if (event.type === 'message_end') {
       if (event.message.role === 'assistant') {
         overflowRecovery.handleAssistantMessage(event.message);
+        syncSessionFromAgent(session, agent.state.messages);
         return;
       }
 

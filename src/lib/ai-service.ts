@@ -18,12 +18,25 @@ import {
 import { compactForOverflow, compactIfNeeded, getCompressedPath } from './ai-compress.js';
 import { prepareAgentContext } from './ai-context.js';
 import { type ProxyStreamRequestPayload, streamProxyWithApiKey } from './ai-proxy.js';
-import { getChatDebugTurns, type ChatSession, getChatSession, getLatestChatSession, saveChatDebugTurns, saveChatSession } from './ai-persistence.js';
+import {
+  getChatDebugTurns,
+  type ChatSession,
+  type ChatSessionShell,
+  getChatSession,
+  getChatSessionShell,
+  getLatestChatSession,
+  getLatestChatSessionShell,
+  saveChatDebugTurns,
+  saveChatSession,
+  saveChatSessionShellPatch,
+  type UpdateChatSessionShellInput,
+} from './ai-persistence.js';
 import { getAITools } from './ai-tools/index.js';
 import * as loroDoc from './loro-doc.js';
 import { withCommitOrigin } from './loro-doc.js';
 import { SYSTEM_NODE_IDS } from '../types/index.js';
 import { scanAndTrackMentionedNodes, clearMentionedNodes } from './ai-mentioned-nodes.js';
+import { measureChatAsync } from './chat-profiler.js';
 
 const AI_SETTINGS_KEY = 'soma-ai-settings';
 const MAX_SESSION_DEBUG_TURNS = 12;
@@ -60,16 +73,22 @@ interface AgentRuntimeState {
   createdAt: number;
   currentSession: ChatSession | null;
   debugTurns: ChatTurnDebugRecord[];
-  hydrated: boolean;
-  restorePromise: Promise<void> | null;
+  shellHydrated: boolean;
+  bodyHydrated: boolean;
+  shellRestorePromise: Promise<void> | null;
+  bodyRestorePromise: Promise<void> | null;
+  restoreKey: string | null;
   temperature: number;
   maxTokens: number;
   thinkingLevel: ThinkingLevel | null;
   activeDebugTurnId: string | null;
+  pendingShellPatch: UpdateChatSessionShellInput | null;
+  pendingShellPatchTimer: ReturnType<typeof setTimeout> | null;
 }
 
 let agentSingleton: Agent | null = null;
 const agentRuntimeState = new WeakMap<Agent, AgentRuntimeState>();
+const allAgents = new Set<Agent>();
 export const agentRegistry = new Map<string, Agent>();
 let migrationPromise: Promise<void> | null = null;
 
@@ -121,12 +140,17 @@ function getAgentRuntimeState(agent: Agent): AgentRuntimeState {
       createdAt: Date.now(),
       currentSession: null,
       debugTurns: [],
-      hydrated: false,
-      restorePromise: null,
+      shellHydrated: false,
+      bodyHydrated: false,
+      shellRestorePromise: null,
+      bodyRestorePromise: null,
+      restoreKey: null,
       temperature: DEFAULT_AGENT_TEMPERATURE,
       maxTokens: DEFAULT_AGENT_MAX_TOKENS,
       thinkingLevel: null,
       activeDebugTurnId: null,
+      pendingShellPatch: null,
+      pendingShellPatchTimer: null,
     };
     agentRuntimeState.set(agent, state);
   }
@@ -276,31 +300,43 @@ export async function selectChatModel(
   provider: string,
   agent: Agent = getAIAgent(),
 ): Promise<Model<any>> {
-  await ensureAISettingsMigrated();
+  return measureChatAsync('model-switch', {
+    requestedModelId: modelId,
+    requestedProvider: provider,
+  }, async () => {
+    await ensureAISettingsMigrated();
 
-  const runtime = getAgentRuntimeState(agent);
-  const session = runtime.currentSession;
-  if (!session) {
-    throw new Error('Chat session is not ready yet.');
-  }
-
-  const resolvedModel = findAvailableModel(getAvailableModels(), modelId, provider);
-  if (!resolvedModel) {
-    throw new Error(`Model ${provider}/${modelId} is not available.`);
-  }
-
-  if (!resolvedModel.reasoning) {
-    runtime.thinkingLevel = null;
-    if (session) {
-      session.selectedThinkingLevel = null;
+    const runtime = getAgentRuntimeState(agent);
+    const session = runtime.currentSession;
+    if (!session) {
+      throw new Error('Chat session is not ready yet.');
     }
-  }
 
-  const agentConfig = readAgentConfigSafely();
-  applyAgentConfiguration(agent, session, agentConfig, resolvedModel);
-  writeAgentModelSelection(resolvedModel.id);
-  await persistChatSession(agent);
-  return resolvedModel;
+    const resolvedModel = findAvailableModel(getAvailableModels(), modelId, provider);
+    if (!resolvedModel) {
+      throw new Error(`Model ${provider}/${modelId} is not available.`);
+    }
+
+    if (!resolvedModel.reasoning) {
+      runtime.thinkingLevel = null;
+      if (session) {
+        session.selectedThinkingLevel = null;
+      }
+    }
+
+    const agentConfig = readAgentConfigSafely();
+    applyAgentConfiguration(agent, session, agentConfig, resolvedModel);
+    writeAgentModelSelection(resolvedModel.id);
+    await persistSessionShellPatch(agent, {
+      selectedModelId: resolvedModel.id,
+      selectedProvider: normalizeProviderId(resolvedModel.provider),
+      selectedThinkingLevel: resolvedModel.reasoning ? session.selectedThinkingLevel ?? null : null,
+    }, {
+      debounceMs: 500,
+      touchUpdatedAt: false,
+    });
+    return resolvedModel;
+  });
 }
 
 export async function selectThinkingLevel(
@@ -313,7 +349,12 @@ export async function selectThinkingLevel(
   const session = runtime.currentSession;
   if (session) {
     session.selectedThinkingLevel = level;
-    await persistChatSession(agent);
+    await persistSessionShellPatch(agent, {
+      selectedThinkingLevel: level,
+    }, {
+      debounceMs: 500,
+      touchUpdatedAt: false,
+    });
   }
 }
 
@@ -412,7 +453,7 @@ export function updateSessionTitle(agent: Agent, title: string): void {
   if (!session) return;
   session.title = title;
   notifyChatTitleChange(session.id, title);
-  void persistChatSession(agent);
+  void persistSessionShellPatch(agent, { title }, { touchUpdatedAt: true });
 }
 
 /**
@@ -446,6 +487,108 @@ function setCurrentSession(agent: Agent, session: ChatSession): ChatSession {
   }
 
   return session;
+}
+
+function setRuntimeRestoreKey(runtime: AgentRuntimeState, key: string): void {
+  if (runtime.restoreKey === key) {
+    return;
+  }
+
+  runtime.shellHydrated = false;
+  runtime.bodyHydrated = false;
+  runtime.shellRestorePromise = null;
+  runtime.bodyRestorePromise = null;
+  runtime.restoreKey = key;
+}
+
+function createSessionFromShell(shell: ChatSessionShell): ChatSession {
+  const session = createSession(shell.id);
+  session.title = shell.title;
+  session.createdAt = shell.createdAt;
+  session.updatedAt = shell.updatedAt;
+  session.selectedModelId = shell.selectedModelId ?? undefined;
+  session.selectedProvider = shell.selectedProvider ?? undefined;
+  session.selectedThinkingLevel = shell.selectedThinkingLevel ?? null;
+  return session;
+}
+
+function clearPendingShellPatch(runtime: AgentRuntimeState): UpdateChatSessionShellInput | null {
+  if (runtime.pendingShellPatchTimer !== null) {
+    clearTimeout(runtime.pendingShellPatchTimer);
+    runtime.pendingShellPatchTimer = null;
+  }
+
+  const pendingPatch = runtime.pendingShellPatch;
+  runtime.pendingShellPatch = null;
+  return pendingPatch;
+}
+
+async function persistSessionShellPatch(
+  agent: Agent,
+  patch: UpdateChatSessionShellInput,
+  options: {
+    debounceMs?: number;
+    touchUpdatedAt?: boolean;
+  } = {},
+): Promise<void> {
+  const runtime = getAgentRuntimeState(agent);
+  const session = runtime.currentSession;
+  if (!runtime.shellHydrated || !session) {
+    return;
+  }
+
+  if (patch.title !== undefined) {
+    session.title = patch.title;
+    if (patch.title) {
+      notifyChatTitleChange(session.id, patch.title);
+    }
+  }
+  if (patch.selectedModelId !== undefined) {
+    session.selectedModelId = patch.selectedModelId ?? undefined;
+  }
+  if (patch.selectedProvider !== undefined) {
+    session.selectedProvider = patch.selectedProvider ?? undefined;
+  }
+  if (patch.selectedThinkingLevel !== undefined) {
+    session.selectedThinkingLevel = patch.selectedThinkingLevel;
+  }
+
+  const writePatch = async (nextPatch: UpdateChatSessionShellInput) => {
+    try {
+      const persistedShell = await measureChatAsync('persist-chat-shell', {
+        sessionId: session.id,
+        patchKeys: Object.keys(nextPatch),
+        touchUpdatedAt: options.touchUpdatedAt ?? false,
+      }, () => saveChatSessionShellPatch(session.id, nextPatch, {
+        touchUpdatedAt: options.touchUpdatedAt,
+      }));
+      if (!persistedShell || getAgentRuntimeState(agent).currentSession !== session) {
+        return;
+      }
+      session.updatedAt = persistedShell.updatedAt;
+    } catch {
+      // Ignore persistence failures; chat should still function.
+    }
+  };
+
+  if ((options.debounceMs ?? 0) > 0) {
+    runtime.pendingShellPatch = {
+      ...(runtime.pendingShellPatch ?? {}),
+      ...patch,
+    };
+    if (runtime.pendingShellPatchTimer !== null) {
+      clearTimeout(runtime.pendingShellPatchTimer);
+    }
+    runtime.pendingShellPatchTimer = setTimeout(() => {
+      const pendingPatch = clearPendingShellPatch(runtime);
+      if (!pendingPatch) return;
+      void writePatch(pendingPatch);
+    }, options.debounceMs);
+    return;
+  }
+
+  clearPendingShellPatch(runtime);
+  await writePatch(patch);
 }
 
 function ensureCurrentSession(agent: Agent): ChatSession {
@@ -619,7 +762,12 @@ function createOverflowRecoveryCoordinator(session: ChatSession, agent: Agent) {
 
 async function ensureAgentHydrated(agent: Agent): Promise<void> {
   if (!supportsDynamicAgentConfiguration(agent)) return;
-  if (getAgentRuntimeState(agent).hydrated) return;
+  const runtime = getAgentRuntimeState(agent);
+  if (runtime.bodyHydrated) return;
+  if (agent.sessionId) {
+    await restoreChatSessionById(agent.sessionId, agent);
+    return;
+  }
   await restoreLatestChatSession(agent);
 }
 
@@ -788,6 +936,7 @@ export function createAgent(model: Model<any> = DEFAULT_CHAT_MODEL): Agent {
   }));
   agent.setSystemPrompt(getBuiltInAgentSystemPrompt());
   getAgentRuntimeState(agent);
+  allAgents.add(agent);
   return agent;
 }
 
@@ -809,83 +958,60 @@ export function getAgentForSession(sessionId: string): Agent {
   return agent;
 }
 
-export function restoreChatSessionById(sessionId: string, agent: Agent): Promise<void> {
+async function hydrateSessionBody(agent: Agent, sessionId: string): Promise<void> {
   const runtime = getAgentRuntimeState(agent);
-  if (runtime.hydrated) return Promise.resolve();
-
-  if (!runtime.restorePromise) {
-    runtime.restorePromise = (async () => {
-      try {
-        const session = await getChatSession(sessionId);
-        if (session) {
-          trimIncompleteTrail(session);
-          setCurrentSession(agent, session);
-          await restoreDebugTurns(session.id, agent);
-          agent.replaceMessages(getCompressedPath(session));
-          try {
-            await configureAgent(agent);
-          } catch {
-            // Keep default prompt/tools when config hydration fails.
-          }
-          runtime.hydrated = true;
-          return;
+  await measureChatAsync('hydrate-chat-body', { sessionId }, async () => {
+    try {
+      const session = await getChatSession(sessionId);
+      if (session) {
+        trimIncompleteTrail(session);
+        setCurrentSession(agent, session);
+        await restoreDebugTurns(session.id, agent);
+        agent.replaceMessages(getCompressedPath(session));
+        try {
+          await configureAgent(agent);
+        } catch {
+          // Keep default prompt/tools when config hydration fails.
         }
-      } catch {
-        // IndexedDB is unavailable in some test/browser contexts.
+        runtime.bodyHydrated = true;
+        return;
       }
+    } catch {
+      // IndexedDB is unavailable in some test/browser contexts.
+    }
 
-      const createdSession = createSession(sessionId);
-      let persistedSession = createdSession;
-      try {
-        persistedSession = await saveChatSession(createdSession);
-      } catch {
-        // Ignore persistence failures; chat should still function.
-      }
-
-      setCurrentSession(agent, persistedSession);
+    const currentSession = runtime.currentSession;
+    if (currentSession?.id === sessionId) {
       setCurrentDebugTurns(agent, []);
       agent.replaceMessages([]);
-      try {
-        await configureAgent(agent);
-      } catch {
-        // Keep default prompt/tools when config hydration fails.
-      }
-      runtime.hydrated = true;
-    })();
-  }
-
-  return runtime.restorePromise;
+      runtime.bodyHydrated = true;
+    }
+  });
 }
 
-export function restoreLatestChatSession(agent: Agent = getAIAgent()): Promise<void> {
+async function prepareSessionShell(
+  agent: Agent,
+  options: {
+    key: string;
+    shellLoader: () => Promise<ChatSessionShell | null>;
+    fallbackSession: () => ChatSession;
+  },
+): Promise<void> {
   const runtime = getAgentRuntimeState(agent);
-  if (runtime.hydrated) return Promise.resolve();
+  setRuntimeRestoreKey(runtime, options.key);
+  if (runtime.shellHydrated) return;
 
-  // Share a single restore promise so React StrictMode's double-invoked
-  // effects await the same IndexedDB read instead of the second call
-  // resolving immediately with an empty agent.
-  if (!runtime.restorePromise) {
-    runtime.restorePromise = (async () => {
+  if (!runtime.shellRestorePromise) {
+    runtime.shellRestorePromise = measureChatAsync('hydrate-chat-shell', { restoreKey: options.key }, async () => {
+      let shell: ChatSessionShell | null = null;
       try {
-        const latestSession = await getLatestChatSession();
-        if (latestSession) {
-          trimIncompleteTrail(latestSession);
-          setCurrentSession(agent, latestSession);
-          await restoreDebugTurns(latestSession.id, agent);
-          agent.replaceMessages(getCompressedPath(latestSession));
-          try {
-            await configureAgent(agent);
-          } catch {
-            // Keep default prompt/tools when config hydration fails.
-          }
-          runtime.hydrated = true;
-          return;
-        }
+        shell = await options.shellLoader();
       } catch {
-        // IndexedDB is unavailable in some test/browser contexts.
+        shell = null;
       }
 
-      setCurrentSession(agent, createSession());
+      const session = shell ? createSessionFromShell(shell) : options.fallbackSession();
+      setCurrentSession(agent, session);
       setCurrentDebugTurns(agent, []);
       agent.replaceMessages([]);
       try {
@@ -893,11 +1019,46 @@ export function restoreLatestChatSession(agent: Agent = getAIAgent()): Promise<v
       } catch {
         // Keep default prompt/tools when config hydration fails.
       }
-      runtime.hydrated = true;
-    })();
+      runtime.shellHydrated = true;
+      runtime.bodyHydrated = !shell;
+      runtime.bodyRestorePromise = shell
+        ? hydrateSessionBody(agent, shell.id)
+        : Promise.resolve();
+    });
   }
 
-  return runtime.restorePromise;
+  return runtime.shellRestorePromise;
+}
+
+export function prepareChatSessionById(sessionId: string, agent: Agent): Promise<void> {
+  return prepareSessionShell(agent, {
+    key: `session:${sessionId}`,
+    shellLoader: () => getChatSessionShell(sessionId),
+    fallbackSession: () => createSession(sessionId),
+  });
+}
+
+export function prepareLatestChatSession(agent: Agent = getAIAgent()): Promise<void> {
+  return prepareSessionShell(agent, {
+    key: 'latest',
+    shellLoader: () => getLatestChatSessionShell(),
+    fallbackSession: () => createSession(),
+  });
+}
+
+export async function waitForChatSessionBody(agent: Agent = getAIAgent()): Promise<void> {
+  const runtime = getAgentRuntimeState(agent);
+  await runtime.bodyRestorePromise;
+}
+
+export async function restoreChatSessionById(sessionId: string, agent: Agent): Promise<void> {
+  await prepareChatSessionById(sessionId, agent);
+  await waitForChatSessionBody(agent);
+}
+
+export async function restoreLatestChatSession(agent: Agent = getAIAgent()): Promise<void> {
+  await prepareLatestChatSession(agent);
+  await waitForChatSessionBody(agent);
 }
 
 let chatSyncNudgeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -914,14 +1075,18 @@ function debouncedSyncNudge(): void {
 
 export async function persistChatSession(agent: Agent = getAIAgent()): Promise<void> {
   const runtime = getAgentRuntimeState(agent);
-  if (!runtime.hydrated) return;
+  if (!runtime.shellHydrated || !runtime.bodyHydrated) return;
   if (!runtime.currentSession) return;
 
   try {
-    const [persistedSession, persistedTurns] = await Promise.all([
-      saveChatSession(runtime.currentSession),
-      saveChatDebugTurns(runtime.currentSession.id, runtime.debugTurns),
-    ]);
+    clearPendingShellPatch(runtime);
+    const [persistedSession, persistedTurns] = await measureChatAsync('persist-chat-session', {
+      sessionId: runtime.currentSession.id,
+      messageCount: getLinearPath(runtime.currentSession).length,
+    }, async () => Promise.all([
+      saveChatSession(runtime.currentSession!),
+      saveChatDebugTurns(runtime.currentSession!.id, runtime.debugTurns),
+    ]));
     runtime.currentSession.updatedAt = persistedSession.updatedAt;
     runtime.debugTurns = persistedTurns;
 
@@ -936,8 +1101,11 @@ export async function createNewChatSession(agent: Agent = getAIAgent()): Promise
   agent.abort();
   agent.reset();
   setCurrentSession(agent, createSession());
-  runtime.hydrated = true;
-  runtime.restorePromise = null;
+  runtime.shellHydrated = true;
+  runtime.bodyHydrated = true;
+  runtime.shellRestorePromise = Promise.resolve();
+  runtime.bodyRestorePromise = Promise.resolve();
+  runtime.restoreKey = agent.sessionId ? `session:${agent.sessionId}` : 'latest';
   clearMentionedNodes();
   await configureAgent(agent);
   await persistChatSession(agent);
@@ -1041,7 +1209,19 @@ export function hasSteering(agent: Agent = getAIAgent()): boolean {
   return agent.hasQueuedMessages();
 }
 
+export function isChatSessionShellReady(agent: Agent = getAIAgent()): boolean {
+  return getAgentRuntimeState(agent).shellHydrated;
+}
+
+export function isChatSessionBodyReady(agent: Agent = getAIAgent()): boolean {
+  return getAgentRuntimeState(agent).bodyHydrated;
+}
+
 export function resetAIAgentForTests(): void {
+  for (const agent of allAgents) {
+    clearPendingShellPatch(getAgentRuntimeState(agent));
+  }
+  allAgents.clear();
   agentSingleton = null;
   agentRegistry.clear();
   migrationPromise = null;

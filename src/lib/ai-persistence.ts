@@ -2,12 +2,16 @@ import type { AgentMessage } from '@mariozechner/pi-agent-core';
 import { openDB, type DBSchema, type IDBPDatabase, type IDBPTransaction, unwrap } from 'idb';
 import { linearToTree } from './ai-chat-tree.js';
 import type { BridgeEntry, ChatSession, MessageNode } from './ai-chat-tree.js';
-import { buildChatSessionSearchSummary, buildChatSessionUserMessageSummaries } from './ai-chat-summary.js';
+import {
+  buildChatSessionSearchSummary,
+  buildChatSessionUserMessageSummaries,
+  joinChatSessionSearchText,
+} from './ai-chat-summary.js';
 import type { ChatTurnDebugRecord } from './ai-debug.js';
 import { IMAGE_PLACEHOLDER, messageHasImage, replaceMessageImages } from './ai-message-images.js';
 
 const DB_NAME = 'soma-ai-chat';
-const DB_VERSION = 5;
+const DB_VERSION = 6;
 const STORE_NAME = 'sessions';
 const META_STORE_NAME = 'session-metas';
 const USER_MESSAGE_META_STORE_NAME = 'session-user-metas';
@@ -22,9 +26,31 @@ const ALL_STORE_NAMES = [STORE_NAME, META_STORE_NAME, USER_MESSAGE_META_STORE_NA
 export interface ChatSessionMeta {
   id: string;
   title: string | null;
+  createdAt: number;
   updatedAt: number;
+  selectedModelId: string | null;
+  selectedProvider: string | null;
+  selectedThinkingLevel: ChatSession['selectedThinkingLevel'] | null;
+  contentSearchText: string;
   searchText: string;
   userMessageCount: number;
+}
+
+export interface ChatSessionShell {
+  id: string;
+  title: string | null;
+  createdAt: number;
+  updatedAt: number;
+  selectedModelId: string | null;
+  selectedProvider: string | null;
+  selectedThinkingLevel: ChatSession['selectedThinkingLevel'] | null;
+}
+
+export interface UpdateChatSessionShellInput {
+  title?: string | null;
+  selectedModelId?: string | null;
+  selectedProvider?: string | null;
+  selectedThinkingLevel?: ChatSession['selectedThinkingLevel'] | null;
 }
 
 export interface ChatSessionUserMessageMeta {
@@ -122,14 +148,48 @@ function normalizeChatDebugTurns(turns: ChatTurnDebugRecord[] | null | undefined
 }
 
 function toSessionMeta(session: ChatSession): ChatSessionMeta {
-  const { searchText, userMessageCount } = buildChatSessionSearchSummary(session);
+  const { contentSearchText, searchText, userMessageCount } = buildChatSessionSearchSummary(session);
 
   return {
     id: session.id,
     title: session.title ?? null,
+    createdAt: session.createdAt,
     updatedAt: session.updatedAt,
+    selectedModelId: session.selectedModelId ?? null,
+    selectedProvider: session.selectedProvider ?? null,
+    selectedThinkingLevel: session.selectedThinkingLevel ?? null,
+    contentSearchText,
     searchText,
     userMessageCount,
+  };
+}
+
+function toSessionShell(session: Pick<ChatSessionMeta, keyof ChatSessionShell>): ChatSessionShell {
+  return {
+    id: session.id,
+    title: session.title ?? null,
+    createdAt: session.createdAt,
+    updatedAt: session.updatedAt,
+    selectedModelId: session.selectedModelId ?? null,
+    selectedProvider: session.selectedProvider ?? null,
+    selectedThinkingLevel: session.selectedThinkingLevel ?? null,
+  };
+}
+
+function applySessionShellPatch<T extends ChatSession | ChatSessionMeta>(
+  session: T,
+  patch: UpdateChatSessionShellInput,
+  updatedAt: number,
+): T {
+  return {
+    ...session,
+    title: patch.title !== undefined ? patch.title : session.title,
+    updatedAt,
+    selectedModelId: patch.selectedModelId !== undefined ? patch.selectedModelId : session.selectedModelId,
+    selectedProvider: patch.selectedProvider !== undefined ? patch.selectedProvider : session.selectedProvider,
+    selectedThinkingLevel: patch.selectedThinkingLevel !== undefined
+      ? patch.selectedThinkingLevel
+      : session.selectedThinkingLevel,
   };
 }
 
@@ -248,9 +308,9 @@ async function getDB(): Promise<IDBPDatabase<ChatPersistenceDB>> {
       const userMessageStore = ensureUserMessageMetaStore(db, transaction);
       const debugStore = ensureDebugStore(db, transaction);
 
-      if (oldVersion < 3 || oldVersion < 4 || oldVersion < 5) {
+      if (oldVersion < 3 || oldVersion < 4 || oldVersion < 5 || oldVersion < 6) {
         backfillDerivedSessionStores(sessionStore, {
-          metaStore: oldVersion < 4 ? metaStore : null,
+          metaStore: oldVersion < 4 || oldVersion < 6 ? metaStore : null,
           userMessageStore: oldVersion < 5 ? userMessageStore : null,
           debugStore: oldVersion < 3 ? debugStore : null,
         });
@@ -344,6 +404,43 @@ export async function saveChatSession(session: ChatSession): Promise<ChatSession
   return nextSession;
 }
 
+export async function saveChatSessionShellPatch(
+  sessionId: string,
+  patch: UpdateChatSessionShellInput,
+  options: {
+    touchUpdatedAt?: boolean;
+  } = {},
+): Promise<ChatSessionShell | null> {
+  const db = await getDB();
+  const tx = db.transaction(SESSION_META_STORE_NAMES, 'readwrite');
+  const store = tx.objectStore(STORE_NAME);
+  const metaStore = tx.objectStore(META_STORE_NAME);
+  const existing = await store.get(sessionId);
+
+  if (!existing) {
+    await tx.done;
+    return null;
+  }
+
+  const existingSession = normalizeChatSession(existing);
+  const existingMeta = (await metaStore.get(sessionId)) ?? toSessionMeta(existingSession);
+  const nextUpdatedAt = options.touchUpdatedAt ? Date.now() : existingSession.updatedAt;
+  const nextSession = applySessionShellPatch(existingSession, patch, nextUpdatedAt);
+  const nextMetaBase = applySessionShellPatch(existingMeta, patch, nextUpdatedAt);
+  const nextMeta: ChatSessionMeta = {
+    ...nextMetaBase,
+    contentSearchText: existingMeta.contentSearchText ?? '',
+    searchText: joinChatSessionSearchText(nextMetaBase.title, existingMeta.contentSearchText ?? ''),
+    userMessageCount: existingMeta.userMessageCount ?? 0,
+  };
+
+  await store.put(nextSession);
+  await metaStore.put(nextMeta);
+  await tx.done;
+
+  return toSessionShell(nextMeta);
+}
+
 export async function getChatSession(sessionId: string): Promise<ChatSession | null> {
   const db = await getDB();
   const session = await db.get(STORE_NAME, sessionId);
@@ -353,6 +450,11 @@ export async function getChatSession(sessionId: string): Promise<ChatSession | n
 export async function getChatSessionMeta(sessionId: string): Promise<ChatSessionMeta | null> {
   const db = await getDB();
   return (await db.get(META_STORE_NAME, sessionId)) ?? null;
+}
+
+export async function getChatSessionShell(sessionId: string): Promise<ChatSessionShell | null> {
+  const meta = await getChatSessionMeta(sessionId);
+  return meta ? toSessionShell(meta) : null;
 }
 
 export async function getLatestChatSession(): Promise<ChatSession | null> {
@@ -370,6 +472,23 @@ export async function getLatestChatSession(): Promise<ChatSession | null> {
   const session = await tx.objectStore(STORE_NAME).get(metaCursor.value.id);
   await tx.done;
   return session ? normalizeChatSession(session) : null;
+}
+
+export async function getLatestChatSessionShell(): Promise<ChatSessionShell | null> {
+  const db = await getDB();
+  const tx = db.transaction(META_STORE_NAME, 'readonly');
+  const metaCursor = await tx.objectStore(META_STORE_NAME)
+    .index(UPDATED_AT_INDEX)
+    .openCursor(null, 'prev');
+
+  if (!metaCursor) {
+    await tx.done;
+    return null;
+  }
+
+  const shell = toSessionShell(metaCursor.value);
+  await tx.done;
+  return shell;
 }
 
 export async function listChatSessionMetas(): Promise<ChatSessionMeta[]> {

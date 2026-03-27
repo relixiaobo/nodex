@@ -1,5 +1,6 @@
 import 'fake-indexeddb/auto';
 import { deleteDB } from 'idb';
+import { vi } from 'vitest';
 import * as aiPersistence from '../../src/lib/ai-persistence.js';
 import { getChatSession, resetChatPersistenceForTests } from '../../src/lib/ai-persistence.js';
 import { useUIStore } from '../../src/stores/ui-store.js';
@@ -12,6 +13,13 @@ import {
 import { resetAndSeed } from './helpers/test-state.js';
 
 const DB_NAME = 'soma-ai-chat';
+
+async function expectSessionPersisted(sessionId: string): Promise<void> {
+  await vi.waitFor(async () => {
+    const persisted = await getChatSession(sessionId);
+    expect(persisted?.id).toBe(sessionId);
+  });
+}
 
 describe('chat-panel-actions', () => {
   beforeEach(async () => {
@@ -30,8 +38,7 @@ describe('chat-panel-actions', () => {
     expect(state.currentNodeId).toBe('proj_1');
     expect(state.currentChatSessionId).toBe(sessionId);
 
-    const persisted = await getChatSession(sessionId);
-    expect(persisted?.id).toBe(sessionId);
+    await expectSessionPersisted(sessionId);
   });
 
   it('dedupes concurrent ensureChatSession calls into one persisted session', async () => {
@@ -45,6 +52,7 @@ describe('chat-panel-actions', () => {
     expect(firstSessionId).toBe(secondSessionId);
     expect(saveChatSessionSpy).toHaveBeenCalledTimes(1);
     expect(useUIStore.getState().currentChatSessionId).toBe(firstSessionId);
+    await expectSessionPersisted(firstSessionId);
   });
 
   it('openNewChatDrawer creates a new persisted session and opens the drawer', async () => {
@@ -55,12 +63,12 @@ describe('chat-panel-actions', () => {
     expect(state.currentChatSessionId).toBe(sessionId);
     expect(state.currentNodeId).toBe('proj_1');
 
-    const persisted = await getChatSession(sessionId);
-    expect(persisted?.id).toBe(sessionId);
+    await expectSessionPersisted(sessionId);
   });
 
   it('focusOrOpenChat focuses an existing session instead of creating another one', async () => {
     const existingSessionId = await ensureChatSession();
+    await expectSessionPersisted(existingSessionId);
 
     useUIStore.getState().closeChatDrawer();
     await focusOrOpenChat();
@@ -72,6 +80,7 @@ describe('chat-panel-actions', () => {
 
   it('openChatWithPrompt reuses the existing chat session and queues the prompt', async () => {
     const existingSessionId = await ensureChatSession();
+    await expectSessionPersisted(existingSessionId);
 
     useUIStore.getState().closeChatDrawer();
     await openChatWithPrompt('Explain this page');
@@ -83,6 +92,8 @@ describe('chat-panel-actions', () => {
       sessionId: existingSessionId,
       prompt: 'Explain this page',
     });
+
+    await expectSessionPersisted(existingSessionId);
   });
 
   it('openChatWithPrompt creates a new chat session when none exists', async () => {
@@ -95,5 +106,6 @@ describe('chat-panel-actions', () => {
       sessionId: state.currentChatSessionId!,
       prompt: 'Start fresh',
     });
+    await expectSessionPersisted(state.currentChatSessionId!);
   });
 });

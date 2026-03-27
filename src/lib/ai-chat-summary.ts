@@ -47,16 +47,8 @@ export function getVisibleUserMessages(session: ChatSession): Array<{ node: Mess
     .filter((entry) => entry.text.length > 0);
 }
 
-export function buildChatSessionSearchText(
-  session: ChatSession,
-  title: string | null | undefined = session.title,
-): string {
+export function buildChatSessionContentSearchText(session: ChatSession): string {
   const parts: string[] = [];
-  const normalizedTitle = title?.trim();
-
-  if (normalizedTitle) {
-    parts.push(normalizedTitle);
-  }
 
   for (const node of getActivePath(session)) {
     const message = node.message;
@@ -77,12 +69,39 @@ export function buildChatSessionSearchText(
   return parts.join('\n\n');
 }
 
+export function joinChatSessionSearchText(
+  title: string | null | undefined,
+  contentSearchText: string,
+): string {
+  const parts: string[] = [];
+  const normalizedTitle = title?.trim();
+
+  if (normalizedTitle) {
+    parts.push(normalizedTitle);
+  }
+
+  if (contentSearchText.trim().length > 0) {
+    parts.push(contentSearchText);
+  }
+
+  return parts.join('\n\n');
+}
+
+export function buildChatSessionSearchText(
+  session: ChatSession,
+  title: string | null | undefined = session.title,
+): string {
+  return joinChatSessionSearchText(title, buildChatSessionContentSearchText(session));
+}
+
 export function buildChatSessionSearchSummary(
   session: ChatSession,
   title: string | null | undefined = session.title,
-): { searchText: string; userMessageCount: number } {
+): { contentSearchText: string; searchText: string; userMessageCount: number } {
+  const contentSearchText = buildChatSessionContentSearchText(session);
   return {
-    searchText: buildChatSessionSearchText(session, title),
+    contentSearchText,
+    searchText: joinChatSessionSearchText(title, contentSearchText),
     userMessageCount: getVisibleUserMessages(session).length,
   };
 }

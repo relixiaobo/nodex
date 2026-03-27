@@ -12,14 +12,17 @@ import {
   getAIAgent,
   getThinkingLevel,
   hasSteering,
+  isChatSessionBodyReady,
+  isChatSessionShellReady,
+  prepareChatSessionById,
+  prepareLatestChatSession,
   regenerateResponse,
-  restoreChatSessionById,
-  restoreLatestChatSession,
   setSteeringNote,
   stopStreaming,
   streamChat,
   switchMessageBranch,
   updateSessionTitle,
+  waitForChatSessionBody,
 } from '../lib/ai-service.js';
 
 export type ChatConversationMessage = UserMessage | AssistantMessage;
@@ -100,21 +103,31 @@ function getConversationMessages(agent: Agent): ChatMessageEntry[] {
 
 export function useAgent(agent: Agent = getAIAgent(), sessionId?: string) {
   const [revision, setRevision] = useState(0);
-  const [ready, setReady] = useState(false);
+  const [ready, setReady] = useState(() => isChatSessionShellReady(agent));
+  const [messagesReady, setMessagesReady] = useState(() => isChatSessionBodyReady(agent));
 
   useEffect(() => {
     let cancelled = false;
     setReady(false);
+    setMessagesReady(false);
 
-    const restore = sessionId
-      ? restoreChatSessionById(sessionId, agent)
-      : restoreLatestChatSession(agent);
+    const restoreShell = sessionId
+      ? prepareChatSessionById(sessionId, agent)
+      : prepareLatestChatSession(agent);
 
-    void restore.finally(() => {
+    void restoreShell.finally(() => {
       if (cancelled) return;
       setReady(true);
       startTransition(() => {
         setRevision((value) => value + 1);
+      });
+
+      void waitForChatSessionBody(agent).finally(() => {
+        if (cancelled) return;
+        setMessagesReady(true);
+        startTransition(() => {
+          setRevision((value) => value + 1);
+        });
       });
     });
 
@@ -142,6 +155,7 @@ export function useAgent(agent: Agent = getAIAgent(), sessionId?: string) {
     return {
       agent,
       ready,
+      messagesReady,
       sessionId: agent.sessionId ?? null,
       sessionTitle: getCurrentSession(agent)?.title ?? null,
       messages,
@@ -180,10 +194,12 @@ export function useAgent(agent: Agent = getAIAgent(), sessionId?: string) {
       },
       newChat: async () => {
         await createNewChatSession(agent);
+        setReady(true);
+        setMessagesReady(true);
         startTransition(() => {
           setRevision((value) => value + 1);
         });
       },
     };
-  }, [agent, ready, revision]);
+  }, [agent, messagesReady, ready, revision]);
 }

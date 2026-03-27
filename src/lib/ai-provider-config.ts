@@ -264,6 +264,13 @@ export function getApiKeyForProvider(provider: string): string | null {
 
 /** @internal Tracks Model instances created by buildCustomModel(). */
 const customModelSet = new WeakSet<Model<Api>>();
+let availableModelsCache:
+  | {
+    signature: string;
+    models: Model<Api>[];
+    modelsWithMeta: AvailableModel[];
+  }
+  | null = null;
 
 /** Check whether a Model was created by buildCustomModel(). */
 function isCustomModel(model: Model<Api>): boolean {
@@ -324,11 +331,21 @@ function buildCustomModel(
 }
 
 export function getAvailableModels(): Model<Api>[] {
-  const knownProviders = new Set(getProviders().map((provider) => normalizeProviderId(provider)));
   const enabledConfigs = getCanonicalProviderConfigs(getProviderConfigs())
     .filter((config) => config.enabled);
+  const signature = JSON.stringify(enabledConfigs.map((config) => ({
+    provider: normalizeProviderId(config.provider),
+    baseUrl: config.baseUrl ?? '',
+    nodeId: config.nodeId,
+    models: readListFieldValues(config.nodeId, NDX_F.PROVIDER_MODELS),
+  })));
 
-  return enabledConfigs.flatMap((config) => {
+  if (availableModelsCache?.signature === signature) {
+    return availableModelsCache.models;
+  }
+
+  const knownProviders = new Set(getProviders().map((provider) => normalizeProviderId(provider)));
+  const models = enabledConfigs.flatMap((config) => {
     const provider = normalizeProviderId(config.provider);
 
     // SDK built-in models (only for known providers)
@@ -354,6 +371,27 @@ export function getAvailableModels(): Model<Api>[] {
 
     return [...sdkModels, ...customModels];
   });
+
+  availableModelsCache = {
+    signature,
+    models,
+    modelsWithMeta: models.map((model) => {
+      // Custom models are never featured, even if their ID coincidentally
+      // matches a featured model name.
+      const custom = isCustomModel(model);
+      const featured = FEATURED_MODELS[normalizeProviderId(model.provider)];
+      const entry = custom ? undefined : featured?.find((f) => f.id === model.id);
+      return {
+        id: model.id,
+        name: model.name,
+        provider: model.provider,
+        reasoning: model.reasoning,
+        featured: !!entry,
+      };
+    }),
+  };
+
+  return availableModelsCache.models;
 }
 
 export function hasAnyEnabledProvider(): boolean {
@@ -371,9 +409,12 @@ export function getFeaturedModelIds(): Set<string> {
 }
 
 export function getAvailableModelsWithMeta(): AvailableModel[] {
-  return getAvailableModels().map((model) => {
-    // Custom models are never featured, even if their ID coincidentally
-    // matches a featured model name.
+  const models = getAvailableModels();
+  if (availableModelsCache?.models === models) {
+    return availableModelsCache.modelsWithMeta;
+  }
+
+  return models.map((model) => {
     const custom = isCustomModel(model);
     const featured = FEATURED_MODELS[normalizeProviderId(model.provider)];
     const entry = custom ? undefined : featured?.find((f) => f.id === model.id);

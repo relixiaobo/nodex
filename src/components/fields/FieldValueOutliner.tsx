@@ -13,8 +13,10 @@
 import { useMemo, useState, useCallback, useRef, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useNodeStore } from '../../stores/node-store';
+import { useNode } from '../../hooks/use-node';
 import { useChildren } from '../../hooks/use-children';
 import { useNodeFields, type FieldEntry } from '../../hooks/use-node-fields';
+import { useNodeScopeRevision } from '../../hooks/use-node-scope-revision.js';
 import { OutlinerItem } from '../outliner/OutlinerItem';
 import { RowHost } from '../outliner/RowHost.js';
 import { TrailingInput } from '../editor/TrailingInput';
@@ -150,18 +152,13 @@ function PasswordFieldEditor({ fieldEntryId, selectableChildIds }: { fieldEntryI
 }
 
 export function FieldValueOutliner({ fieldEntryId, fieldDataType, attrDefId, configNodeId, onNavigateOut, panelId = 'node-main' }: FieldValueOutlinerProps) {
-  useChildren(fieldEntryId);
+  const childNodes = useChildren(fieldEntryId);
+  const fieldEntryNode = useNode(fieldEntryId);
+  const attrDefNode = useNode(attrDefId ?? null);
+  const configNode = useNode(configNodeId ?? null);
+  const scopeRevision = useNodeScopeRevision(fieldEntryId);
 
-  // Values are fieldEntry.children (no key prefix in new model)
-  const childIdsJson = useNodeStore((s) => {
-    void s._version;
-    const t = s.getNode(fieldEntryId);
-    const c = t?.children ?? [];
-    return JSON.stringify(c);
-  });
-  const childIds: string[] = useMemo(() => JSON.parse(childIdsJson), [childIdsJson]);
-
-  const _version = useNodeStore((s) => s._version);
+  const childIds = useMemo(() => childNodes.map((node) => node.id), [childNodes]);
 
   // Detect nested field entries created via > inside field values
   const fields = useNodeFields(fieldEntryId);
@@ -185,7 +182,7 @@ export function FieldValueOutliner({ fieldEntryId, fieldDataType, attrDefId, con
     }
     return result;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [childIds, fieldMap, _version]);
+  }, [childIds, fieldMap, scopeRevision]);
 
   const selectableChildIds = useMemo(
     () => visibleChildren.map((c) => c.id),
@@ -200,22 +197,20 @@ export function FieldValueOutliner({ fieldEntryId, fieldDataType, attrDefId, con
   const setFocusedNode = useUIStore((s) => s.setFocusedNode);
   const clearFocus = useUIStore((s) => s.clearFocus);
   const setEditingFieldName = useUIStore((s) => s.setEditingFieldName);
-  const canEditValues = useNodeStore((s) => {
-    void s._version;
+  const canEditValues = useMemo(() => {
     if (configNodeId && fieldEntryId.startsWith('__virtual_')) {
-      return getNodeCapabilities(configNodeId).canEditFieldValues;
+      return !!configNode && getNodeCapabilities(configNodeId).canEditFieldValues;
     }
     return canEditFieldEntryValue(fieldEntryId);
-  });
-  const canCreateValueChildren = useNodeStore((s) => {
-    void s._version;
-    return canCreateChildrenUnder(fieldEntryId);
-  });
-  const renderSingleSelectOptionsPicker = useNodeStore((s) => {
-    void s._version;
-    if (!attrDefId) return false;
-    return shouldRenderSingleSelectOptionsPicker(fieldDataType, s.getNode(attrDefId));
-  });
+  }, [configNode, configNodeId, fieldEntryId]);
+  const canCreateValueChildren = useMemo(
+    () => canCreateChildrenUnder(fieldEntryId),
+    [fieldEntryId, fieldEntryNode, scopeRevision],
+  );
+  const renderSingleSelectOptionsPicker = useMemo(
+    () => shouldRenderSingleSelectOptionsPicker(fieldDataType, attrDefNode),
+    [attrDefNode, fieldDataType],
+  );
 
   // Drop zone hooks (must be before early returns)
   const moveNodeTo = useNodeStore((s) => s.moveNodeTo);

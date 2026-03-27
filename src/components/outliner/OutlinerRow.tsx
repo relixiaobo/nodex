@@ -8,6 +8,7 @@
  * identical interaction behavior regardless of row type or container context.
  */
 import { useCallback, useEffect, type ReactNode } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useUIStore } from '../../stores/ui-store.js';
 import { useNodeStore } from '../../stores/node-store.js';
 import * as loroDoc from '../../lib/loro-doc.js';
@@ -30,6 +31,7 @@ import {
 import { resolveSelectionKeyboardAction } from '../../lib/selection-keyboard.js';
 import { copyNodesToClipboard, cutNodesToClipboard } from '../../lib/node-clipboard.js';
 import { isNodeInTrash } from '../../lib/node-capabilities.js';
+import { getRootScopeRowIds } from '../../lib/root-scope-row-registry.js';
 
 // ── Public types ──
 
@@ -39,7 +41,7 @@ export interface RowInteractionConfig {
   /** Parent node ID */
   parentId: string;
   /** Top-level selectable row IDs within the root scope */
-  rootChildIds: string[];
+  rootChildIds?: string[];
   /** Root node ID for selection flat-list computation */
   rootNodeId: string;
   /** Panel ID for multi-panel expanded-node scoping */
@@ -78,28 +80,22 @@ interface OutlinerRowProps {
 // ── Selection state derivation ──
 
 export function useRowSelectionState(rowId: string, parentId: string, panelId: string) {
-  const isInSelectedSet = useUIStore((s) => s.selectedNodeIds.has(rowId));
-  const isMultiSelected = useUIStore((s) => s.selectedNodeIds.size > 1);
-  const isSelectionAnchor = useUIStore((s) => s.selectionAnchorId === rowId);
-  const focusedNodeId = useUIStore((s) => s.focusedNodeId);
-  const focusedPanelId = useUIStore((s) => s.focusedPanelId);
-  const selectedParentId = useUIStore((s) => s.selectedParentId);
-  const selectedPanelId = useUIStore((s) => s.selectedPanelId);
+  return useUIStore(useShallow((s) => {
+    const isMultiSelected = s.selectedNodeIds.size > 1;
+    const isFocused = s.focusedNodeId === rowId && s.focusedPanelId === panelId;
+    const isSelected = s.selectedPanelId === panelId && s.selectedNodeIds.has(rowId) && (
+      isMultiSelected ||
+      s.selectedParentId === null ||
+      s.selectedParentId === parentId
+    );
 
-  const isFocused = focusedNodeId === rowId && focusedPanelId === panelId;
-
-  const isSelected = selectedPanelId === panelId && isInSelectedSet && (
-    isMultiSelected ||
-    selectedParentId === null ||
-    selectedParentId === parentId
-  );
-
-  return {
-    isSelected,
-    isMultiSelected,
-    isSelectionAnchor,
-    isFocused,
-  };
+    return {
+      isSelected,
+      isMultiSelected,
+      isSelectionAnchor: s.selectionAnchorId === rowId,
+      isFocused,
+    };
+  }));
 }
 
 // ── Component ──
@@ -125,7 +121,6 @@ export function OutlinerRow({ config, children }: OutlinerRowProps) {
   const setFocusedNode = useUIStore((s) => s.setFocusedNode);
   const clearFocus = useUIStore((s) => s.clearFocus);
   const setExpanded = useUIStore((s) => s.setExpanded);
-  const expandedNodes = useUIStore((s) => s.expandedNodes);
   const setPendingInputChar = useUIStore((s) => s.setPendingInputChar);
 
   const trashNode = useNodeStore((s) => s.trashNode);
@@ -143,6 +138,8 @@ export function OutlinerRow({ config, children }: OutlinerRowProps) {
   useEffect(() => {
     // Only active when selected but not focused/editing
     if (!isSelected || isFocused || isEditing) return;
+
+    const getRootRows = () => getRootScopeRowIds(rootNodeId, panelId, rootChildIds ?? []);
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.defaultPrevented) return;
@@ -200,7 +197,7 @@ export function OutlinerRow({ config, children }: OutlinerRowProps) {
       if (selAction === 'batch_delete') {
         e.preventDefault();
         const latestUi = useUIStore.getState();
-        const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId, panelId);
+        const flatList = getFlattenedVisibleNodes(getRootRows(), latestUi.expandedNodes, rootNodeId, panelId);
         const bounds = getSelectionBounds(latestUi.selectedNodeIds, flatList);
         const prev = bounds ? getPreviousVisibleNode(bounds.first.nodeId, bounds.first.parentId, flatList) : null;
         const orderedIds = getSelectedIdsInOrder(latestUi.selectedNodeIds, flatList);
@@ -231,7 +228,7 @@ export function OutlinerRow({ config, children }: OutlinerRowProps) {
       if (selAction === 'batch_indent') {
         e.preventDefault();
         const latestUi = useUIStore.getState();
-        const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId, panelId);
+        const flatList = getFlattenedVisibleNodes(getRootRows(), latestUi.expandedNodes, rootNodeId, panelId);
         const orderedIds = getSelectedIdsInOrder(latestUi.selectedNodeIds, flatList);
 
         for (const id of orderedIds) {
@@ -257,7 +254,7 @@ export function OutlinerRow({ config, children }: OutlinerRowProps) {
       if (selAction === 'batch_outdent') {
         e.preventDefault();
         const latestUi = useUIStore.getState();
-        const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId, panelId);
+        const flatList = getFlattenedVisibleNodes(getRootRows(), latestUi.expandedNodes, rootNodeId, panelId);
         const orderedIds = getSelectedIdsInOrder(latestUi.selectedNodeIds, flatList);
 
         for (let i = orderedIds.length - 1; i >= 0; i--) {
@@ -274,7 +271,7 @@ export function OutlinerRow({ config, children }: OutlinerRowProps) {
       if (selAction === 'batch_duplicate') {
         e.preventDefault();
         const latestUi = useUIStore.getState();
-        const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId, panelId);
+        const flatList = getFlattenedVisibleNodes(getRootRows(), latestUi.expandedNodes, rootNodeId, panelId);
         const orderedIds = getSelectedIdsInOrder(latestUi.selectedNodeIds, flatList);
         duplicateNodes(orderedIds);
         clearSelection();
@@ -290,7 +287,7 @@ export function OutlinerRow({ config, children }: OutlinerRowProps) {
       if (selAction === 'batch_copy') {
         e.preventDefault();
         const latestUi = useUIStore.getState();
-        const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId, panelId);
+        const flatList = getFlattenedVisibleNodes(getRootRows(), latestUi.expandedNodes, rootNodeId, panelId);
         const orderedIds = getSelectedIdsInOrder(latestUi.selectedNodeIds, flatList);
         copyNodesToClipboard(orderedIds);
         return;
@@ -299,7 +296,7 @@ export function OutlinerRow({ config, children }: OutlinerRowProps) {
       if (selAction === 'batch_cut') {
         e.preventDefault();
         const latestUi = useUIStore.getState();
-        const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId, panelId);
+        const flatList = getFlattenedVisibleNodes(getRootRows(), latestUi.expandedNodes, rootNodeId, panelId);
         const bounds = getSelectionBounds(latestUi.selectedNodeIds, flatList);
         const prev = bounds ? getPreviousVisibleNode(bounds.first.nodeId, bounds.first.parentId, flatList) : null;
         const orderedIds = getSelectedIdsInOrder(latestUi.selectedNodeIds, flatList);
@@ -324,7 +321,7 @@ export function OutlinerRow({ config, children }: OutlinerRowProps) {
       if (selAction === 'extend_up' || selAction === 'extend_down') {
         e.preventDefault();
         const latestUi = useUIStore.getState();
-        const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId, panelId);
+        const flatList = getFlattenedVisibleNodes(getRootRows(), latestUi.expandedNodes, rootNodeId, panelId);
 
         const anchor = latestUi.selectionAnchorId;
         if (!anchor) return;
@@ -363,7 +360,7 @@ export function OutlinerRow({ config, children }: OutlinerRowProps) {
 
       // Navigate / enter edit / type-char: use fresh state for multi-select bounds
       const latestUi = useUIStore.getState();
-      const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId, panelId);
+      const flatList = getFlattenedVisibleNodes(getRootRows(), latestUi.expandedNodes, rootNodeId, panelId);
 
       if (selAction === 'navigate_up') {
         e.preventDefault();
@@ -427,7 +424,7 @@ export function OutlinerRow({ config, children }: OutlinerRowProps) {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [
     isSelected, isFocused, isEditing, isSelectionAnchor, rowKind,
-    parentId, rowId, rootNodeId, panelId, rootChildIds, expandedNodes,
+    parentId, rowId, rootNodeId, panelId, rootChildIds,
     onSelectionKeydown, onBatchDelete, onBatchIndent, onBatchOutdent,
     setSelectedNodes, clearSelection, setFocusedNode, clearFocus,
     setPendingInputChar, enterEdit,
@@ -447,7 +444,7 @@ export function OutlinerRow({ config, children }: OutlinerRowProps) {
 export function useRowPointerHandlers(
   rowId: string,
   parentId: string,
-  rootChildIds: string[],
+  rootChildIds: string[] | undefined,
   rootNodeId: string,
   panelId: string,
 ) {
@@ -474,7 +471,12 @@ export function useRowPointerHandlers(
       setSelectedNode(rowId, parentId, 'global', panelId);
       return;
     }
-    const flatList = getFlattenedVisibleNodes(rootChildIds, state.expandedNodes, rootNodeId, panelId);
+    const flatList = getFlattenedVisibleNodes(
+      getRootScopeRowIds(rootNodeId, panelId, rootChildIds ?? []),
+      state.expandedNodes,
+      rootNodeId,
+      panelId,
+    );
     const range = computeRangeSelection(anchor, rowId, flatList);
     setSelectedNodes(range, anchor, panelId);
   }, [rowId, parentId, rootChildIds, rootNodeId, panelId, setSelectedNode, setSelectedNodes]);

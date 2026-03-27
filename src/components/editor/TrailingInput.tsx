@@ -42,6 +42,7 @@ import { marksToDoc } from '../../lib/pm-doc-utils.js';
 import { parseMultiLinePaste } from '../../lib/paste-parser.js';
 import { logPasteDebug, previewMultiline, summarizePasteNodes } from '../../lib/paste-debug.js';
 import { buildExpandedNodeKey } from '../../lib/expanded-node-key.js';
+import { useStructuralRenderTrace } from '../../lib/structural-profiler.js';
 
 const KEY_TRAILING_ENTER = getPrimaryShortcutKey('trailing.enter', 'Enter');
 const KEY_TRAILING_INDENT = getPrimaryShortcutKey('trailing.indent_depth', 'Tab');
@@ -81,6 +82,7 @@ function getEditorText(view: EditorView): string {
 }
 
 export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, panelId = 'node-main', fieldDataType, attrDefId, onNavigateOut, isSearchContext }: TrailingInputProps) {
+    useStructuralRenderTrace('TrailingInput', parentId);
     const createChild = useNodeStore((s) => s.createChild);
     const createNodeInSearchContext = useNodeStore((s) => s.createNodeInSearchContext);
     const cycleNodeCheckbox = useNodeStore((s) => s.cycleNodeCheckbox);

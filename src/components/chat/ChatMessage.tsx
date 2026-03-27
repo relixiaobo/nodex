@@ -257,7 +257,7 @@ export function ChatMessage({
     };
   }, []);
 
-  if (!isUser && (!assistantBlocks || assistantBlocks.length === 0) && !hasInlineError && !streaming) {
+  if (!isUser && (!assistantBlocks || assistantBlocks.length === 0) && !hasInlineError && !turnActive) {
     return null;
   }
 

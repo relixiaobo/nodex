@@ -15,6 +15,7 @@ import { keymap } from 'prosemirror-keymap';
 import { chainCommands, exitCode } from 'prosemirror-commands';
 import type { ThinkingLevel } from '@mariozechner/pi-ai';
 import { ArrowUp, Brain, Check, ChevronDown, Settings, Square } from '../../lib/icons.js';
+import { formatProviderName } from '../../lib/ai-provider-config.js';
 import { useUIStore } from '../../stores/ui-store.js';
 import { DropdownPanel } from '../ui/DropdownPanel.js';
 import { docToMarks, marksToDoc } from '../../lib/pm-doc-utils.js';
@@ -581,7 +582,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
                               {moreModelGroups.map(([provider, models]) => (
                                 <div key={provider} className="py-1">
                                   <div className="px-2 pb-1 text-[10px] font-medium uppercase tracking-[0.08em] text-foreground-tertiary">
-                                    {provider}
+                                    {formatProviderName(provider)}
                                   </div>
                                   {models.map((model) => renderModelItem(model))}
                                 </div>

@@ -2,6 +2,7 @@ import { getProviders } from '@mariozechner/pi-ai';
 import { useMemo, useState, type FormEvent } from 'react';
 import { toast } from 'sonner';
 import {
+  formatProviderName,
   guessProviderFromApiKey,
   normalizeProviderId,
   saveProviderApiKey,
@@ -57,7 +58,7 @@ export function ChatOnboarding() {
           >
             {providerOptions.map((option) => (
               <option key={option} value={option}>
-                {option}
+                {formatProviderName(option)}
               </option>
             ))}
           </select>

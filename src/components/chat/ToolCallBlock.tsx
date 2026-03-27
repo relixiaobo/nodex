@@ -9,6 +9,7 @@ import {
   Search, Terminal, Trash2, Wand2,
 } from '../../lib/icons.js';
 import { CollapsibleIndicator } from './CollapsibleIndicator.js';
+import { CopyIconButton } from './CopyIconButton.js';
 
 interface ToolCallBlockProps {
   toolCall: ToolCall;
@@ -250,6 +251,14 @@ function getResultParts(result: ToolResultMessage): ResultPart[] {
     );
 }
 
+function getToolResultCopyText(result?: ToolResultMessage): string {
+  if (!result) return '';
+  return result.content
+    .filter((block): block is Extract<typeof block, { type: 'text' }> => block.type === 'text')
+    .map((block) => block.text)
+    .join('\n\n');
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -265,8 +274,13 @@ export function ToolCallBlock({ toolCall, result }: ToolCallBlockProps) {
     () => expanded ? highlightCode(JSON.stringify(toolCall.arguments, null, 2), 'json') : '',
     [expanded, toolCall.arguments],
   );
+  const inputText = useMemo(
+    () => JSON.stringify(toolCall.arguments, null, 2),
+    [toolCall.arguments],
+  );
 
   const parts = useMemo(() => result && expanded ? getResultParts(result) : [], [result, expanded]);
+  const outputText = useMemo(() => getToolResultCopyText(result), [result]);
 
   return (
     <div className="max-w-full">
@@ -287,7 +301,15 @@ export function ToolCallBlock({ toolCall, result }: ToolCallBlockProps) {
       {expanded && (
         <div className="ml-5 mt-1 overflow-hidden rounded-lg border border-border/60 bg-foreground/[0.02]">
           <div className="px-3 py-2">
-            <div className="mb-1 text-[10px] font-medium uppercase tracking-[0.06em] text-foreground-tertiary">Input</div>
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <div className="text-[10px] font-medium uppercase tracking-[0.06em] text-foreground-tertiary">Input</div>
+              <CopyIconButton
+                text={inputText}
+                ariaLabel="Copy tool input"
+                className="inline-flex h-6 w-6 items-center justify-center rounded-md text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground disabled:opacity-40"
+                iconSize={12}
+              />
+            </div>
             <pre
               className={`${CODE_BLOCK} text-foreground-secondary`}
               dangerouslySetInnerHTML={{ __html: inputHtml }}
@@ -295,9 +317,17 @@ export function ToolCallBlock({ toolCall, result }: ToolCallBlockProps) {
           </div>
           {result && (
             <div className="border-t border-border/50 px-3 py-2">
-              <div className="mb-1 text-[10px] font-medium uppercase tracking-[0.06em] text-foreground-tertiary">
-                Output
-                {result.isError && <span className="ml-1.5 text-destructive">error</span>}
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <div className="text-[10px] font-medium uppercase tracking-[0.06em] text-foreground-tertiary">
+                  Output
+                  {result.isError && <span className="ml-1.5 text-destructive">error</span>}
+                </div>
+                <CopyIconButton
+                  text={outputText}
+                  ariaLabel="Copy tool output"
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-md text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground disabled:opacity-40"
+                  iconSize={12}
+                />
               </div>
               {parts.map((part, i) =>
                 part.type === 'image_placeholder' ? (

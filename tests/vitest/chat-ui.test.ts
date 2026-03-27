@@ -4,6 +4,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createRoot, type Root } from 'react-dom/client';
 import { flushSync } from 'react-dom';
+import { EditorView } from 'prosemirror-view';
 import { ChatInput } from '../../src/components/chat/ChatInput.js';
 import { ChatPanelHeader } from '../../src/components/chat/ChatPanelHeader.js';
 import { ChatMessage } from '../../src/components/chat/ChatMessage.js';
@@ -210,6 +211,9 @@ function createAssistantEntry(
 describe('chat ui', () => {
   const originalInnerWidth = window.innerWidth;
   const originalResizeObserver = globalThis.ResizeObserver;
+  const originalScrollToSelection = EditorView.prototype.scrollToSelection;
+  const originalTextGetClientRects = Text.prototype.getClientRects;
+  const originalTextGetBoundingClientRect = Text.prototype.getBoundingClientRect;
   let container: HTMLDivElement;
   let root: Root;
 
@@ -221,6 +225,19 @@ describe('chat ui', () => {
     resetChatPersistenceForTests();
     window.innerWidth = originalInnerWidth;
     globalThis.ResizeObserver = MockResizeObserver as typeof ResizeObserver;
+    EditorView.prototype.scrollToSelection = function scrollToSelection() {};
+    Text.prototype.getClientRects = function getClientRects() {
+      return {
+        length: 1,
+        item: () => null,
+        [Symbol.iterator]: function* iterator() {
+          yield new DOMRect(0, 0, 0, 0);
+        },
+      } as unknown as DOMRectList;
+    };
+    Text.prototype.getBoundingClientRect = function getBoundingClientRect() {
+      return new DOMRect(0, 0, 0, 0);
+    };
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
@@ -233,7 +250,22 @@ describe('chat ui', () => {
     container.remove();
     window.innerWidth = originalInnerWidth;
     globalThis.ResizeObserver = originalResizeObserver;
+    EditorView.prototype.scrollToSelection = originalScrollToSelection;
+    Text.prototype.getClientRects = originalTextGetClientRects;
+    Text.prototype.getBoundingClientRect = originalTextGetBoundingClientRect;
   });
+
+  function dispatchPlainTextPaste(target: HTMLElement, text: string) {
+    const event = new Event('paste', { bubbles: true, cancelable: true }) as Event & {
+      clipboardData: { getData: (type: string) => string };
+    };
+    Object.defineProperty(event, 'clipboardData', {
+      value: {
+        getData: (type: string) => (type === 'text/plain' ? text : ''),
+      },
+    });
+    target.dispatchEvent(event);
+  }
 
   it('keeps auto-scroll sticky only when the reader is already near the bottom', () => {
     expect(shouldStickChatScroll({
@@ -733,6 +765,70 @@ describe('chat ui', () => {
     const pm = container.querySelector('.ProseMirror') as HTMLElement;
     expect(pm).not.toBeNull();
     expect(pm?.getAttribute('contenteditable')).toBe('true');
+  });
+
+  it('accepts multi-line plain-text paste in the composer', async () => {
+    flushSync(() => {
+      root.render(React.createElement(ChatInput, {
+        disabled: false,
+        onSend: async () => {},
+        onStop: () => {},
+      }));
+    });
+
+    const pm = container.querySelector('.ProseMirror') as HTMLElement;
+    expect(pm).not.toBeNull();
+
+    flushSync(() => {
+      pm.focus();
+      dispatchPlainTextPaste(pm, '第一行\n第二行\nA very long pasted paragraph that should still appear in chat input.');
+    });
+
+    await vi.waitFor(() => {
+      const html = pm.innerHTML;
+      expect(html).toContain('第一行');
+      expect(html).toContain('第二行');
+      expect(html).toContain('<br');
+      expect(html).toContain('A very long pasted paragraph');
+    });
+  });
+
+  it('supports undo and redo shortcuts in the composer', async () => {
+    flushSync(() => {
+      root.render(React.createElement(ChatInput, {
+        disabled: false,
+        onSend: async () => {},
+        onStop: () => {},
+      }));
+    });
+
+    const pm = container.querySelector('.ProseMirror') as HTMLElement;
+    expect(pm).not.toBeNull();
+
+    flushSync(() => {
+      pm.focus();
+      dispatchPlainTextPaste(pm, 'Undo me');
+    });
+
+    await vi.waitFor(() => {
+      expect(pm.textContent).toContain('Undo me');
+    });
+
+    flushSync(() => {
+      pm.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true }));
+    });
+
+    await vi.waitFor(() => {
+      expect(pm.textContent ?? '').not.toContain('Undo me');
+    });
+
+    flushSync(() => {
+      pm.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, shiftKey: true, bubbles: true }));
+    });
+
+    await vi.waitFor(() => {
+      expect(pm.textContent).toContain('Undo me');
+    });
   });
 
   it('keeps the drawer layout visible on narrow screens instead of swapping to a chat-only view', async () => {

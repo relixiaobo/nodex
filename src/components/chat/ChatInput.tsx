@@ -9,6 +9,7 @@ import {
   useState,
 } from 'react';
 import { EditorState, type Plugin } from 'prosemirror-state';
+import { history, redo, undo } from 'prosemirror-history';
 import { EditorView } from 'prosemirror-view';
 import { keymap } from 'prosemirror-keymap';
 import { chainCommands, exitCode } from 'prosemirror-commands';
@@ -20,6 +21,7 @@ import { docToMarks, marksToDoc } from '../../lib/pm-doc-utils.js';
 import {
   isEditorViewAlive,
   replaceEditorRangeWithInlineRef,
+  replaceEditorSelectionWithPlainText,
   setEditorPlainTextContent,
 } from '../../lib/pm-editor-view.js';
 import {
@@ -299,6 +301,14 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
       return dom instanceof HTMLElement && dom.dataset.composing === 'true';
     };
 
+    const runHistoryCommand = (
+      command: typeof undo,
+    ): boolean => {
+      const view = viewRef.current;
+      if (!view || view.isDestroyed) return false;
+      return command(view.state, view.dispatch, view);
+    };
+
     const insertHardBreak: (state: EditorState, dispatch?: EditorView['dispatch']) => boolean =
       chainCommands(exitCode, (state, dispatch) => {
         if (dispatch) {
@@ -309,7 +319,20 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
       });
 
     return [
+      history(),
       keymap({
+        'Mod-z': () => {
+          if (isComposing()) return false;
+          return runHistoryCommand(undo);
+        },
+        'Mod-Shift-z': () => {
+          if (isComposing()) return false;
+          return runHistoryCommand(redo);
+        },
+        'Mod-y': () => {
+          if (isComposing()) return false;
+          return runHistoryCommand(redo);
+        },
         'Enter': () => {
           if (isComposing()) return false;
           if (refActiveRef.current) {
@@ -389,6 +412,14 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
         }
       },
       handleDOMEvents: {
+        paste: (view, event) => {
+          const pastedText = event.clipboardData?.getData('text/plain');
+          if (pastedText == null) return false;
+
+          event.preventDefault();
+          replaceEditorSelectionWithPlainText(view, pastedText);
+          return true;
+        },
         compositionstart: (view) => {
           view.dom.dataset.composing = 'true';
           return false;

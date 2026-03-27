@@ -6,6 +6,7 @@ import type { AgentDebugSnapshot, DebugTokenEstimate } from '../../lib/ai-debug.
 import { sanitizeDebugValue } from '../../lib/ai-debug.js';
 import { highlightCode } from '../../lib/code-highlight.js';
 import { ChevronDown } from '../../lib/icons.js';
+import { CopyIconButton } from './CopyIconButton.js';
 
 interface ChatDebugPanelProps {
   debug: AgentDebugState;
@@ -28,12 +29,22 @@ interface UsageMeta {
   stopReason: string;
 }
 
+interface TurnUsageMeta {
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+  cost: number;
+  assistantMessages: number;
+}
+
 interface ConversationEntry {
   id: string;
   role: DisplayRole;
   contentParts: ContentPart[];
   rawJson: string | null;
   usageMeta?: UsageMeta;
+  turnUsageMeta?: TurnUsageMeta;
 }
 
 const DEBUG_TEXT = 'max-h-80 overflow-auto whitespace-pre-wrap break-words font-mono text-[10px] leading-4 text-foreground-secondary';
@@ -176,21 +187,52 @@ function RawJsonToggle({
 }) {
   return (
     <div className="space-y-2">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="inline-flex items-center gap-1.5 rounded-full border border-border px-2 py-1 font-mono text-[10px] text-foreground-tertiary transition-colors hover:border-border-emphasis hover:text-foreground"
-      >
-        <span>{label}</span>
-        <ChevronDown
-          size={12}
-          strokeWidth={1.5}
-          className={`transition-transform ${open ? 'rotate-180' : ''}`}
+      <div className="flex items-center gap-1.5">
+        <button
+          type="button"
+          onClick={onToggle}
+          className="inline-flex items-center gap-1.5 rounded-full border border-border px-2 py-1 font-mono text-[10px] text-foreground-tertiary transition-colors hover:border-border-emphasis hover:text-foreground"
+        >
+          <span>{label}</span>
+          <ChevronDown
+            size={12}
+            strokeWidth={1.5}
+            className={`transition-transform ${open ? 'rotate-180' : ''}`}
+          />
+        </button>
+        <CopyIconButton
+          text={json}
+          ariaLabel="Copy raw JSON"
+          className="inline-flex h-6 w-6 items-center justify-center rounded-md text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground"
+          iconSize={12}
         />
-      </button>
+      </div>
       {open && (
         <DebugCodeBlock text={json} language="json" />
       )}
+    </div>
+  );
+}
+
+function UsageMetaLine({
+  meta,
+  total = false,
+}: {
+  meta: UsageMeta | TurnUsageMeta;
+  total?: boolean;
+}) {
+  return (
+    <div
+      className="pl-[60px] pr-2 py-0.5 font-mono text-[10px] text-foreground-tertiary"
+      data-testid={total ? 'chat-debug-turn-usage-meta' : 'chat-debug-usage-meta'}
+    >
+      {'↳ '}{total ? 'total ' : ''}in:{meta.input} out:{meta.output}
+      {meta.cacheWrite > 0 && ` cw:${meta.cacheWrite}`}
+      {meta.cacheRead > 0 && ` cr:${meta.cacheRead}`}
+      {' · '}{formatCost(meta.cost)}
+      {'assistantMessages' in meta
+        ? ` · ${meta.assistantMessages} round${meta.assistantMessages === 1 ? '' : 's'}`
+        : ` · ${meta.stopReason}`}
     </div>
   );
 }
@@ -299,44 +341,49 @@ function ConversationRow({
             ) : (
               <span className="w-11 shrink-0" />
             )}
-            <button
-              type="button"
-              onClick={() => onTogglePart(partId)}
-              className={`flex min-w-0 flex-1 flex-col rounded-lg px-2 py-1 text-left transition-colors hover:bg-foreground/4 ${isExpanded ? 'bg-foreground/4' : ''}`}
-            >
-              <div className="flex w-full items-center gap-2">
-                <span className="min-w-0 flex-1 font-mono text-[10px] text-foreground-tertiary">
-                  {part.type}
-                </span>
-                <ChevronDown
-                  size={12}
-                  strokeWidth={1.5}
-                  className={`shrink-0 text-foreground-tertiary transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                />
-              </div>
-              {isExpanded ? (
-                <HighlightedPre
-                  text={part.fullText}
-                  language={inferLanguage(part.fullText)}
-                  className={DEBUG_TEXT}
-                />
-              ) : (
-                <span className="block truncate font-mono text-[10px] leading-4 text-foreground-secondary">
-                  {part.preview}
-                </span>
-              )}
-            </button>
+            <div className={`flex min-w-0 flex-1 items-start gap-1 ${isExpanded ? 'rounded-lg bg-foreground/4' : ''}`}>
+              <button
+                type="button"
+                onClick={() => onTogglePart(partId)}
+                className="flex min-w-0 flex-1 flex-col rounded-lg px-2 py-1 text-left transition-colors hover:bg-foreground/4"
+              >
+                <div className="flex w-full items-center gap-2">
+                  <span className="min-w-0 flex-1 font-mono text-[10px] text-foreground-tertiary">
+                    {part.type}
+                  </span>
+                  <ChevronDown
+                    size={12}
+                    strokeWidth={1.5}
+                    className={`shrink-0 text-foreground-tertiary transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                  />
+                </div>
+                {isExpanded ? (
+                  <HighlightedPre
+                    text={part.fullText}
+                    language={inferLanguage(part.fullText)}
+                    className={DEBUG_TEXT}
+                  />
+                ) : (
+                  <span className="block truncate font-mono text-[10px] leading-4 text-foreground-secondary">
+                    {part.preview}
+                  </span>
+                )}
+              </button>
+              <CopyIconButton
+                text={part.fullText}
+                ariaLabel="Copy debug content"
+                className="mt-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground"
+                iconSize={12}
+              />
+            </div>
           </div>
         );
       })}
       {entry.usageMeta && (
-        <div className="pl-[60px] pr-2 py-0.5 font-mono text-[10px] text-foreground-tertiary" data-testid="chat-debug-usage-meta">
-          {'↳ '}in:{entry.usageMeta.input} out:{entry.usageMeta.output}
-          {entry.usageMeta.cacheWrite > 0 && ` cw:${entry.usageMeta.cacheWrite}`}
-          {entry.usageMeta.cacheRead > 0 && ` cr:${entry.usageMeta.cacheRead}`}
-          {' · '}{formatCost(entry.usageMeta.cost)}
-          {' · '}{entry.usageMeta.stopReason}
-        </div>
+        <UsageMetaLine meta={entry.usageMeta} />
+      )}
+      {entry.turnUsageMeta && (
+        <UsageMetaLine meta={entry.turnUsageMeta} total />
       )}
       {entry.rawJson && (
         <div className="pl-[60px] pr-2 pt-1">
@@ -424,6 +471,28 @@ function buildUsageMeta(originalMessage: Message): UsageMeta | undefined {
   };
 }
 
+function appendTurnUsageMeta(entry: ConversationEntry, usageMeta: UsageMeta): void {
+  const current = entry.turnUsageMeta;
+  if (!current) {
+    entry.turnUsageMeta = {
+      input: usageMeta.input,
+      output: usageMeta.output,
+      cacheRead: usageMeta.cacheRead,
+      cacheWrite: usageMeta.cacheWrite,
+      cost: usageMeta.cost,
+      assistantMessages: 1,
+    };
+    return;
+  }
+
+  current.input += usageMeta.input;
+  current.output += usageMeta.output;
+  current.cacheRead += usageMeta.cacheRead;
+  current.cacheWrite += usageMeta.cacheWrite;
+  current.cost += usageMeta.cost;
+  current.assistantMessages += 1;
+}
+
 function buildConversationEntries(snapshot: AgentDebugSnapshot): ConversationEntry[] {
   const sanitizedMessages = snapshot.messages.map((message) => sanitizeDebugValue(message) as Message);
 
@@ -444,6 +513,8 @@ function buildConversationEntries(snapshot: AgentDebugSnapshot): ConversationEnt
     });
   }
 
+  let activeUserEntry: ConversationEntry | null = null;
+
   sanitizedMessages.forEach((message, index) => {
     const inspector = snapshot.messageInspectors[index];
     const originalMessage = snapshot.messages[index];
@@ -459,22 +530,28 @@ function buildConversationEntries(snapshot: AgentDebugSnapshot): ConversationEnt
     }
 
     if (message.role === 'assistant') {
+      const usageMeta = buildUsageMeta(originalMessage);
       entries.push({
         id: inspector.id,
         role: 'ASST',
         contentParts: buildAssistantParts(message),
         rawJson: inspector.json,
-        usageMeta: buildUsageMeta(originalMessage),
+        usageMeta,
       });
+      if (activeUserEntry && usageMeta) {
+        appendTurnUsageMeta(activeUserEntry, usageMeta);
+      }
       return;
     }
 
-    entries.push({
+    const userEntry: ConversationEntry = {
       id: inspector.id,
       role: 'USER',
       contentParts: buildUserParts(message),
       rawJson: inspector.json,
-    });
+    };
+    entries.push(userEntry);
+    activeUserEntry = userEntry;
   });
 
   return entries;

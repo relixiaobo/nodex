@@ -176,6 +176,21 @@ function toSessionShell(session: Pick<ChatSessionMeta, keyof ChatSessionShell>):
   };
 }
 
+function applyPersistedSessionShell(
+  session: ChatSession,
+  shell: Pick<ChatSessionShell, keyof ChatSessionShell>,
+): ChatSession {
+  return {
+    ...session,
+    title: shell.title ?? null,
+    createdAt: shell.createdAt,
+    updatedAt: shell.updatedAt,
+    selectedModelId: shell.selectedModelId ?? undefined,
+    selectedProvider: shell.selectedProvider ?? undefined,
+    selectedThinkingLevel: shell.selectedThinkingLevel ?? null,
+  };
+}
+
 function applySessionShellPatch<T extends ChatSession | ChatSessionMeta>(
   session: T,
   patch: UpdateChatSessionShellInput,
@@ -413,28 +428,41 @@ export async function saveChatSessionShellPatch(
 ): Promise<ChatSessionShell | null> {
   const db = await getDB();
   const tx = db.transaction(SESSION_META_STORE_NAMES, 'readwrite');
-  const store = tx.objectStore(STORE_NAME);
   const metaStore = tx.objectStore(META_STORE_NAME);
-  const existing = await store.get(sessionId);
+  const existingMeta = await metaStore.get(sessionId);
 
+  if (existingMeta) {
+    const nextUpdatedAt = options.touchUpdatedAt ? Date.now() : existingMeta.updatedAt;
+    const nextMetaBase = applySessionShellPatch(existingMeta, patch, nextUpdatedAt);
+    const nextMeta: ChatSessionMeta = {
+      ...nextMetaBase,
+      contentSearchText: existingMeta.contentSearchText ?? '',
+      searchText: joinChatSessionSearchText(nextMetaBase.title, existingMeta.contentSearchText ?? ''),
+      userMessageCount: existingMeta.userMessageCount ?? 0,
+    };
+
+    await metaStore.put(nextMeta);
+    await tx.done;
+    return toSessionShell(nextMeta);
+  }
+
+  const existing = await tx.objectStore(STORE_NAME).get(sessionId);
   if (!existing) {
     await tx.done;
     return null;
   }
 
   const existingSession = normalizeChatSession(existing);
-  const existingMeta = (await metaStore.get(sessionId)) ?? toSessionMeta(existingSession);
   const nextUpdatedAt = options.touchUpdatedAt ? Date.now() : existingSession.updatedAt;
-  const nextSession = applySessionShellPatch(existingSession, patch, nextUpdatedAt);
-  const nextMetaBase = applySessionShellPatch(existingMeta, patch, nextUpdatedAt);
+  const derivedMeta = toSessionMeta(existingSession);
+  const nextMetaBase = applySessionShellPatch(derivedMeta, patch, nextUpdatedAt);
   const nextMeta: ChatSessionMeta = {
     ...nextMetaBase,
-    contentSearchText: existingMeta.contentSearchText ?? '',
-    searchText: joinChatSessionSearchText(nextMetaBase.title, existingMeta.contentSearchText ?? ''),
-    userMessageCount: existingMeta.userMessageCount ?? 0,
+    contentSearchText: derivedMeta.contentSearchText,
+    searchText: joinChatSessionSearchText(nextMetaBase.title, derivedMeta.contentSearchText),
+    userMessageCount: derivedMeta.userMessageCount,
   };
 
-  await store.put(nextSession);
   await metaStore.put(nextMeta);
   await tx.done;
 
@@ -443,8 +471,15 @@ export async function saveChatSessionShellPatch(
 
 export async function getChatSession(sessionId: string): Promise<ChatSession | null> {
   const db = await getDB();
-  const session = await db.get(STORE_NAME, sessionId);
-  return session ? normalizeChatSession(session) : null;
+  const tx = db.transaction([STORE_NAME, META_STORE_NAME] as const, 'readonly');
+  const [session, meta] = await Promise.all([
+    tx.objectStore(STORE_NAME).get(sessionId),
+    tx.objectStore(META_STORE_NAME).get(sessionId),
+  ]);
+  await tx.done;
+  if (!session) return null;
+  const normalizedSession = normalizeChatSession(session);
+  return meta ? applyPersistedSessionShell(normalizedSession, toSessionShell(meta)) : normalizedSession;
 }
 
 export async function getChatSessionMeta(sessionId: string): Promise<ChatSessionMeta | null> {
@@ -471,7 +506,8 @@ export async function getLatestChatSession(): Promise<ChatSession | null> {
 
   const session = await tx.objectStore(STORE_NAME).get(metaCursor.value.id);
   await tx.done;
-  return session ? normalizeChatSession(session) : null;
+  if (!session) return null;
+  return applyPersistedSessionShell(normalizeChatSession(session), toSessionShell(metaCursor.value));
 }
 
 export async function getLatestChatSessionShell(): Promise<ChatSessionShell | null> {

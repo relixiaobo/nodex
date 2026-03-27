@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto';
 import type { AgentMessage } from '@mariozechner/pi-agent-core';
-import { deleteDB } from 'idb';
+import { deleteDB, openDB } from 'idb';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { getLinearPath, linearToTree, type ChatSession } from '../../src/lib/ai-chat-tree.js';
 import { IMAGE_PLACEHOLDER } from '../../src/lib/ai-message-images.js';
@@ -68,6 +68,15 @@ async function resetPersistence(): Promise<void> {
   resetChatPersistenceForTests();
   await deleteDB(DB_NAME);
   resetChatPersistenceForTests();
+}
+
+async function readRawPersistedSession(sessionId: string): Promise<ChatSession | null> {
+  const db = await openDB(DB_NAME);
+  try {
+    return (await db.get(STORE_NAME, sessionId)) ?? null;
+  } finally {
+    db.close();
+  }
 }
 
 async function seedLegacySessions(sessions: LegacyChatSession[]): Promise<void> {
@@ -281,6 +290,7 @@ describe('ai persistence', () => {
 
     const before = await getChatSession('session_shell_patch');
     const beforePath = getLinearPath(before!).map((node) => node.message);
+    const rawBefore = await readRawPersistedSession('session_shell_patch');
 
     const patched = await saveChatSessionShellPatch('session_shell_patch', {
       title: 'renamed',
@@ -312,6 +322,12 @@ describe('ai persistence', () => {
     expect(await getChatSessionMeta('session_shell_patch')).toMatchObject({
       title: 'renamed',
       searchText: 'renamed\n\nhello\n\nworld',
+    });
+    expect(await readRawPersistedSession('session_shell_patch')).toMatchObject({
+      title: rawBefore?.title ?? null,
+      selectedProvider: rawBefore?.selectedProvider,
+      selectedModelId: rawBefore?.selectedModelId,
+      updatedAt: rawBefore?.updatedAt,
     });
   });
 

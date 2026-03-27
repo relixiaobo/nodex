@@ -28,7 +28,7 @@ import { getWorkspaceHomeNodeId } from '../lib/system-node-presets.js';
 import type { ParsedPasteNode } from '../lib/paste-parser.js';
 import { resolveEffectiveId } from '../lib/node-type-utils.js';
 import { resolveChildSupertags } from '../lib/field-utils.js';
-import { beginStructuralProfile } from '../lib/dev-structural-profiler.js';
+import { beginStructuralProfile } from '../lib/structural-profiler.js';
 
 // ============================================================
 // Store 接口

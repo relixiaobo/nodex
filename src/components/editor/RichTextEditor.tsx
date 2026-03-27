@@ -26,7 +26,7 @@ import type { HighlightNodeStore } from '../../lib/highlight-service.js';
 import { parseMultiLinePaste, type ParsedPasteNode } from '../../lib/paste-parser.js';
 import { logPasteDebug, previewMultiline, summarizePasteNodes } from '../../lib/paste-debug.js';
 import { parseNodeLinkFromHtml } from '../../lib/node-clipboard.js';
-import { useStructuralRenderTrace } from '../../lib/dev-structural-profiler.js';
+import { useStructuralRenderTrace } from '../../lib/structural-profiler.js';
 
 /**
  * Detect whether a string looks like a URL for smart paste.

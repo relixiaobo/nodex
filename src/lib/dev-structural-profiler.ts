@@ -1,4 +1,3 @@
-import { useEffect, useRef } from 'react';
 import type { ProfilerOnRenderCallback } from 'react';
 
 type ComponentBucket = {
@@ -259,16 +258,10 @@ function recordComponentActivity(componentName: string, instanceId: string | und
   if (instanceId) bucket.uniqueInstances.add(instanceId);
 }
 
-export function useStructuralRenderTrace(componentName: string, instanceId?: string): void {
-  const mountIdRef = useRef(instanceId);
-  mountIdRef.current = instanceId;
+export function recordStructuralComponentRender(componentName: string, instanceId?: string): void {
+  recordComponentActivity(componentName, instanceId, 'render');
+}
 
-  if (import.meta.env.DEV) {
-    recordComponentActivity(componentName, mountIdRef.current, 'render');
-  }
-
-  useEffect(() => {
-    if (!import.meta.env.DEV) return;
-    recordComponentActivity(componentName, mountIdRef.current, 'mount');
-  }, []);
+export function recordStructuralComponentMount(componentName: string, instanceId?: string): void {
+  recordComponentActivity(componentName, instanceId, 'mount');
 }

@@ -28,7 +28,7 @@ import { navigateToSiblingRow } from '../../lib/outliner-navigation.js';
 import { ViewToolbar } from './ViewToolbar.js';
 import { readViewConfig, applyViewPipeline } from '../../lib/view-pipeline.js';
 import { canCreateChildrenUnder } from '../../lib/node-capabilities.js';
-import { useStructuralRenderTrace } from '../../lib/dev-structural-profiler.js';
+import { useStructuralRenderTrace } from '../../lib/structural-profiler.js';
 import { clearRootScopeRowIds, setRootScopeRowIds } from '../../lib/root-scope-row-registry.js';
 
 interface OutlinerViewProps {

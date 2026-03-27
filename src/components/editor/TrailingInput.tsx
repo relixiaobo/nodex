@@ -42,7 +42,7 @@ import { marksToDoc } from '../../lib/pm-doc-utils.js';
 import { parseMultiLinePaste } from '../../lib/paste-parser.js';
 import { logPasteDebug, previewMultiline, summarizePasteNodes } from '../../lib/paste-debug.js';
 import { buildExpandedNodeKey } from '../../lib/expanded-node-key.js';
-import { useStructuralRenderTrace } from '../../lib/dev-structural-profiler.js';
+import { useStructuralRenderTrace } from '../../lib/structural-profiler.js';
 
 const KEY_TRAILING_ENTER = getPrimaryShortcutKey('trailing.enter', 'Enter');
 const KEY_TRAILING_INDENT = getPrimaryShortcutKey('trailing.indent_depth', 'Tab');

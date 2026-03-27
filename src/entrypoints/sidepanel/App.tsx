@@ -46,7 +46,7 @@ import {
   type HighlightUnresolvablePayload,
 } from '../../lib/highlight-messaging.js';
 import { ensureSystemNodes } from '../../lib/bootstrap-system-nodes.js';
-import { installDevStructuralProfiler, onStructuralProfilerCommit } from '../../lib/dev-structural-profiler.js';
+import { installStructuralProfiler, onStructuralProfilerCommit } from '../../lib/structural-profiler.js';
 import { Toaster, toast } from 'sonner';
 import { TooltipProvider } from '../../components/ui/Tooltip';
 import { isAppPanel, isChatPanel } from '../../types/index.js';
@@ -458,7 +458,7 @@ export function App({ skipBootstrap = false }: AppProps) {
 
  useEffect(() => {
   if (!import.meta.env.DEV) return;
-  installDevStructuralProfiler();
+  installStructuralProfiler();
   const conflicts = findUnexpectedShortcutConflicts();
   if (conflicts.length > 0) {
    console.warn('[shortcut-registry] unexpected conflicts detected', conflicts);

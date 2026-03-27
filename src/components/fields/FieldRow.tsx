@@ -54,7 +54,7 @@ import { OutlinerRow, useRowSelectionState, useRowPointerHandlers } from '../out
 import { canCreateChildrenUnder, getNodeCapabilities } from '../../lib/node-capabilities.js';
 import { useDragDropRow } from '../../hooks/use-drag-drop-row.js';
 import { DESCRIPTION_SHORTCUT_KEYS, matchesShortcutEvent } from '../../lib/shortcut-registry.js';
-import { useStructuralRenderTrace } from '../../lib/dev-structural-profiler.js';
+import { useStructuralRenderTrace } from '../../lib/structural-profiler.js';
 
 function focusTrailingInputForParent(parentId: string): boolean {
   const roots = document.querySelectorAll<HTMLElement>('[data-trailing-parent-id]');

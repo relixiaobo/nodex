@@ -64,7 +64,7 @@ import { readViewConfig, applyViewPipeline } from '../../lib/view-pipeline.js';
 import { OutlinerRow, useRowSelectionState, useRowPointerHandlers } from './OutlinerRow.js';
 import { NodeContextMenuPortal } from './NodeContextMenu.js';
 import { useDragDropRow } from '../../hooks/use-drag-drop-row.js';
-import { useStructuralRenderTrace } from '../../lib/dev-structural-profiler.js';
+import { useStructuralRenderTrace } from '../../lib/structural-profiler.js';
 import { getRootScopeRowIds } from '../../lib/root-scope-row-registry.js';
 import {
   OUTLINER_ROW_CONTAINER_CLASS,

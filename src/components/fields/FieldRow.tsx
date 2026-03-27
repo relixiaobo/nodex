@@ -14,7 +14,9 @@
  */
 import { useCallback, useRef, useEffect, useMemo, useState, type CSSProperties, type DragEvent, type ReactNode } from 'react';
 import { Trash2, type AppIcon } from '../../lib/icons.js';
+import { useNode } from '../../hooks/use-node.js';
 import { useNodeFields } from '../../hooks/use-node-fields';
+import { useNodeScopeRevision } from '../../hooks/use-node-scope-revision.js';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import { useWorkspaceTags } from '../../hooks/use-workspace-tags';
@@ -193,12 +195,9 @@ export function resolveFieldRowSelectAction(params: {
 
 function ConfigTagPicker({ nodeId, configKey, placeholder }: { nodeId: string; configKey: string; placeholder: string }) {
   const tags = useWorkspaceTags();
+  const node = useNode(nodeId);
   const setConfigValue = useNodeStore((s) => s.setConfigValue);
-  const selectedId = useNodeStore((s) => {
-    void s._version;
-    const node = s.getNode(nodeId);
-    return resolveConfigValueWithDefault(node, configKey);
-  });
+  const selectedId = resolveConfigValueWithDefault(node, configKey);
 
   const options: NodePickerOption[] = useMemo(
     () => tags.map((t) => ({ id: t.id, name: t.name, isTagDef: true })),
@@ -238,12 +237,9 @@ function ConfigSelectPicker({
   options: Array<{ value: string; label: string; icon?: AppIcon }>;
   placeholder: string;
 }) {
+  const node = useNode(nodeId);
   const setConfigValue = useNodeStore((s) => s.setConfigValue);
-  const selectedId = useNodeStore((s) => {
-    void s._version;
-    const node = s.getNode(nodeId);
-    return resolveConfigValueWithDefault(node, configKey);
-  });
+  const selectedId = resolveConfigValueWithDefault(node, configKey);
   const pickerOptions: NodePickerOption[] = useMemo(
     () => options.map((o) => ({ id: o.value, name: o.label, icon: o.icon })),
     [options],
@@ -271,12 +267,9 @@ function ConfigSelectPicker({
 }
 
 function ConfigNumberInput({ nodeId, configKey }: { nodeId: string; configKey: string }) {
+  const node = useNode(nodeId);
   const setConfigValue = useNodeStore((s) => s.setConfigValue);
-  const value = useNodeStore((s) => {
-    void s._version;
-    const node = s.getNode(nodeId);
-    return resolveConfigValueWithDefault(node, configKey);
-  });
+  const value = resolveConfigValueWithDefault(node, configKey);
   const propName = configKeyToPropName(configKey);
   const valueText = value === undefined || value === null ? '' : String(value);
   const [draft, setDraft] = useState(valueText);
@@ -455,7 +448,11 @@ export function FieldRow({
   const moveFieldEntry = useNodeStore((s) => s.moveFieldEntry);
   const removeField = useNodeStore((s) => s.removeField);
   const updateNodeDescription = useNodeStore((s) => s.updateNodeDescription);
-  const _version = useNodeStore((s) => s._version);
+  const ownerNode = useNode(nodeId);
+  const attrDefNode = useNode(attrDefId ?? null);
+  const fieldEntryNode = useNode(fieldEntryId);
+  const ownerScopeRevision = useNodeScopeRevision(nodeId);
+  const fieldEntryScopeRevision = useNodeScopeRevision(fieldEntryId);
   const siblingFields = useNodeFields(nodeId);
   const clickOffsetXRef = useRef<number | undefined>(undefined);
   const rowRef = useRef<HTMLDivElement>(null);
@@ -482,67 +479,56 @@ export function FieldRow({
     : undefined;
   const resolvedControl = configControl ?? configDef?.control;
   const Icon = getFieldTypeIcon(dataType);
-  const fieldDescription = useNodeStore((s) => {
-    void s._version;
-    const fieldDef = attrDefId ? s.getNode(attrDefId) : null;
-    return fieldDef?.type === 'fieldDef' ? fieldDef.description : undefined;
-  });
-  const canEditFieldDefinition = useNodeStore((s) => {
-    void s._version;
-    const fieldDef = attrDefId ? s.getNode(attrDefId) : null;
-    return fieldDef?.type === 'fieldDef' ? getNodeCapabilities(attrDefId).canEditNode : false;
-  });
-  const canManageFieldStructure = useNodeStore((s) => {
-    void s._version;
-    return canCreateChildrenUnder(nodeId);
-  });
+  const fieldDescription = attrDefNode?.type === 'fieldDef' ? attrDefNode.description : undefined;
+  const canEditFieldDefinition = attrDefNode?.type === 'fieldDef' ? getNodeCapabilities(attrDefId).canEditNode : false;
+  const canManageFieldStructure = useMemo(
+    () => canCreateChildrenUnder(nodeId),
+    [nodeId, ownerNode],
+  );
 
   // Validation: read first value child of fieldEntry to check value
-  const validationWarning = useNodeStore((s) => {
-    void s._version;
+  const validationWarning = useMemo(() => {
     if (!VALIDATED_FIELD_TYPES.has(dataType)) return null;
-    const fieldEntry = s.getNode(fieldEntryId);
+    const fieldEntry = fieldEntryNode;
     if (!fieldEntry?.children || fieldEntry.children.length === 0) return null;
     const min = resolveMinValue(attrDefId);
     const max = resolveMaxValue(attrDefId);
     for (const cid of fieldEntry.children) {
-      const child = s.getNode(cid);
+      const child = useNodeStore.getState().getNode(cid);
       if (child && !child.type && child.name) {
         return validateFieldValue(dataType, child.name, { min, max });
       }
     }
     return null;
-  });
+  }, [attrDefId, dataType, fieldEntryNode, fieldEntryScopeRevision]);
 
-  const configNumberValidationWarning = useNodeStore((s) => {
-    void s._version;
+  const configNumberValidationWarning = useMemo(() => {
     if (!isSystemConfig || resolvedControl !== 'number_input') return null;
-    const n = s.getNode(nodeId);
+    const n = ownerNode;
     if (!n) return null;
     const raw = resolveConfigValue(n, attrDefId);
     if (raw === undefined || raw === null || raw === '') return null;
     return validateFieldValue(FIELD_TYPES.NUMBER, String(raw));
-  });
+  }, [attrDefId, isSystemConfig, ownerNode, resolvedControl]);
 
   // Auto-collect count for "Collected values" list row name display.
   const isAutoCollectList = configKey === '__AUTOCOLLECT_LIST__';
-  const autoCollectCount = useNodeStore((s) => {
-    void s._version;
+  const autoCollectCount = useMemo(() => {
     if (!isAutoCollectList) return 0;
-    const fieldDef = s.getNode(nodeId);
+    const fieldDef = ownerNode;
     if (!fieldDef?.children) return 0;
     return fieldDef.children.filter((id) => {
-      const n = s.getNode(id);
+      const n = useNodeStore.getState().getNode(id);
       return n && !n.type && n.autoCollected;
     }).length;
-  });
+  }, [isAutoCollectList, ownerNode, ownerScopeRevision]);
 
   const siblingFieldIds = useMemo(
     () => new Set(siblingFields.map((f) => f.fieldEntryId)),
     [siblingFields],
   );
   const renderableSiblings = useMemo(() => {
-    const parentChildren = useNodeStore.getState().getNode(nodeId)?.children ?? [];
+    const parentChildren = ownerNode?.children ?? [];
     const result: Array<{ id: string; type: 'field' | 'content' }> = [];
     for (const cid of parentChildren) {
       if (siblingFieldIds.has(cid)) {
@@ -555,7 +541,7 @@ export function FieldRow({
     }
     return result;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [_version, nodeId, siblingFieldIds]);
+  }, [ownerNode, ownerScopeRevision, nodeId, siblingFieldIds]);
 
   const moveToSibling = useCallback((direction: 'up' | 'down') => {
     const index = renderableSiblings.findIndex((item) => item.type === 'field' && item.id === fieldEntryId);

@@ -5,6 +5,7 @@ import { useNode } from '../../hooks/use-node';
 import { useChildren } from '../../hooks/use-children';
 import { useNodeTags } from '../../hooks/use-node-tags';
 import { useNodeFields, type FieldEntry } from '../../hooks/use-node-fields';
+import { useNodeScopeRevision, useSchemaRevision } from '../../hooks/use-node-scope-revision.js';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import * as loroDoc from '../../lib/loro-doc.js';
@@ -267,7 +268,9 @@ export function OutlinerItem({
   const hardDeleteNode = useNodeStore((s) => s.hardDeleteNode);
   const toggleNodeDone = useNodeStore((s) => s.toggleNodeDone);
   const cycleNodeCheckbox = useNodeStore((s) => s.cycleNodeCheckbox);
-  const _version = useNodeStore((s) => s._version);
+  const scopeRevision = useNodeScopeRevision(effectiveNodeId);
+  const parentScopeRevision = useNodeScopeRevision(parentId);
+  const schemaRevision = useSchemaRevision();
 
   const canEditNode = useMemo(() => getNodeCapabilities(nodeId).canEditNode, [nodeId]);
 
@@ -330,7 +333,6 @@ export function OutlinerItem({
 
   const allChildIds = effectiveNode?.children ?? [];
   const renderableSiblings = useMemo(() => {
-    void _version;
     const getNode = useNodeStore.getState().getNode;
     const parentChildren = getNode(parentId)?.children ?? [];
     const result: Array<{ id: string; type: 'field' | 'content' }> = [];
@@ -346,7 +348,7 @@ export function OutlinerItem({
     }
     return result;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [_version, parentId, parentFieldVisibility]);
+  }, [parentScopeRevision, parentId, parentFieldVisibility]);
 
   // Build field lookup by fieldEntry ID
   const fieldMap = useMemo(() => {
@@ -371,7 +373,7 @@ export function OutlinerItem({
     const store = useNodeStore.getState();
     return readViewConfig(effectiveNodeId, store.getViewDefId, store.getNode, store.getFilters);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [effectiveNodeId, _version]);
+  }, [effectiveNodeId, scopeRevision]);
 
   // Classify children → apply filter → group → sort pipeline
   const visibleChildren = useMemo(() => {
@@ -384,9 +386,9 @@ export function OutlinerItem({
       getChildNodeType: (id) => useNodeStore.getState().getNode(id)?.type,
       isOutlinerContentType: isOutlinerContentNodeType,
     });
-    return applyViewPipeline(rows, viewConfig, useNodeStore.getState().getNode, _version);
+    return applyViewPipeline(rows, viewConfig, useNodeStore.getState().getNode, useNodeStore.getState()._version);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allChildIds, fieldMap, tagIds, viewConfig, _version]);
+  }, [allChildIds, fieldMap, tagIds, viewConfig, scopeRevision]);
 
   // Template content clone colors: content children with templateId get the owning tagDef's color.
   // This ensures template-cloned content matches the supertag's bullet color.
@@ -405,7 +407,7 @@ export function OutlinerItem({
     }
     return map;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visibleChildren, _version]);
+  }, [visibleChildren, scopeRevision]);
 
   const childIds = useMemo(
     () => visibleChildren.filter((c) => c.type === 'content').map((c) => c.id),
@@ -503,7 +505,7 @@ export function OutlinerItem({
   });
   const pendingConversionInlineRefColor = useMemo(
     () => (pendingConversionRefTargetId ? resolveInlineReferenceTextColor(pendingConversionRefTargetId) : undefined),
-    [pendingConversionRefTargetId, _version],
+    [pendingConversionRefTargetId, schemaRevision],
   );
   const pendingConversionStyle = useMemo<CSSProperties | undefined>(() => (
     isPendingConversion

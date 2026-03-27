@@ -8,6 +8,7 @@
 import { LoroDoc, LoroList, LoroText, LoroMovableList, UndoManager, VersionVector, type TreeID, type PeerID, type Value } from 'loro-crdt';
 import { nanoid } from 'nanoid';
 import type { NodexNode } from '../types/node.js';
+import { SYSTEM_NODE_IDS } from '../types/index.js';
 import { saveSnapshotRecord, loadSnapshotRecord } from './loro-persistence.js';
 import { resetAwareness } from './awareness.js';
 import { readRichTextFromLoroText, writeRichTextToLoroText } from './loro-text-bridge.js';
@@ -113,32 +114,20 @@ export function wasLoadedFromSnapshot(): boolean {
 // ② Fine-grained subscriptions — per-node 订阅内部状态
 // ============================================================
 
-interface NodeSub {
-  callbacks: Set<() => void>;
-  unsub: (() => void) | null;
-}
+type SubscriptionCallbacks = Set<() => void>;
+type DomainSubscriptionKey = 'schema';
 
-/** nodexId → 该节点的订阅集合 */
-const nodeSubscriptions = new Map<string, NodeSub>();
+/** nodexId → 该节点快照的订阅集合 */
+const nodeSubscriptions = new Map<string, SubscriptionCallbacks>();
 
-function attachNodeDataSub(nodexId: string, sub: NodeSub): void {
-  sub.unsub?.();
-  sub.unsub = null;
-  if (!doc) return;
-  const treeId = nodexToTree.get(nodexId);
-  if (!treeId) return;
-  const treeNode = doc.getTree('nodes').getNodeByID(treeId);
-  if (!treeNode) return;
-  sub.unsub = treeNode.data.subscribe(() => {
-    for (const cb of sub.callbacks) cb();
-  });
-}
+/** parentId → children 列表订阅集合 */
+const childrenSubscriptions = new Map<string, SubscriptionCallbacks>();
 
-function reattachNodeSubs(): void {
-  for (const [nodexId, sub] of nodeSubscriptions) {
-    attachNodeDataSub(nodexId, sub);
-  }
-}
+/** scopeNodeId → 当前节点直接渲染作用域订阅集合 */
+const scopeSubscriptions = new Map<string, SubscriptionCallbacks>();
+
+/** 领域级订阅（如 schema） */
+const domainSubscriptions = new Map<DomainSubscriptionKey, SubscriptionCallbacks>();
 
 /** 防抖保存定时器 */
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -159,6 +148,15 @@ let _cacheVer = 0;
 let _lastCacheVer = -1;
 const _nodeCache = new Map<string, NodexNode | null>();
 const _childrenCache = new Map<string, string[]>();
+const _dirtyNodeIds = new Set<string>();
+const _dirtyChildrenIds = new Set<string>();
+const _dirtyScopeIds = new Set<string>();
+const _deletedNodeIds = new Set<string>();
+const _dirtyDomains = new Set<DomainSubscriptionKey>();
+const _scopeRevisions = new Map<string, number>();
+const _domainRevisions = new Map<DomainSubscriptionKey, number>();
+
+const SCOPE_PROXY_TYPES = new Set<NonNullable<NodexNode['type']>>(['fieldEntry', 'viewDef', 'queryCondition']);
 
 /**
  * Full cache invalidation — clears all entries on next read via checkCache().
@@ -186,6 +184,105 @@ function invalidateCacheForNode(nodexId: string): void {
 function invalidateNodeAndChildrenCache(nodexId: string): void {
   _nodeCache.delete(nodexId);   // NodexNode.children is stale
   _childrenCache.delete(nodexId); // getChildren() result is stale
+}
+
+function getOrCreateSubscriptionSet<T>(map: Map<T, SubscriptionCallbacks>, key: T): SubscriptionCallbacks {
+  let callbacks = map.get(key);
+  if (!callbacks) {
+    callbacks = new Set();
+    map.set(key, callbacks);
+  }
+  return callbacks;
+}
+
+function subscribeKey<T>(map: Map<T, SubscriptionCallbacks>, key: T, callback: () => void): () => void {
+  const callbacks = getOrCreateSubscriptionSet(map, key);
+  callbacks.add(callback);
+  return () => {
+    callbacks.delete(callback);
+    if (callbacks.size === 0) {
+      map.delete(key);
+    }
+  };
+}
+
+function emitCallbacks(callbacks: Iterable<() => void> | undefined): void {
+  if (!callbacks) return;
+  for (const cb of callbacks) cb();
+}
+
+function markSchemaDirtyForNode(nodexId: string): void {
+  let currentId: string | null = nodexId;
+  while (currentId) {
+    if (currentId === SYSTEM_NODE_IDS.SCHEMA) {
+      _dirtyDomains.add('schema');
+      return;
+    }
+    currentId = getParentId(currentId);
+  }
+}
+
+function markAncestorScopes(nodexId: string): void {
+  let currentId = nodexId;
+  while (true) {
+    const parentId = getParentId(currentId);
+    if (!parentId) return;
+    _dirtyScopeIds.add(parentId);
+    const parentNode = toNodexNode(parentId);
+    if (!parentNode || !parentNode.type || !SCOPE_PROXY_TYPES.has(parentNode.type)) return;
+    currentId = parentId;
+  }
+}
+
+function markNodeDirty(nodexId: string): void {
+  _dirtyNodeIds.add(nodexId);
+  invalidateCacheForNode(nodexId);
+  markAncestorScopes(nodexId);
+  markSchemaDirtyForNode(nodexId);
+}
+
+function markNodeAndChildrenDirty(nodexId: string): void {
+  _dirtyNodeIds.add(nodexId);
+  _dirtyChildrenIds.add(nodexId);
+  _dirtyScopeIds.add(nodexId);
+  invalidateNodeAndChildrenCache(nodexId);
+  markAncestorScopes(nodexId);
+  markSchemaDirtyForNode(nodexId);
+}
+
+function markDeletedNodeDirty(nodexId: string): void {
+  _deletedNodeIds.add(nodexId);
+  _dirtyNodeIds.add(nodexId);
+  _nodeCache.delete(nodexId);
+  _childrenCache.delete(nodexId);
+}
+
+function flushDirtySubscriptions(): void {
+  const dirtyNodeIds = [..._dirtyNodeIds, ..._deletedNodeIds];
+  const dirtyChildrenIds = [..._dirtyChildrenIds];
+  const dirtyScopeIds = [..._dirtyScopeIds];
+  const dirtyDomains = [..._dirtyDomains];
+
+  _dirtyNodeIds.clear();
+  _dirtyChildrenIds.clear();
+  _dirtyScopeIds.clear();
+  _deletedNodeIds.clear();
+  _dirtyDomains.clear();
+
+  for (const id of dirtyNodeIds) {
+    emitCallbacks(nodeSubscriptions.get(id));
+  }
+  for (const id of dirtyChildrenIds) {
+    emitCallbacks(childrenSubscriptions.get(id));
+  }
+  for (const id of dirtyScopeIds) {
+    _scopeRevisions.set(id, (_scopeRevisions.get(id) ?? 0) + 1);
+    emitCallbacks(scopeSubscriptions.get(id));
+  }
+  for (const domain of dirtyDomains) {
+    _domainRevisions.set(domain, (_domainRevisions.get(domain) ?? 0) + 1);
+    emitCallbacks(domainSubscriptions.get(domain));
+  }
 }
 
 /** 在读取前调用 — 若版本变化则清空缓存 */
@@ -296,8 +393,6 @@ function rebuildMappings(): void {
       registerMapping(storedId, node.id);
     }
   }
-  // ② 重建后重新挂载 per-node 订阅（checkout/import 后 TreeNode 引用可能失效）
-  reattachNodeSubs();
 }
 
 /**
@@ -384,7 +479,6 @@ function fixDuplicateContainerMappings(): boolean {
 
   if (changed || childrenMoved > 0) {
     invalidateCache();
-    reattachNodeSubs();
   }
 
   return childrenMoved > 0;
@@ -700,17 +794,27 @@ function deduplicateSchemaTagDefs(): boolean {
  * undoDoc, redoDoc, etc.) instead of from doc.subscribe() — which would
  * trigger a re-entrant WASM lock panic inside Loro's event handler dispatch.
  *
- * For text-editing commits (`user:text`, `user:paste`) cache invalidation
- * is skipped: the mutation function already selectively invalidated the
- * edited node, and a full flush would clear 14K entries — the very thing
- * that caused 350ms typing lag.
- *
- * For all other commits (structural changes, undo, import, intermediate
- * commits inside multi-step store actions) a full invalidateCache() is
- * called to guarantee no stale reads persist across commit boundaries.
  */
-function notifySubscribers(skipCacheFlush?: boolean): void {
-  if (!skipCacheFlush) invalidateCache();
+function notifySubscribers(forceAll = false): void {
+  if (forceAll) {
+    for (const callbacks of nodeSubscriptions.values()) emitCallbacks(callbacks);
+    for (const callbacks of childrenSubscriptions.values()) emitCallbacks(callbacks);
+    for (const [scopeId, callbacks] of scopeSubscriptions) {
+      _scopeRevisions.set(scopeId, (_scopeRevisions.get(scopeId) ?? 0) + 1);
+      emitCallbacks(callbacks);
+    }
+    for (const [domain, callbacks] of domainSubscriptions) {
+      _domainRevisions.set(domain, (_domainRevisions.get(domain) ?? 0) + 1);
+      emitCallbacks(callbacks);
+    }
+    _dirtyNodeIds.clear();
+    _dirtyChildrenIds.clear();
+    _dirtyScopeIds.clear();
+    _deletedNodeIds.clear();
+    _dirtyDomains.clear();
+  } else {
+    flushDirtySubscriptions();
+  }
   for (const cb of subscribers) cb();
 }
 
@@ -832,9 +936,10 @@ export async function initLoroDoc(workspaceId: string): Promise<{ hadSnapshot: b
 
 /** 重置（仅测试用） */
 export function resetLoroDoc(): void {
-  // ② 清理 per-node 订阅
-  for (const sub of nodeSubscriptions.values()) sub.unsub?.();
   nodeSubscriptions.clear();
+  childrenSubscriptions.clear();
+  scopeSubscriptions.clear();
+  domainSubscriptions.clear();
 
   // Clean up subscribeLocalUpdates hook
   if (unsubLocalUpdates) { unsubLocalUpdates(); unsubLocalUpdates = null; }
@@ -854,6 +959,15 @@ export function resetLoroDoc(): void {
   _hadSnapshot = false;
   _wasmPoisoned = false;
   detachedMutationWarnings.clear();
+  _dirtyNodeIds.clear();
+  _dirtyChildrenIds.clear();
+  _dirtyScopeIds.clear();
+  _deletedNodeIds.clear();
+  _dirtyDomains.clear();
+  _scopeRevisions.clear();
+  _domainRevisions.clear();
+  _nodeCache.clear();
+  _childrenCache.clear();
   invalidateCache();
   if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
 }
@@ -861,12 +975,25 @@ export function resetLoroDoc(): void {
 /** 同步初始化（仅测试用，不加载快照） */
 export function initLoroDocForTest(workspaceId: string): void {
   redoRestoreUIMetaStack.length = 0;
+  nodeSubscriptions.clear();
+  childrenSubscriptions.clear();
+  scopeSubscriptions.clear();
+  domainSubscriptions.clear();
   doc = new LoroDoc();
   configureTextStyles(doc);
   currentWorkspaceId = workspaceId;
   detachedMutationWarnings.clear();
   nodexToTree.clear();
   treeToNodex.clear();
+  _dirtyNodeIds.clear();
+  _dirtyChildrenIds.clear();
+  _dirtyScopeIds.clear();
+  _deletedNodeIds.clear();
+  _dirtyDomains.clear();
+  _scopeRevisions.clear();
+  _domainRevisions.clear();
+  _nodeCache.clear();
+  _childrenCache.clear();
   // mergeInterval=0 for deterministic tests; exclude '__seed__' and system origins
   // so seed/system commits are not tracked in the undo stack.
   undoManager = new UndoManager(doc, { mergeInterval: 0, excludeOriginPrefixes: [...UNDO_EXCLUDED_ORIGIN_PREFIXES] });
@@ -908,8 +1035,8 @@ export function createNode(
 ): string {
   const id = nodexId ?? nanoid();
   if (!canApplyMutation('createNode')) return id;
-  // Selective: only the parent's NodexNode.children and getChildren() are stale.
-  if (parentNodexId) invalidateNodeAndChildrenCache(parentNodexId);
+  if (parentNodexId) markNodeAndChildrenDirty(parentNodexId);
+  markNodeDirty(id);
   const tree = getTree();
   const parentTreeId = parentNodexId ? nodexToTree.get(parentNodexId) : undefined;
   const treeNode = tree.createNode(parentTreeId, index);
@@ -923,11 +1050,10 @@ export function createNode(
 
 export function moveNode(nodexId: string, newParentNodexId: string, index?: number): void {
   if (!canApplyMutation('moveNode')) return;
-  // Selective: invalidate old parent, new parent, and moved node.
   const oldParentId = getParentId(nodexId);
-  if (oldParentId) invalidateNodeAndChildrenCache(oldParentId);
-  invalidateNodeAndChildrenCache(newParentNodexId);
-  invalidateCacheForNode(nodexId); // NodexNode.children unchanged, but parent ref may differ
+  if (oldParentId) markNodeAndChildrenDirty(oldParentId);
+  markNodeAndChildrenDirty(newParentNodexId);
+  markNodeDirty(nodexId);
   const tree = getTree();
   const treeId = nodexToTree.get(nodexId);
   const parentTreeId = nodexToTree.get(newParentNodexId);
@@ -953,11 +1079,9 @@ export function deleteNode(nodexId: string): void {
   const toRemove = [nodexId, ...collectDescendants(nodexId)];
   tree.delete(treeId);
   for (const id of toRemove) removeMapping(id);
-  // Selective: invalidate parent + all deleted nodes' caches.
-  if (parentId) invalidateNodeAndChildrenCache(parentId);
+  if (parentId) markNodeAndChildrenDirty(parentId);
   for (const id of toRemove) {
-    _nodeCache.delete(id);
-    _childrenCache.delete(id);
+    markDeletedNodeDirty(id);
   }
 }
 
@@ -982,7 +1106,7 @@ export function setNodeRichTextContent(
   inlineRefs: NodexNode['inlineRefs'] = [],
 ): void {
   if (!canApplyMutation('setNodeRichTextContent')) return;
-  invalidateCacheForNode(nodexId);
+  markNodeDirty(nodexId);
   const tree = getTree();
   const treeId = nodexToTree.get(nodexId);
   if (!treeId) return;
@@ -1001,7 +1125,7 @@ export function setNodeRichTextContent(
 
 export function setNodeData(nodexId: string, key: string, value: unknown): void {
   if (!canApplyMutation('setNodeData')) return;
-  invalidateCacheForNode(nodexId);
+  markNodeDirty(nodexId);
   const tree = getTree();
   const treeId = nodexToTree.get(nodexId);
   if (!treeId) return;
@@ -1014,7 +1138,7 @@ export function setNodeData(nodexId: string, key: string, value: unknown): void 
 
 export function setNodeDataBatch(nodexId: string, data: Record<string, unknown>): void {
   if (!canApplyMutation('setNodeDataBatch')) return;
-  invalidateCacheForNode(nodexId);
+  markNodeDirty(nodexId);
   const tree = getTree();
   const treeId = nodexToTree.get(nodexId);
   if (!treeId) return;
@@ -1029,7 +1153,7 @@ export function setNodeDataBatch(nodexId: string, data: Record<string, unknown>)
 
 export function deleteNodeData(nodexId: string, key: string): void {
   if (!canApplyMutation('deleteNodeData')) return;
-  invalidateCacheForNode(nodexId);
+  markNodeDirty(nodexId);
   const tree = getTree();
   const treeId = nodexToTree.get(nodexId);
   if (!treeId) return;
@@ -1053,7 +1177,7 @@ function getTagsContainer(nodexId: string): LoroList | null {
 
 export function addTag(nodexId: string, tagDefId: string): void {
   if (!canApplyMutation('addTag')) return;
-  invalidateCacheForNode(nodexId);
+  markNodeDirty(nodexId);
   const tags = getTagsContainer(nodexId);
   if (!tags) return;
   const arr = tags.toArray() as string[];
@@ -1062,7 +1186,7 @@ export function addTag(nodexId: string, tagDefId: string): void {
 
 export function removeTag(nodexId: string, tagDefId: string): void {
   if (!canApplyMutation('removeTag')) return;
-  invalidateCacheForNode(nodexId);
+  markNodeDirty(nodexId);
   const tags = getTagsContainer(nodexId);
   if (!tags) return;
   const arr = tags.toArray() as string[];
@@ -1277,7 +1401,7 @@ export function importUpdates(data: Uint8Array): void {
   }
   rebuildMappings();
   scheduleSave();
-  notifySubscribers();
+  notifySubscribers(true);
 }
 
 /** Result of a resilient batch import. */
@@ -1344,7 +1468,7 @@ export function importUpdatesBatch(updates: Uint8Array[]): ImportBatchResult {
       }
     }
     scheduleSave();
-    notifySubscribers();
+    notifySubscribers(true);
   }
 
   return { imported, skipped, poisoned: _wasmPoisoned };
@@ -1390,11 +1514,7 @@ export function commitDoc(origin?: string): void {
   // Explicit notification — replaces doc.subscribe() which caused WASM re-entrant lock panic.
   // Safe to call synchronously here: doc.commit() has returned, no Loro lock is held.
   scheduleSave();
-  // For text edits, skip the full cache flush — the mutation function already
-  // selectively invalidated the edited node.  Full flush would clear 14K entries
-  // and trigger O(N) WASM reads from useSyncExternalStore selectors (~350ms).
-  const skipFlush = resolvedOrigin === 'user:text' || resolvedOrigin === 'user:paste';
-  notifySubscribers(skipFlush);
+  notifySubscribers();
 }
 
 export function withCommitOrigin<T>(origin: string, fn: () => T): T {
@@ -1440,7 +1560,7 @@ export function undoDoc(): boolean {
   if (result) {
     rebuildMappings();
     scheduleSave();
-    notifySubscribers();
+    notifySubscribers(true);
   }
   return result;
 }
@@ -1458,7 +1578,7 @@ export function redoDoc(): boolean {
   if (result) {
     rebuildMappings();
     scheduleSave();
-    notifySubscribers();
+    notifySubscribers(true);
   }
   return result;
 }
@@ -1469,7 +1589,7 @@ export function undoAiDoc(): boolean {
   if (result) {
     rebuildMappings();
     scheduleSave();
-    notifySubscribers();
+    notifySubscribers(true);
   }
   return result;
 }
@@ -1490,37 +1610,38 @@ export function canUndoAiDoc(): boolean {
 // ② Fine-grained subscriptions — per-node 订阅 API
 // ============================================================
 
-/**
- * 订阅单个节点的数据变更（name / type / tags / 字段等）。
- *
- * - 仅触发该节点 LoroMap 数据变化，不触发无关节点
- * - 结构变更（children 增删移）仍需通过全局 subscribe() 监听
- * - 保留全局 _version 作为 fallback，本 API 为 opt-in
- *
- * @returns 取消订阅函数
- *
- * @example
- * ```ts
- * const unsub = subscribeNode('nodeA', () => console.log('A changed'));
- * // Later:
- * unsub();
- * ```
- */
+/** Subscribe to a single node snapshot (data + children). */
 export function subscribeNode(nodexId: string, callback: () => void): () => void {
-  let sub = nodeSubscriptions.get(nodexId);
-  if (!sub) {
-    sub = { callbacks: new Set(), unsub: null };
-    nodeSubscriptions.set(nodexId, sub);
-    attachNodeDataSub(nodexId, sub);
-  }
-  sub.callbacks.add(callback);
-  return () => {
-    sub!.callbacks.delete(callback);
-    if (sub!.callbacks.size === 0) {
-      sub!.unsub?.();
-      nodeSubscriptions.delete(nodexId);
-    }
-  };
+  return subscribeKey(nodeSubscriptions, nodexId, callback);
+}
+
+/** Subscribe to a parent's direct children list. */
+export function subscribeChildren(parentNodexId: string, callback: () => void): () => void {
+  return subscribeKey(childrenSubscriptions, parentNodexId, callback);
+}
+
+/**
+ * Subscribe to the render scope rooted at `scopeNodeId`.
+ *
+ * Scope changes include:
+ * - direct children list changes
+ * - direct child data changes
+ * - proxy descendants that affect the owner row model (fieldEntry, viewDef, queryCondition)
+ */
+export function subscribeScope(scopeNodeId: string, callback: () => void): () => void {
+  return subscribeKey(scopeSubscriptions, scopeNodeId, callback);
+}
+
+export function getScopeRevision(scopeNodeId: string): number {
+  return _scopeRevisions.get(scopeNodeId) ?? 0;
+}
+
+export function subscribeSchema(callback: () => void): () => void {
+  return subscribeKey(domainSubscriptions, 'schema', callback);
+}
+
+export function getSchemaRevision(): number {
+  return _domainRevisions.get('schema') ?? 0;
 }
 
 // ============================================================
@@ -1619,7 +1740,7 @@ export function checkout(frontiers: Array<{ peer: PeerID; counter: number }>): v
   if (!doc) throw new Error('[loro-doc] LoroDoc 未初始化');
   doc.checkout(frontiers);
   rebuildMappings();
-  notifySubscribers();
+  notifySubscribers(true);
 }
 
 /**
@@ -1630,7 +1751,7 @@ export function checkoutToLatest(): void {
   doc.checkoutToLatest();
   detachedMutationWarnings.clear();
   rebuildMappings();
-  notifySubscribers();
+  notifySubscribers(true);
 }
 
 /**
@@ -1685,7 +1806,7 @@ export function getNodeText(nodexId: string): LoroText | null {
  */
 export function getOrCreateNodeText(nodexId: string): LoroText | null {
   if (!canApplyMutation('getOrCreateNodeText')) return getNodeText(nodexId);
-  invalidateCacheForNode(nodexId);
+  markNodeDirty(nodexId);
   const treeId = nodexToTree.get(nodexId);
   if (!treeId) return null;
   const node = getTree().getNodeByID(treeId);
@@ -1760,7 +1881,7 @@ export function forkDoc(): DocFork {
         lastMergedVV = forkedDoc.oplogVersion();
         rebuildMappings();
         scheduleSave();
-        notifySubscribers();
+        notifySubscribers(true);
       }
     },
   };

@@ -3,6 +3,7 @@ import { useNode } from '../../hooks/use-node';
 import { useChildren } from '../../hooks/use-children';
 import { useNodeFields, type FieldEntry } from '../../hooks/use-node-fields';
 import { useNodeTags } from '../../hooks/use-node-tags';
+import { useNodeScopeRevision } from '../../hooks/use-node-scope-revision.js';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import * as loroDoc from '../../lib/loro-doc.js';
@@ -50,7 +51,7 @@ export function OutlinerView({ rootNodeId, showTemplateFields, panelId }: Outlin
   useChildren(rootNodeId);
 
   const allChildIds = node?.children ?? [];
-  const _version = useNodeStore((s) => s._version);
+  const scopeRevision = useNodeScopeRevision(rootNodeId);
   const setFocusedNode = useUIStore((s) => s.setFocusedNode);
   const clearFocus = useUIStore((s) => s.clearFocus);
   const setEditingFieldName = useUIStore((s) => s.setEditingFieldName);
@@ -75,10 +76,10 @@ export function OutlinerView({ rootNodeId, showTemplateFields, panelId }: Outlin
 
   const fields = useNodeFields(rootNodeId);
   const tagIds = useNodeTags(rootNodeId);
-  const canCreateRootChildren = useNodeStore((s) => {
-    void s._version;
-    return canCreateChildrenUnder(rootNodeId);
-  });
+  const canCreateRootChildren = useMemo(
+    () => canCreateChildrenUnder(rootNodeId),
+    [rootNodeId, node],
+  );
 
   // Hidden field reveal state from UIStore (session-only, keyed by "panelNodeId:fieldEntryId")
   const expandedHiddenFields = useUIStore((s) => s.expandedHiddenFields);
@@ -109,7 +110,7 @@ export function OutlinerView({ rootNodeId, showTemplateFields, panelId }: Outlin
     const store = useNodeStore.getState();
     return readViewConfig(rootNodeId, store.getViewDefId, store.getNode, store.getFilters);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rootNodeId, _version]);
+  }, [rootNodeId, scopeRevision]);
 
   // Classify children → apply filter → group → sort pipeline
   const visibleChildren = useMemo(() => {
@@ -122,9 +123,9 @@ export function OutlinerView({ rootNodeId, showTemplateFields, panelId }: Outlin
       getChildNodeType: (id) => useNodeStore.getState().getNode(id)?.type,
       isOutlinerContentType: isOutlinerContentNodeType,
     });
-    return applyViewPipeline(rows, viewConfig, useNodeStore.getState().getNode, _version);
+    return applyViewPipeline(rows, viewConfig, useNodeStore.getState().getNode, useNodeStore.getState()._version);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allChildIds, fieldMap, tagIds, viewConfig, _version]);
+  }, [allChildIds, fieldMap, tagIds, viewConfig, scopeRevision]);
 
   // Template content clone colors: content children with templateId get the owning tagDef's color.
   const templateContentColors = useMemo(() => {
@@ -142,7 +143,7 @@ export function OutlinerView({ rootNodeId, showTemplateFields, panelId }: Outlin
     }
     return map;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visibleChildren, _version]);
+  }, [visibleChildren, scopeRevision]);
 
   /** Check if a hidden field has been temporarily revealed via UIStore */
   const isFieldRevealed = (fieldEntryId: string) =>

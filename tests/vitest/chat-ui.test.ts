@@ -279,7 +279,7 @@ describe('chat ui', () => {
   it('renders a message-level streaming spinner aligned with the assistant content flow', () => {
     const html = renderToStaticMarkup(
       React.createElement(ChatMessage, {
-        streaming: true,
+        turnPhase: 'waiting_for_tool',
         entry: {
           nodeId: null,
           message: {
@@ -421,7 +421,7 @@ describe('chat ui', () => {
           },
           branches: null,
         },
-        streaming: true,
+        turnPhase: 'waiting_for_tool',
       }),
     );
     expect(html).toContain('Streaming response...');

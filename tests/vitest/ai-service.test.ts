@@ -52,6 +52,40 @@ function createAssistantMessage(text: string, timestamp: number): import('@mario
   };
 }
 
+function createAssistantToolCallMessage(
+  timestamp: number,
+  toolCallId: string = 'tool_call_1',
+): import('@mariozechner/pi-agent-core').AgentMessage {
+  return {
+    role: 'assistant',
+    content: [{
+      type: 'toolCall',
+      id: toolCallId,
+      name: 'browser',
+      arguments: { action: 'get_text' },
+    }],
+    api: 'anthropic-messages',
+    provider: 'anthropic',
+    model: 'claude-sonnet-4-5',
+    usage: {
+      input: 0,
+      output: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+      totalTokens: 0,
+      cost: {
+        input: 0,
+        output: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+        total: 0,
+      },
+    },
+    stopReason: 'toolUse',
+    timestamp,
+  };
+}
+
 function createToolResultMessage(
   text: string,
   timestamp: number,
@@ -835,6 +869,39 @@ describe('ai-service', () => {
     expect(agent.prompt).toHaveBeenCalledTimes(1);
     expect(agent.prompt).toHaveBeenCalledWith('hello world');
     expect(agent.abort).toHaveBeenCalledTimes(1);
+  });
+
+  it('syncs assistant tool-call messages into the session tree on message_end before tool results arrive', async () => {
+    const { createNewChatSession, getCurrentSession, streamChat } = await import('../../src/lib/ai-service.js');
+    const { agent, state, emit } = createDynamicTestAgent();
+
+    await createNewChatSession(agent);
+
+    const toolCallMessage = createAssistantToolCallMessage(2);
+
+    agent.prompt.mockImplementation(async (prompt: string) => {
+      state.messages = [
+        createUserMessage(prompt, 1),
+        toolCallMessage,
+      ];
+
+      emit({
+        type: 'message_end',
+        message: toolCallMessage,
+      } as import('@mariozechner/pi-agent-core').AgentEvent);
+
+      expect(getLinearPath(getCurrentSession(agent)!).map((node) => node.message)).toEqual([
+        createUserMessage('Check the page', 1),
+        toolCallMessage,
+      ]);
+    });
+
+    await streamChat('Check the page', agent);
+
+    expect(getLinearPath(getCurrentSession(agent)!).map((node) => node.message)).toEqual([
+      createUserMessage('Check the page', 1),
+      toolCallMessage,
+    ]);
   });
 
   it('editAndResend creates a new user branch and continues without duplicating the user message', async () => {

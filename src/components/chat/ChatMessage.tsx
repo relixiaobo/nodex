@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { AssistantMessage, ToolCall, ToolResultMessage } from '@mariozechner/pi-ai';
 import { toast } from 'sonner';
-import type { ChatConversationMessage, ChatMessageEntry } from '../../hooks/use-agent.js';
+import type { ChatConversationMessage, ChatMessageEntry, ChatTurnPhase } from '../../hooks/use-agent.js';
 import { Brain, Check, ChevronLeft, ChevronRight, Copy, Pencil, RefreshCw } from '../../lib/icons.js';
 import { CollapsibleIndicator } from './CollapsibleIndicator.js';
 import { MarkdownContent } from './MarkdownRenderer.js';
@@ -12,6 +12,7 @@ interface ChatMessageProps {
   entry: ChatMessageEntry;
   toolResults?: Map<string, ToolResultMessage>;
   streaming?: boolean;
+  turnPhase?: ChatTurnPhase;
   grouped?: boolean;
   busy?: boolean;
   /** True when this is the last message in a consecutive same-role group.
@@ -167,6 +168,7 @@ export function ChatMessage({
   entry,
   toolResults,
   streaming = false,
+  turnPhase = 'idle',
   grouped = false,
   busy = false,
   isLastInTurn = true,
@@ -178,6 +180,7 @@ export function ChatMessage({
   const { message, nodeId, branches } = entry;
   const text = getMessageText(message);
   const isUser = message.role === 'user';
+  const turnActive = turnPhase !== 'idle';
   const assistantBlocks = message.role === 'assistant'
     ? renderAssistantBlocks(message, streaming, toolResults)
     : null;
@@ -299,7 +302,7 @@ export function ChatMessage({
     );
   }
 
-  const showToolbar = nodeId !== null && !streaming && !isEditing && (isUser || isLastInTurn);
+  const showToolbar = nodeId !== null && !turnActive && !isEditing && (isUser || isLastInTurn);
 
   return (
     <div className={`${isUser ? 'group/message' : ''} flex w-full ${isUser ? 'justify-end' : 'justify-start'} ${grouped ? 'mt-1' : 'mt-4 first:mt-0'}`}>
@@ -358,7 +361,7 @@ export function ChatMessage({
         ) : (
           <div className="flex w-full flex-col gap-2">
             {assistantBlocks}
-            {streaming && <StreamingIndicator />}
+            {turnActive && <StreamingIndicator />}
           </div>
         )}
         {showToolbar && (

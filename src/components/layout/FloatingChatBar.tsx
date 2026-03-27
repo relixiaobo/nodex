@@ -1,15 +1,48 @@
+import { useEffect, useState } from 'react';
 import { useUIStore } from '../../stores/ui-store.js';
 import { ensureChatSession } from '../../lib/chat-panel-actions.js';
+import { getAgentForSession } from '../../lib/ai-service.js';
+
+function useAgentStreaming(): boolean {
+  const sessionId = useUIStore((s) => s.currentChatSessionId);
+  const [streaming, setStreaming] = useState(false);
+
+  useEffect(() => {
+    if (!sessionId) {
+      setStreaming(false);
+      return;
+    }
+
+    let agent: ReturnType<typeof getAgentForSession>;
+    try {
+      agent = getAgentForSession(sessionId);
+    } catch {
+      setStreaming(false);
+      return;
+    }
+
+    setStreaming(agent.state.isStreaming);
+    const unsubscribe = agent.subscribe(() => {
+      setStreaming(agent.state.isStreaming);
+    });
+    return unsubscribe;
+  }, [sessionId]);
+
+  return streaming;
+}
 
 export function FloatingChatBar() {
   const openChatDrawer = useUIStore((s) => s.openChatDrawer);
   const chatDrawerOpen = useUIStore((s) => s.chatDrawerOpen);
   const chatDraft = useUIStore((s) => s.chatDraft);
+  const isStreaming = useAgentStreaming();
 
   function handleClick() {
     void ensureChatSession();
     openChatDrawer();
   }
+
+  const showStreaming = isStreaming && !chatDrawerOpen;
 
   return (
     <div
@@ -23,9 +56,16 @@ export function FloatingChatBar() {
           onClick={handleClick}
           className="flex w-full items-center rounded-xl border border-border bg-background px-3 py-2.5 text-base leading-6 text-foreground-tertiary transition-colors hover:border-foreground/20"
         >
-          <span className="min-w-0 flex-1 truncate text-left">
-            {chatDraft || 'Ask anything…'}
-          </span>
+          {showStreaming ? (
+            <span className="flex items-center gap-2">
+              <span className="chat-streaming-capsule" />
+              <span className="text-sm text-foreground-tertiary">Thinking…</span>
+            </span>
+          ) : (
+            <span className="min-w-0 flex-1 truncate text-left">
+              {chatDraft || 'Ask anything…'}
+            </span>
+          )}
         </button>
       </div>
     </div>

@@ -19,12 +19,13 @@
 | nodex-claude | — | 空闲 | — |
 | nodex-claude-2 | — | 空闲 | — |
 | nodex-gemini | — | 空闲 | — |
-| nodex-codex | — | 空闲 | — |
+| nodex-codex | perf/chat-drawer-lag | #184 Chat 性能优化 | 待执行 |
 
 ---
 
 ## 进行中
 
+- [ ] **#184 Chat 抽屉性能优化 — 打开/切换模型卡顿** → nodex-codex
 
 ---
 

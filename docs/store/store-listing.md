@@ -1,7 +1,7 @@
 # Chrome Web Store Listing
 
 ## Extension Name
-soma
+soma — Notes that think with you
 
 ## Short Description (132 chars max)
 Notes that think with you. Structured notes, web highlights, and AI thinking partner — all in your browser sidebar.

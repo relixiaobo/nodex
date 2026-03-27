@@ -790,6 +790,9 @@ async function runAgentTurn(session: ChatSession, agent: Agent, input: AgentTurn
       if (event.message.role === 'assistant') {
         overflowRecovery.handleAssistantMessage(event.message);
         syncSessionFromAgent(session, agent.state.messages);
+        // Check if context is approaching the limit mid-turn (e.g. after
+        // multiple tool calls) and compact before the next API call.
+        void compactIfNeeded(session, agent);
         return;
       }
 

@@ -57,7 +57,7 @@ export function FloatingChatBar() {
           className="flex w-full items-center rounded-xl border border-border bg-background px-3 py-2.5 text-base leading-6 text-foreground-tertiary transition-colors hover:border-foreground/20"
         >
           <span className="min-w-0 flex-1 truncate text-left">
-            {showStreaming ? 'soma is working…' : (chatDraft || 'Ask anything…')}
+            {showStreaming ? <><span>soma is working</span><span className="inline-block w-[1em] text-left animate-ellipsis" /></> : (chatDraft || 'Ask anything…')}
           </span>
         </button>
       </div>

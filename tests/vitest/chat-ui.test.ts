@@ -353,7 +353,7 @@ describe('chat ui', () => {
     expect(html).toContain('hljs-');
   });
 
-  it('renders error messages as plain text without markdown', () => {
+  it('renders error messages as inline error footer with retry button', () => {
     const html = renderToStaticMarkup(
       React.createElement(ChatMessage, {
         entry: {
@@ -373,9 +373,41 @@ describe('chat ui', () => {
         },
       }),
     );
+    // Partial text before error is still rendered as markdown
+    expect(html).toContain('chat-prose');
+    expect(html).toContain('<strong>');
+    // Error footer with destructive styling and retry button
     expect(html).toContain('text-destructive');
-    expect(html).not.toContain('chat-prose');
-    expect(html).not.toContain('<strong>');
+    expect(html).toContain('API error');
+    expect(html).toContain('Retry');
+  });
+
+  it('skips raw JSON error blocks and shows parsed error message', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(ChatMessage, {
+        entry: {
+          nodeId: 'msg_json_err',
+          message: {
+            role: 'assistant',
+            content: [{ type: 'text', text: '{"type":"error","error":{"type":"api_error","message":"Internal server error"},"request_id":"req_123"}' }],
+            api: 'anthropic-messages',
+            provider: 'anthropic',
+            model: 'test',
+            usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+            stopReason: 'error',
+            errorMessage: '{"type":"error","error":{"type":"api_error","message":"Internal server error"},"request_id":"req_123"}',
+            timestamp: 2,
+          },
+          branches: null,
+        },
+      }),
+    );
+    // Raw JSON should NOT be rendered
+    expect(html).not.toContain('request_id');
+    expect(html).not.toContain('req_123');
+    // Parsed user-friendly message should show
+    expect(html).toContain('Internal server error');
+    expect(html).toContain('Retry');
   });
 
   it('does not render the legacy inline streaming cursor on the last text block', () => {

@@ -19,13 +19,12 @@
 | nodex-claude | — | 空闲 | — |
 | nodex-claude-2 | — | 空闲 | — |
 | nodex-gemini | — | 空闲 | — |
-| nodex-codex | perf/structural-mutation-lag | #183 性能优化 Phase 2 | 待执行 |
+| nodex-codex | — | 空闲 | — |
 
 ---
 
 ## 进行中
 
-- [ ] **#183 性能优化 Phase 2 — 消除 Enter/结构操作卡顿** → nodex-codex
 
 ---
 
@@ -126,6 +125,7 @@
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-27 | 性能优化 Phase 2 — 细粒度订阅消除结构操作卡顿 | codex | #183 |
 | 2026-03-26 | 性能优化 40K 节点 — O(N) 热点消除 | claude | #182 |
 | 2026-03-26 | Tana 数据导入 + Sync 启动修复 | claude-2 | #180 |
 | 2026-03-25 | @ 引用节点 — Chat 输入框 ProseMirror + @ mention + context injection | claude | #179 |

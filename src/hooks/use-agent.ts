@@ -18,6 +18,7 @@ import {
   prepareChatSessionById,
   prepareLatestChatSession,
   regenerateResponse,
+  retryFromError,
   setSteeringNote,
   stopStreaming,
   streamChat,
@@ -304,6 +305,7 @@ export function useAgent(agent: Agent = getAIAgent(), sessionId?: string) {
       sendMessage: (prompt: string) => streamChat(prompt, agent),
       editMessage: (nodeId: string, newContent: string) => editAndResend(nodeId, newContent, agent),
       regenerateMessage: (nodeId: string) => regenerateResponse(nodeId, agent),
+      retryFromError: (nodeId: string) => retryFromError(nodeId, agent),
       switchBranch: (nodeId: string) => {
         switchMessageBranch(nodeId, agent);
         startTransition(() => {

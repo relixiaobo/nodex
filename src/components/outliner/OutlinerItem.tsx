@@ -1313,7 +1313,7 @@ function OutlinerItemInner({
     [nodeId, parentId, panelId, createSiblingNodesFromPaste, setFocusedNode],
   );
 
-  const handleIndent = useCallback(() => {
+  const handleIndent = useCallback((cursorOffset?: number) => {
     // References cannot be indented (would cause ownership conflicts)
     if (loroDoc.getParentId(nodeId) !== parentId) return;
 
@@ -1334,9 +1334,13 @@ function OutlinerItemInner({
     indentNode(nodeId);
     // Update focusedParentId so the node keeps focus under its new parent
     setFocusedNode(nodeId, newParentId, panelId);
+    // Preserve cursor position — editor remounts under new parent
+    if (cursorOffset !== undefined) {
+      useUIStore.getState().setFocusClickCoords({ nodeId, parentId: newParentId, textOffset: cursorOffset });
+    }
   }, [nodeId, panelId, parentId, indentNode, setExpanded, setFocusedNode]);
 
-  const handleOutdent = useCallback(() => {
+  const handleOutdent = useCallback((cursorOffset?: number) => {
     // References cannot be outdented (would cause ownership conflicts)
     if (loroDoc.getParentId(nodeId) !== parentId) return;
     // Compute grandparent before moving so we can update focusedParentId
@@ -1344,6 +1348,10 @@ function OutlinerItemInner({
     outdentNode(nodeId);
     if (grandparentId) {
       setFocusedNode(nodeId, grandparentId, panelId);
+      // Preserve cursor position — editor remounts under new parent
+      if (cursorOffset !== undefined) {
+        useUIStore.getState().setFocusClickCoords({ nodeId, parentId: grandparentId, textOffset: cursorOffset });
+      }
     }
   }, [nodeId, parentId, panelId, outdentNode, setFocusedNode]);
 

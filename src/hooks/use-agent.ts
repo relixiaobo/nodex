@@ -28,11 +28,19 @@ import {
 
 export type ChatConversationMessage = UserMessage | AssistantMessage;
 
-export interface ChatMessageEntry {
+export interface ChatConversationEntry {
+  kind: 'message';
   nodeId: string | null;
   message: ChatConversationMessage;
   branches: { ids: string[]; currentIndex: number } | null;
 }
+
+export interface ActiveAssistantPlaceholderEntry {
+  kind: 'active_assistant_placeholder';
+  timestamp: number;
+}
+
+export type ChatMessageEntry = ChatConversationEntry | ActiveAssistantPlaceholderEntry;
 
 export type ChatTurnPhase = 'idle' | 'streaming_text' | 'waiting_for_tool' | 'resuming_after_tool';
 
@@ -46,6 +54,14 @@ export interface AgentDebugState {
   reasoning: boolean;
   thinkingLevel: ThinkingLevel | null;
   turns: ChatTurnDebugRecord[];
+}
+
+function getEntryRole(entry: ChatMessageEntry): 'user' | 'assistant' {
+  return entry.kind === 'message' ? entry.message.role : 'assistant';
+}
+
+function getEntryTimestamp(entry: ChatMessageEntry): number {
+  return entry.kind === 'message' ? entry.message.timestamp : entry.timestamp;
 }
 
 /** Extract a map of toolCallId → result text from all messages. */
@@ -94,6 +110,42 @@ function assistantHasPendingToolCalls(
   return sawToolCall ? false : false;
 }
 
+export function shouldAppendActiveAssistantPlaceholder(
+  messages: ChatMessageEntry[],
+  turnPhase: ChatTurnPhase,
+): boolean {
+  if (turnPhase === 'idle' || messages.length === 0) {
+    return false;
+  }
+
+  return getEntryRole(messages[messages.length - 1]!) !== 'assistant';
+}
+
+function createActiveAssistantPlaceholderEntry(
+  timestamp: number,
+): ChatMessageEntry {
+  return {
+    kind: 'active_assistant_placeholder',
+    timestamp,
+  };
+}
+
+function appendActiveAssistantPlaceholder(
+  messages: ChatMessageEntry[],
+  turnPhase: ChatTurnPhase,
+  agent: Agent,
+): ChatMessageEntry[] {
+  if (!shouldAppendActiveAssistantPlaceholder(messages, turnPhase)) {
+    return messages;
+  }
+
+  const lastTimestamp = getEntryTimestamp(messages[messages.length - 1] ?? { kind: 'active_assistant_placeholder', timestamp: 0 });
+  return [
+    ...messages,
+    createActiveAssistantPlaceholderEntry(lastTimestamp),
+  ];
+}
+
 function getConversationState(
   agent: Agent,
   toolResults: Map<string, ToolResultMessage>,
@@ -110,12 +162,13 @@ function getConversationState(
         const currentIndex = branchIds.indexOf(node.id);
 
         return [{
+          kind: 'message',
           nodeId: node.id,
           message: node.message,
           branches: branchIds.length > 1 && currentIndex >= 0
             ? { ids: branchIds, currentIndex }
             : null,
-        } satisfies ChatMessageEntry];
+        } satisfies ChatConversationEntry];
       })
     : [];
 
@@ -126,10 +179,11 @@ function getConversationState(
     .flatMap((message) =>
       isConversationMessage(message)
         ? [{
+          kind: 'message',
           nodeId: null,
           message,
           branches: null,
-        } satisfies ChatMessageEntry]
+        } satisfies ChatConversationEntry]
         : [],
     );
 
@@ -142,29 +196,31 @@ function getConversationState(
 
   if (isConversationMessage(streamingMessage) && !sameConversationMessage(streamingMessage, lastTransient ?? lastPersisted)) {
     entries.push({
+      kind: 'message',
       nodeId: null,
       message: streamingMessage,
       branches: null,
     });
   }
 
+  let turnPhase: ChatTurnPhase;
   if (!agent.state.isStreaming) {
-    return { messages: entries, turnPhase: 'idle' };
+    turnPhase = 'idle';
+  } else if (streamingMessage?.role === 'assistant') {
+    turnPhase = assistantHasVisibleText(streamingMessage) ? 'streaming_text' : 'resuming_after_tool';
+  } else {
+    const latestAssistant = [...entries]
+      .reverse()
+      .find((entry) => entry.kind === 'message' && entry.message.role === 'assistant')?.message as AssistantMessage | undefined;
+    turnPhase = latestAssistant && assistantHasPendingToolCalls(latestAssistant, toolResults)
+      ? 'waiting_for_tool'
+      : 'resuming_after_tool';
   }
 
-  if (streamingMessage?.role === 'assistant') {
-    return {
-      messages: entries,
-      turnPhase: assistantHasVisibleText(streamingMessage) ? 'streaming_text' : 'resuming_after_tool',
-    };
-  }
-
-  const latestAssistant = [...entries].reverse().find((entry) => entry.message.role === 'assistant')?.message as AssistantMessage | undefined;
-  if (latestAssistant && assistantHasPendingToolCalls(latestAssistant, toolResults)) {
-    return { messages: entries, turnPhase: 'waiting_for_tool' };
-  }
-
-  return { messages: entries, turnPhase: 'resuming_after_tool' };
+  return {
+    messages: appendActiveAssistantPlaceholder(entries, turnPhase, agent),
+    turnPhase,
+  };
 }
 
 export function useAgent(agent: Agent = getAIAgent(), sessionId?: string) {
@@ -216,7 +272,9 @@ export function useAgent(agent: Agent = getAIAgent(), sessionId?: string) {
 
     const toolResults = buildToolResultMap(agent.state.messages);
     const { messages, turnPhase } = getConversationState(agent, toolResults);
-    const lastMessage = messages[messages.length - 1]?.message;
+    const lastMessage = [...messages]
+      .reverse()
+      .find((entry): entry is ChatConversationEntry => entry.kind === 'message')?.message;
     const error = lastMessage?.role === 'assistant' && lastMessage.stopReason === 'aborted'
       ? undefined
       : agent.state.error;

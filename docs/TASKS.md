@@ -126,6 +126,8 @@
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-27 | Chat 复制/粘贴/Debug 增强 + thinking level 持久化 | codex | #188 |
+| 2026-03-27 | node_search 长混合查询召回率优化 | codex | #187 |
 | 2026-03-27 | Chat 呼吸胶囊立即显示 — placeholder display entry | codex | #186 |
 | 2026-03-27 | Chat tool-call/streaming UI 稳定化 — turn-phase 模型 + 呼吸胶囊 | codex | #185 |
 | 2026-03-27 | Chat 抽屉性能优化 — shell/body 分离 + 模型切换防抖 | codex | #184 |

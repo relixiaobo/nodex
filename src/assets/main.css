@@ -798,6 +798,28 @@ html, body {
   margin: 12px 0;
 }
 
-/* Legacy streaming cursor inline hack — no longer needed.
-   The streaming indicator is now a fixed element at the bottom of the message list,
-   not an inline sibling of the last text block. */
+/* Assistant streaming indicator:
+   small vertical capsule, aligned with the assistant content flow,
+   with a gentle breathing opacity/brightness cycle instead of a spinner. */
+@keyframes chat-streaming-breathe {
+  0%, 100% {
+    opacity: 0.35;
+    transform: scaleY(0.94);
+    filter: brightness(0.94);
+  }
+  50% {
+    opacity: 1;
+    transform: scaleY(1);
+    filter: brightness(1.06);
+  }
+}
+
+.chat-streaming-capsule {
+  display: inline-block;
+  width: 6px;
+  height: 14px;
+  border-radius: 9999px;
+  background-color: var(--color-primary);
+  animation: chat-streaming-breathe 1.35s ease-in-out infinite;
+  transform-origin: center;
+}

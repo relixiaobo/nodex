@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { AssistantMessage, ToolCall, ToolResultMessage } from '@mariozechner/pi-ai';
 import { toast } from 'sonner';
 import type { ChatConversationMessage, ChatMessageEntry } from '../../hooks/use-agent.js';
-import { Brain, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, Pencil, RefreshCw } from '../../lib/icons.js';
+import { Brain, Check, ChevronLeft, ChevronRight, Copy, Pencil, RefreshCw } from '../../lib/icons.js';
+import { CollapsibleIndicator } from './CollapsibleIndicator.js';
 import { MarkdownContent } from './MarkdownRenderer.js';
 import { ToolCallBlock } from './ToolCallBlock.js';
 import { ToolCallGroup } from './ToolCallGroup.js';
@@ -59,18 +60,14 @@ function ThinkingBlock({ text, streaming }: { text: string; streaming: boolean }
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
-        className="group/thinking flex max-w-full items-center gap-1.5 py-0.5 text-foreground-tertiary transition-colors hover:text-foreground-secondary"
+        className="group/thinking flex max-w-full items-center gap-1.5 py-0.5 text-left text-foreground-tertiary transition-colors hover:text-foreground-secondary"
       >
-        <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center">
-          {expanded ? (
-            <ChevronDown size={14} strokeWidth={1.8} className="rotate-180" />
-          ) : (
-            <>
-              <Brain size={14} strokeWidth={1.5} className="group-hover/thinking:hidden" />
-              <ChevronDown size={14} strokeWidth={1.8} className="hidden group-hover/thinking:block" />
-            </>
-          )}
-        </span>
+        <CollapsibleIndicator
+          expanded={expanded}
+          hoverScopeClass="group-hover/thinking"
+          sizeClassName="h-3.5 w-3.5"
+          icon={<Brain size={14} strokeWidth={1.5} />}
+        />
         <span className="text-xs">
           {streaming && !text ? 'Thinking…' : 'Thought'}
         </span>
@@ -80,6 +77,18 @@ function ThinkingBlock({ text, streaming }: { text: string; streaming: boolean }
           {text}
         </pre>
       )}
+    </div>
+  );
+}
+
+function StreamingIndicator() {
+  return (
+    <div
+      data-testid="chat-message-streaming-indicator"
+      className="flex items-center py-1"
+      aria-label="Assistant is responding"
+    >
+      <span className="chat-streaming-capsule" />
     </div>
   );
 }
@@ -349,6 +358,7 @@ export function ChatMessage({
         ) : (
           <div className="flex w-full flex-col gap-2">
             {assistantBlocks}
+            {streaming && <StreamingIndicator />}
           </div>
         )}
         {showToolbar && (

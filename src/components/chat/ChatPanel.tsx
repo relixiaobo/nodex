@@ -538,11 +538,6 @@ export function ChatPanel({ sessionId, hideHeader, debugOpen: externalDebugOpen 
                 ) : (
                   renderConversationMessages()
                 )}
-                {isStreaming && (
-                  <div className="sticky bottom-0 flex h-8 items-center bg-inherit pl-1">
-                    <span className="inline-block h-3.5 w-1.5 animate-pulse rounded-sm bg-primary" />
-                  </div>
-                )}
               </div>
               <div className="relative">
                 {steeringNote && (

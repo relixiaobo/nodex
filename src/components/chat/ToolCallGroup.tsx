@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import type { ToolCall, ToolResultMessage } from '@mariozechner/pi-ai';
-import { ChevronDown, ListChecks, Loader2 } from '../../lib/icons.js';
-import { ToolCallBlock, getStatus, summarizeToolCall } from './ToolCallBlock.js';
+import { ListChecks, Loader2 } from '../../lib/icons.js';
+import { CollapsibleIndicator } from './CollapsibleIndicator.js';
+import { ToolCallBlock, getStatus } from './ToolCallBlock.js';
 
 interface ToolCallGroupProps {
   toolCalls: ToolCall[];
@@ -25,18 +26,13 @@ export function ToolCallGroup({ toolCalls, results }: ToolCallGroupProps) {
     setExpanded((v) => !v);
   }
 
-  const latestToolCall = toolCalls[total - 1];
-  const latestStatus = getStatus(results?.get(latestToolCall.id));
-
   // ── Title ─────────────────────────────────────────────────────────────
 
   let titleText: string;
   if (!isExecuting) {
     titleText = `Completed ${total} steps`;
-  } else if (expanded) {
-    titleText = `${total} steps`;
   } else {
-    titleText = `${summarizeToolCall(latestToolCall, latestStatus)} · step ${total}`;
+    titleText = `Working through ${total} step${total > 1 ? 's' : ''}`;
   }
 
   const failedSuffix = !isExecuting && failed > 0 ? ` · ${failed} failed` : '';
@@ -51,18 +47,13 @@ export function ToolCallGroup({ toolCalls, results }: ToolCallGroupProps) {
       <button
         type="button"
         onClick={handleToggle}
-        className="group/toolgroup flex max-w-full items-center gap-1.5 py-0.5 text-foreground-tertiary transition-colors hover:text-foreground-secondary"
+        className="group/toolgroup flex max-w-full items-center gap-1.5 py-0.5 text-left text-foreground-tertiary transition-colors hover:text-foreground-secondary"
       >
-        <span className="flex h-4 w-3.5 shrink-0 items-center justify-center">
-          {expanded ? (
-            <ChevronDown size={14} strokeWidth={1.8} className="rotate-180" />
-          ) : (
-            <>
-              <StatusIcon size={14} strokeWidth={1.6} className={`group-hover/toolgroup:hidden ${statusIconClass}`} />
-              <ChevronDown size={14} strokeWidth={1.8} className="hidden group-hover/toolgroup:block" />
-            </>
-          )}
-        </span>
+        <CollapsibleIndicator
+          expanded={expanded}
+          hoverScopeClass="group-hover/toolgroup"
+          icon={<StatusIcon size={14} strokeWidth={1.6} className={statusIconClass} />}
+        />
         <span className="min-w-0 truncate text-xs font-medium">
           {titleText}
           {failedSuffix}

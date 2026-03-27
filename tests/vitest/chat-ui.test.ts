@@ -276,6 +276,32 @@ describe('chat ui', () => {
     expect(midTurnHtml).not.toContain('data-testid="chat-message-toolbar"');
   });
 
+  it('renders a message-level streaming spinner aligned with the assistant content flow', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(ChatMessage, {
+        streaming: true,
+        entry: {
+          nodeId: null,
+          message: {
+            role: 'assistant',
+            content: [{ type: 'text', text: 'Partial answer' }],
+            api: 'anthropic-messages',
+            provider: 'anthropic',
+            model: 'test',
+            usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+            stopReason: 'stop',
+            timestamp: 2,
+          },
+          branches: null,
+        },
+      }),
+    );
+
+    expect(html).toContain('data-testid="chat-message-streaming-indicator"');
+    expect(html).toContain('chat-streaming-capsule');
+    expect(html).not.toContain('chat-streaming-status');
+  });
+
   it('renders assistant messages with chat-prose markdown and user messages with text-base', () => {
     // User messages still use plain text
     const userHtml = renderToStaticMarkup(
@@ -378,7 +404,7 @@ describe('chat ui', () => {
     expect(html).not.toContain('<strong>');
   });
 
-  it('does not render the legacy inline streaming cursor on the last text block', () => {
+  it('renders the message-level breathing capsule instead of the legacy inline cursor hack', () => {
     const html = renderToStaticMarkup(
       React.createElement(ChatMessage, {
         entry: {
@@ -400,8 +426,9 @@ describe('chat ui', () => {
     );
     expect(html).toContain('Streaming response...');
     expect(html).toContain('chat-prose');
-    expect(html).not.toContain('animate-pulse');
-    expect(html).not.toContain('bg-primary');
+    expect(html).toContain('chat-message-streaming-indicator');
+    expect(html).toContain('chat-streaming-capsule');
+    expect(html).not.toContain('animate-spin');
   });
 
   it('keeps composer in working state without turning it into a stop action', () => {
@@ -619,7 +646,7 @@ describe('chat ui', () => {
     await vi.waitFor(() => {
       expect(container.textContent).toContain('Thought');
       // Cross-message grouping: tool-call-only messages after toolResults are grouped
-      expect(container.textContent).toContain('step 2');
+      expect(container.textContent).toContain('Working through 2 steps');
     });
   });
 

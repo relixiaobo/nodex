@@ -21,6 +21,7 @@ interface ChatMessageProps {
   isLastInTurn?: boolean;
   onEdit?: (nodeId: string, newContent: string) => void | Promise<void>;
   onRegenerate?: (nodeId: string) => void | Promise<void>;
+  onRetry?: (nodeId: string) => void | Promise<void>;
   onSwitchBranch?: (nodeId: string) => void;
   onCopy?: (text: string) => void | Promise<void>;
 }
@@ -208,6 +209,7 @@ export function ChatMessage({
   isLastInTurn = true,
   onEdit,
   onRegenerate,
+  onRetry,
   onSwitchBranch,
   onCopy,
 }: ChatMessageProps) {
@@ -273,6 +275,18 @@ export function ChatMessage({
       await onRegenerate(nodeId);
     } catch (error) {
       toast.error(getActionErrorMessage(error, 'Failed to regenerate response'));
+    }
+  }
+
+  async function handleRetry() {
+    if (!nodeId) return;
+    const fn = onRetry ?? onRegenerate;
+    if (!fn) return;
+
+    try {
+      await fn(nodeId);
+    } catch (error) {
+      toast.error(getActionErrorMessage(error, 'Failed to retry'));
     }
   }
 
@@ -377,7 +391,7 @@ export function ChatMessage({
                   <span className="text-sm leading-5 text-destructive">{inlineErrorText}</span>
                   <button
                     type="button"
-                    onClick={() => void handleRegenerate()}
+                    onClick={() => void handleRetry()}
                     disabled={busy}
                     className="inline-flex w-fit items-center gap-1.5 rounded-full border border-destructive/20 px-2.5 py-1 text-xs font-medium text-destructive transition-colors hover:bg-destructive/5 disabled:cursor-not-allowed disabled:opacity-50"
                   >

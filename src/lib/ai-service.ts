@@ -1164,6 +1164,30 @@ export async function editAndResend(
   await runAgentTurn(session, agent, { mode: 'continue' });
 }
 
+/**
+ * Retry from the specific errored assistant message without rewinding the
+ * entire turn. Only regenerates the node itself — prior tool calls and
+ * their results are preserved.
+ */
+export async function retryFromError(
+  nodeId: string,
+  agent: Agent = getAIAgent(),
+): Promise<void> {
+  await ensureAgentHydrated(agent);
+
+  const session = ensureCurrentSession(agent);
+  regenerateTree(session, nodeId);
+
+  const messagesForAgent = getCompressedPath(session);
+  agent.replaceMessages(messagesForAgent);
+
+  if (!canContinueFromMessage(messagesForAgent.at(-1))) {
+    throw new Error('[ai-service] Cannot retry without a trailing user or toolResult message');
+  }
+
+  await runAgentTurn(session, agent, { mode: 'continue' });
+}
+
 export async function regenerateResponse(
   nodeId: string,
   agent: Agent = getAIAgent(),

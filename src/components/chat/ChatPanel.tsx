@@ -140,6 +140,7 @@ export function ChatPanel({ sessionId, hideHeader, debugOpen: externalDebugOpen 
     sendMessage,
     editMessage,
     regenerateMessage,
+    retryFromError,
     switchBranch,
     stopStreaming,
     setSteeringNote,
@@ -360,6 +361,10 @@ export function ChatPanel({ sessionId, hideHeader, debugOpen: externalDebugOpen 
     await runMessageAction(nodeId, () => regenerateMessage(nodeId));
   }
 
+  async function handleRetryFromError(nodeId: string) {
+    await runMessageAction(nodeId, () => retryFromError(nodeId));
+  }
+
   function handleOpenSettings() {
     useUIStore.getState().navigateToNode(SYSTEM_NODE_IDS.SETTINGS);
   }
@@ -411,6 +416,7 @@ export function ChatPanel({ sessionId, hideHeader, debugOpen: externalDebugOpen 
           isLastInTurn={endIndex === messages.length - 1 || getEntryRole(messages[endIndex + 1]!) !== getEntryRole(entry)}
           onEdit={handleEditMessage}
           onRegenerate={handleRegenerateMessage}
+          onRetry={handleRetryFromError}
           onSwitchBranch={switchBranch}
         />,
       );

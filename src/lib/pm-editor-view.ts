@@ -51,6 +51,30 @@ export function replaceEditorRangeWithText(view: EditorView, from: number, to: n
   view.focus();
 }
 
+export function replaceEditorSelectionWithPlainText(view: EditorView, text: string): void {
+  const normalized = text.replace(/\r\n?/g, '\n');
+  const lines = normalized.split('\n');
+  let tr = view.state.tr.deleteSelection();
+  let insertPos = tr.selection.from;
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (line.length > 0) {
+      tr = tr.insertText(line, insertPos);
+      insertPos += line.length;
+    }
+    if (index < lines.length - 1) {
+      tr = tr.insert(insertPos, view.state.schema.nodes.hard_break.create());
+      insertPos += 1;
+    }
+  }
+
+  const nextPos = clampDocPos(tr.doc.content.size, insertPos);
+  tr = tr.setSelection(TextSelection.create(tr.doc, nextPos));
+  view.dispatch(tr);
+  view.focus();
+}
+
 export function replaceEditorRangeWithInlineRef(
   view: EditorView,
   from: number,

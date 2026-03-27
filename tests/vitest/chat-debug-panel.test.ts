@@ -143,10 +143,18 @@ function findButton(container: HTMLElement, text: string): HTMLButtonElement | u
 }
 
 describe('ChatDebugPanel', () => {
+  const clipboardWriteText = vi.fn<(_: string) => Promise<void>>();
   let container: HTMLDivElement;
   let root: Root;
 
   beforeEach(() => {
+    clipboardWriteText.mockReset();
+    clipboardWriteText.mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: clipboardWriteText },
+    });
+
     useChatDebugSnapshotMock.mockReturnValue({
       snapshot: createSnapshot(),
       error: null,
@@ -220,6 +228,74 @@ describe('ChatDebugPanel', () => {
     expect(usageText).toContain('cr:89');
     expect(usageText).toContain('$0.0042');
     expect(usageText).toContain('toolUse');
+  });
+
+  it('shows a per-user-turn usage total aggregated across assistant rounds', () => {
+    const snapshot = createSnapshot();
+    snapshot.messages.splice(2, 0, {
+      role: 'assistant',
+      content: [{ type: 'text', text: 'Found more context' }],
+      api: 'anthropic-messages',
+      provider: 'anthropic',
+      model: 'claude-sonnet-4-5',
+      usage: {
+        input: 30,
+        output: 10,
+        cacheRead: 5,
+        cacheWrite: 2,
+        totalTokens: 47,
+        cost: {
+          input: 0.0003,
+          output: 0.0005,
+          cacheRead: 0.0002,
+          cacheWrite: 0.0001,
+          total: 0.0011,
+        },
+      },
+      stopReason: 'stop',
+      timestamp: 2.5,
+    });
+    snapshot.messageInspectors.splice(2, 0, {
+      id: 'assistant-2b',
+      role: 'assistant',
+      kind: 'message',
+      summary: 'Found more context',
+      json: '{\n  "role": "assistant",\n  "timestamp": 2.5\n}',
+    });
+    useChatDebugSnapshotMock.mockReturnValue({ snapshot, error: null, loading: false });
+
+    flushSync(() => {
+      root.render(React.createElement(ChatDebugPanel, { debug: createDebugState() }));
+    });
+
+    const turnUsage = container.querySelector('[data-testid="chat-debug-turn-usage-meta"]');
+    const usageText = turnUsage?.textContent ?? '';
+    expect(usageText).toContain('total in:150');
+    expect(usageText).toContain('out:34');
+    expect(usageText).toContain('cw:2');
+    expect(usageText).toContain('cr:94');
+    expect(usageText).toContain('$0.0053');
+    expect(usageText).toContain('2 rounds');
+  });
+
+  it('copies debug content blocks to the clipboard', async () => {
+    flushSync(() => {
+      root.render(React.createElement(ChatDebugPanel, { debug: createDebugState() }));
+    });
+
+    const rows = Array.from(container.querySelectorAll('[data-testid="chat-debug-message-row"]'));
+    const userRow = rows.find((row) => row.textContent?.includes('Find Tana notes'));
+    const copyButton = userRow?.querySelector('button[aria-label="Copy debug content"]') as HTMLButtonElement | null;
+
+    expect(copyButton).not.toBeNull();
+
+    flushSync(() => {
+      copyButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    await vi.waitFor(() => {
+      expect(clipboardWriteText).toHaveBeenCalledWith('Find Tana notes');
+    });
   });
 
   it('reveals message details progressively', () => {

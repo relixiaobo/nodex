@@ -752,11 +752,6 @@ function createOverflowRecoveryCoordinator(session: ChatSession, agent: Agent) {
       queue = recovery.catch(() => {});
       recoveries.push(recovery);
     },
-    enqueueCompact(fn: () => Promise<boolean>): void {
-      const task = queue.then(() => fn()).catch(() => {});
-      queue = task.then(() => {});
-      recoveries.push(task.then(() => {}));
-    },
     async waitForAll(): Promise<void> {
       for (const recovery of recoveries) {
         await recovery;
@@ -809,10 +804,6 @@ async function runAgentTurn(session: ChatSession, agent: Agent, input: AgentTurn
       });
       if (overflowRecovery.shouldSkipTurnSync()) return;
       syncSessionFromAgent(session, agent.state.messages);
-      // Check if context is approaching the limit mid-loop (e.g. after
-      // multiple tool calls). Queue behind any overflow recovery to avoid
-      // racing with replaceMessages.
-      overflowRecovery.enqueueCompact(() => compactIfNeeded(session, agent));
       void persistChatSession(agent);
     }
   });
@@ -1108,9 +1099,18 @@ export async function persistChatSession(agent: Agent = getAIAgent()): Promise<v
 
 export async function createNewChatSession(agent: Agent = getAIAgent()): Promise<void> {
   const runtime = getAgentRuntimeState(agent);
+  const previousThinkingLevel = runtime.currentSession?.selectedThinkingLevel ?? runtime.thinkingLevel ?? null;
+  const agentConfig = readAgentConfigSafely();
+  const initialModel = resolveModel(
+    runtime.currentSession,
+    agentConfig?.modelId ?? DEFAULT_AGENT_MODEL_ID,
+  );
+  const session = createSession();
+  session.selectedThinkingLevel = initialModel.reasoning ? previousThinkingLevel : null;
+
   agent.abort();
   agent.reset();
-  setCurrentSession(agent, createSession());
+  setCurrentSession(agent, session);
   runtime.shellHydrated = true;
   runtime.bodyHydrated = true;
   runtime.shellRestorePromise = Promise.resolve();

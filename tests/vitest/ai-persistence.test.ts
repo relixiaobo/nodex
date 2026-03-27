@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto';
 import type { AgentMessage } from '@mariozechner/pi-agent-core';
-import { deleteDB } from 'idb';
+import { deleteDB, openDB } from 'idb';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { getLinearPath, linearToTree, type ChatSession } from '../../src/lib/ai-chat-tree.js';
 import { IMAGE_PLACEHOLDER } from '../../src/lib/ai-message-images.js';
@@ -9,12 +9,15 @@ import {
   getChatDebugTurns,
   getChatSession,
   getChatSessionMeta,
+  getChatSessionShell,
   getLatestChatSession,
+  getLatestChatSessionShell,
   listChatSessionMetas,
   listChatSessionUserMessageMetasPage,
   resetChatPersistenceForTests,
   saveChatDebugTurns,
   saveChatSession,
+  saveChatSessionShellPatch,
 } from '../../src/lib/ai-persistence.js';
 
 const DB_NAME = 'soma-ai-chat';
@@ -65,6 +68,15 @@ async function resetPersistence(): Promise<void> {
   resetChatPersistenceForTests();
   await deleteDB(DB_NAME);
   resetChatPersistenceForTests();
+}
+
+async function readRawPersistedSession(sessionId: string): Promise<ChatSession | null> {
+  const db = await openDB(DB_NAME);
+  try {
+    return (await db.get(STORE_NAME, sessionId)) ?? null;
+  } finally {
+    db.close();
+  }
 }
 
 async function seedLegacySessions(sessions: LegacyChatSession[]): Promise<void> {
@@ -264,6 +276,59 @@ describe('ai persistence', () => {
 
     expect(restored?.selectedProvider).toBe('openai');
     expect(restored?.selectedModelId).toBe('gpt-4o');
+  });
+
+  it('patches only the chat session shell without rewriting the message tree', async () => {
+    await saveChatSession(buildSession('session_shell_patch', [
+      { role: 'user', content: 'hello', timestamp: 1 },
+      { role: 'assistant', content: [{ type: 'text', text: 'world' }], api: 'anthropic-messages', provider: 'anthropic', model: 'claude-sonnet-4-5', usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } }, stopReason: 'stop', timestamp: 2 },
+    ], {
+      title: 'hello',
+      selectedProvider: 'anthropic',
+      selectedModelId: 'claude-sonnet-4-5',
+    }));
+
+    const before = await getChatSession('session_shell_patch');
+    const beforePath = getLinearPath(before!).map((node) => node.message);
+    const rawBefore = await readRawPersistedSession('session_shell_patch');
+
+    const patched = await saveChatSessionShellPatch('session_shell_patch', {
+      title: 'renamed',
+      selectedProvider: 'openai',
+      selectedModelId: 'gpt-5.4',
+    }, { touchUpdatedAt: false });
+
+    const restored = await getChatSession('session_shell_patch');
+    const shell = await getChatSessionShell('session_shell_patch');
+    const latestShell = await getLatestChatSessionShell();
+
+    expect(patched).toMatchObject({
+      id: 'session_shell_patch',
+      title: 'renamed',
+      selectedProvider: 'openai',
+      selectedModelId: 'gpt-5.4',
+    });
+    expect(getLinearPath(restored!).map((node) => node.message)).toEqual(beforePath);
+    expect(restored?.title).toBe('renamed');
+    expect(restored?.selectedProvider).toBe('openai');
+    expect(restored?.selectedModelId).toBe('gpt-5.4');
+    expect(shell).toMatchObject({
+      id: 'session_shell_patch',
+      title: 'renamed',
+      selectedProvider: 'openai',
+      selectedModelId: 'gpt-5.4',
+    });
+    expect(latestShell?.id).toBe('session_shell_patch');
+    expect(await getChatSessionMeta('session_shell_patch')).toMatchObject({
+      title: 'renamed',
+      searchText: 'renamed\n\nhello\n\nworld',
+    });
+    expect(await readRawPersistedSession('session_shell_patch')).toMatchObject({
+      title: rawBefore?.title ?? null,
+      selectedProvider: rawBefore?.selectedProvider,
+      selectedModelId: rawBefore?.selectedModelId,
+      updatedAt: rawBefore?.updatedAt,
+    });
   });
 
   it('persists debug turn logs separately from the chat session payload', async () => {
@@ -505,7 +570,12 @@ describe('ai persistence', () => {
       {
         id: 'legacy_session',
         title: 'legacy hello',
+        createdAt: 100,
         updatedAt: 200,
+        selectedModelId: null,
+        selectedProvider: null,
+        selectedThinkingLevel: null,
+        contentSearchText: 'legacy hello\n\nlegacy hi',
         searchText: 'legacy hello\n\nlegacy hello\n\nlegacy hi',
         userMessageCount: 1,
       },
@@ -584,7 +654,12 @@ describe('ai persistence', () => {
       {
         id: 'session_embedded_debug',
         title: 'hello',
+        createdAt: 1,
         updatedAt: 1,
+        selectedModelId: null,
+        selectedProvider: null,
+        selectedThinkingLevel: null,
+        contentSearchText: 'hello',
         searchText: 'hello\n\nhello',
         userMessageCount: 1,
       },

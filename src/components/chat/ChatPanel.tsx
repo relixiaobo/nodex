@@ -5,6 +5,7 @@ import { useAgent } from '../../hooks/use-agent.js';
 import type { AssistantMessage, ThinkingLevel } from '@mariozechner/pi-ai';
 import { readChatDebugEnabled } from '../../lib/ai-debug.js';
 import { getAvailableModelsWithMeta, hasAnyEnabledProvider } from '../../lib/ai-provider-config.js';
+import { beginChatProfile, type ChatProfileHandle } from '../../lib/chat-profiler.js';
 import { getAgentForSession, selectChatModel, selectThinkingLevel } from '../../lib/ai-service.js';
 import { useNodeStore } from '../../stores/node-store.js';
 import { useSyncStore } from '../../stores/sync-store.js';
@@ -18,6 +19,34 @@ import { ChatInput, type ChatInputHandle } from './ChatInput.js';
 import { ChatMessage } from './ChatMessage.js';
 
 const AUTO_SCROLL_THRESHOLD = 48;
+
+function ChatMessagesSkeleton() {
+  return (
+    <div className="flex h-full flex-col gap-4 px-4 py-4">
+      <div className="flex justify-start">
+        <div className="flex w-full max-w-[78%] flex-col gap-2 rounded-2xl bg-foreground/[0.035] px-4 py-3">
+          <div className="h-3 w-28 rounded-full bg-foreground/[0.08]" />
+          <div className="h-3 w-full rounded-full bg-foreground/[0.06]" />
+          <div className="h-3 w-4/5 rounded-full bg-foreground/[0.06]" />
+        </div>
+      </div>
+      <div className="flex justify-end">
+        <div className="flex w-full max-w-[70%] flex-col gap-2 rounded-2xl bg-foreground/[0.045] px-4 py-3">
+          <div className="h-3 w-20 rounded-full bg-foreground/[0.08]" />
+          <div className="h-3 w-full rounded-full bg-foreground/[0.06]" />
+        </div>
+      </div>
+      <div className="flex justify-start">
+        <div className="flex w-full max-w-[82%] flex-col gap-2 rounded-2xl bg-foreground/[0.035] px-4 py-3">
+          <div className="h-3 w-24 rounded-full bg-foreground/[0.08]" />
+          <div className="h-3 w-full rounded-full bg-foreground/[0.06]" />
+          <div className="h-3 w-5/6 rounded-full bg-foreground/[0.06]" />
+          <div className="h-3 w-3/5 rounded-full bg-foreground/[0.06]" />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export interface ChatPanelProps {
   sessionId: string;
@@ -97,6 +126,7 @@ export function ChatPanel({ sessionId, hideHeader, debugOpen: externalDebugOpen 
     isStreaming,
     error,
     ready,
+    messagesReady,
     debug,
     sendMessage,
     editMessage,
@@ -120,6 +150,9 @@ export function ChatPanel({ sessionId, hideHeader, debugOpen: externalDebugOpen 
   const [selectedModelKey, setSelectedModelKey] = useState<{ id: string; provider: string } | null>(null);
   const [pendingMessageActionId, setPendingMessageActionId] = useState<string | null>(null);
   const [steeringNote, setLocalSteeringNote] = useState<string | null>(null);
+  const openProfileRef = useRef<ChatProfileHandle | null>(null);
+  const openProfileShellMarkedRef = useRef(false);
+  const openProfileEndedRef = useRef(false);
   const chatBusy = isStreaming || pendingMessageActionId !== null;
 
   const availableModels = useMemo(() => {
@@ -183,6 +216,53 @@ export function ChatPanel({ sessionId, hideHeader, debugOpen: externalDebugOpen 
     if (!internalDebugEnabled) setInternalDebugOpen(false);
   }, [internalDebugEnabled]);
 
+  useEffect(() => {
+    openProfileRef.current = beginChatProfile('open-chat', {
+      sessionId,
+      mode: hideHeader ? 'drawer' : 'panel',
+    });
+    openProfileShellMarkedRef.current = false;
+    openProfileEndedRef.current = false;
+    return () => {
+      if (!openProfileEndedRef.current) {
+        openProfileRef.current?.end({ status: 'unmounted-before-ready' });
+      }
+      openProfileRef.current = null;
+      openProfileShellMarkedRef.current = false;
+      openProfileEndedRef.current = false;
+    };
+  }, [hideHeader, sessionId]);
+
+  useEffect(() => {
+    if (!ready || openProfileEndedRef.current || openProfileShellMarkedRef.current) return;
+    openProfileRef.current?.mark('shell-ready', {
+      chatState,
+      hasConfiguredProvider,
+    });
+    openProfileShellMarkedRef.current = true;
+  }, [chatState, hasConfiguredProvider, ready]);
+
+  useEffect(() => {
+    if (!messagesReady || openProfileEndedRef.current) return;
+    if (!openProfileShellMarkedRef.current && ready) {
+      openProfileRef.current?.mark('shell-ready', {
+        chatState,
+        hasConfiguredProvider,
+      });
+      openProfileShellMarkedRef.current = true;
+    }
+    if (!openProfileShellMarkedRef.current) return;
+    openProfileRef.current?.mark('messages-ready', {
+      messageCount: messages.length,
+    });
+    openProfileRef.current?.end({
+      messageCount: messages.length,
+      chatState,
+    });
+    openProfileEndedRef.current = true;
+    openProfileRef.current = null;
+  }, [chatState, hasConfiguredProvider, messages.length, messagesReady, ready]);
+
   const steeringArmedRef = useRef(false);
   useEffect(() => {
     if (steeringArmedRef.current && !hasSteering) {
@@ -192,7 +272,7 @@ export function ChatPanel({ sessionId, hideHeader, debugOpen: externalDebugOpen 
   }, [hasSteering]);
 
   useEffect(() => {
-    if (chatState !== 'ready') return;
+    if (chatState !== 'ready' || !messagesReady) return;
     const scroller = scrollRef.current;
     if (!scroller) return;
     if (!shouldStickToBottomRef.current) return;
@@ -205,7 +285,7 @@ export function ChatPanel({ sessionId, hideHeader, debugOpen: externalDebugOpen 
 
   useEffect(() => {
     if (!isActive || !pendingChatPrompt || pendingChatPrompt.sessionId !== sessionId) return;
-    if (chatState !== 'ready' || chatBusy || !ready) return;
+    if (chatState !== 'ready' || chatBusy || !ready || !messagesReady) return;
 
     setPendingChatPrompt(null);
     void handleSendMessage(pendingChatPrompt.prompt);
@@ -213,6 +293,7 @@ export function ChatPanel({ sessionId, hideHeader, debugOpen: externalDebugOpen 
     chatBusy,
     isActive,
     pendingChatPrompt,
+    messagesReady,
     ready,
     sessionId,
     setPendingChatPrompt,
@@ -430,7 +511,9 @@ export function ChatPanel({ sessionId, hideHeader, debugOpen: externalDebugOpen 
                   shouldStickToBottomRef.current = shouldStickChatScroll(scroller);
                 }}
               >
-                {messages.length === 0 ? (
+                {!messagesReady ? (
+                  <ChatMessagesSkeleton />
+                ) : messages.length === 0 ? (
                   <div className="flex h-full min-h-40 flex-col items-center justify-center gap-4 px-6">
                     <div className="text-center text-sm text-foreground-tertiary">
                       What are you thinking about?
@@ -493,7 +576,7 @@ export function ChatPanel({ sessionId, hideHeader, debugOpen: externalDebugOpen 
                 )}
                 <ChatInput
                   ref={chatInputRef}
-                  disabled={isStreaming}
+                  disabled={isStreaming || !messagesReady}
                   busy={pendingMessageActionId !== null}
                   error={error}
                   currentModel={currentModel}

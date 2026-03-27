@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Check, ChevronDown, Pencil, Plus, RefreshCw } from '../../lib/icons.js';
 import { openNewChatDrawer } from '../../lib/chat-panel-actions.js';
-import { getChatSession, listChatSessionMetasPage, saveChatSession, type ChatSessionMeta } from '../../lib/ai-persistence.js';
+import { beginChatProfile } from '../../lib/chat-profiler.js';
+import { listChatSessionMetasPage, saveChatSessionShellPatch, type ChatSessionMeta } from '../../lib/ai-persistence.js';
 import { regenerateChatTitle } from '../../lib/ai-service.js';
 import { readChatDebugEnabled_sync } from '../../lib/ai-debug.js';
 import { useNodeStore } from '../../stores/node-store.js';
@@ -29,11 +30,7 @@ function InlineRowEditor({ sessionId, initialTitle, onDone }: { sessionId: strin
     try {
       const trimmed = draft.trim();
       if (trimmed && trimmed !== initialTitle) {
-        const session = await getChatSession(sessionId);
-        if (session) {
-          session.title = trimmed;
-          await saveChatSession(session);
-        }
+        await saveChatSessionShellPatch(sessionId, { title: trimmed }, { touchUpdatedAt: true });
       }
     } finally {
       onDone();
@@ -85,9 +82,22 @@ function SessionHistoryDropdown({
   const [editingId, setEditingId] = useState<string | null>(null);
 
   function loadSessions() {
+    const profile = beginChatProfile('chat-history-dropdown', {
+      currentSessionId,
+      limit: HISTORY_LIMIT,
+    });
+    setLoading(true);
     void listChatSessionMetasPage({ limit: HISTORY_LIMIT, offset: 0 }).then(({ items }) => {
       setSessions(items);
       setLoading(false);
+      profile.mark('history-loaded', { itemCount: items.length });
+      profile.end({ itemCount: items.length });
+    }).catch((error) => {
+      setLoading(false);
+      profile.end({
+        status: 'error',
+        error: error instanceof Error ? error.message : String(error),
+      });
     });
   }
 

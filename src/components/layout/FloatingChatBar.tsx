@@ -56,16 +56,9 @@ export function FloatingChatBar() {
           onClick={handleClick}
           className="flex w-full items-center rounded-xl border border-border bg-background px-3 py-2.5 text-base leading-6 text-foreground-tertiary transition-colors hover:border-foreground/20"
         >
-          {showStreaming ? (
-            <span className="flex items-center gap-2">
-              <span className="chat-streaming-capsule" />
-              <span className="text-sm text-foreground-tertiary">Thinking…</span>
-            </span>
-          ) : (
-            <span className="min-w-0 flex-1 truncate text-left">
-              {chatDraft || 'Ask anything…'}
-            </span>
-          )}
+          <span className="min-w-0 flex-1 truncate text-left">
+            {showStreaming ? 'soma is working…' : (chatDraft || 'Ask anything…')}
+          </span>
         </button>
       </div>
     </div>

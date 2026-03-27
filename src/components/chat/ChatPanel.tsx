@@ -11,7 +11,7 @@ import { useNodeStore } from '../../stores/node-store.js';
 import { useSyncStore } from '../../stores/sync-store.js';
 import { useUIStore } from '../../stores/ui-store.js';
 import { SYSTEM_NODE_IDS } from '../../types/index.js';
-import type { ChatConversationMessage, ChatMessageEntry, ChatTurnPhase } from '../../hooks/use-agent.js';
+import type { ChatConversationEntry, ChatConversationMessage, ChatMessageEntry, ChatTurnPhase } from '../../hooks/use-agent.js';
 import { ChatDebugPanel } from './ChatDebugPanel.js';
 import { ChatOnboarding } from './ChatOnboarding.js';
 import { ChatPanelHeader } from './ChatPanelHeader.js';
@@ -70,7 +70,15 @@ function getActionErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
-type ToolCallOnlyEntry = ChatMessageEntry & { message: AssistantMessage };
+type ToolCallOnlyEntry = ChatConversationEntry & { message: AssistantMessage };
+
+function getEntryRole(entry: ChatMessageEntry): 'user' | 'assistant' {
+  return entry.kind === 'message' ? entry.message.role : 'assistant';
+}
+
+function getEntryTimestamp(entry: ChatMessageEntry): number {
+  return entry.kind === 'message' ? entry.message.timestamp : entry.timestamp;
+}
 
 export function isToolCallOnlyMessage(message: ChatConversationMessage): message is AssistantMessage {
   if (message.role !== 'assistant') {
@@ -385,19 +393,22 @@ export function ChatPanel({ sessionId, hideHeader, debugOpen: externalDebugOpen 
     const rendered: Array<ReturnType<typeof ChatMessage>> = [];
 
     const renderMessage = (entry: ChatMessageEntry, startIndex: number, endIndex: number, key?: string) => {
-      const isLastAssistantMessage = endIndex === messages.length - 1 && entry.message.role === 'assistant';
+      const isLastAssistantMessage = endIndex === messages.length - 1 && getEntryRole(entry) === 'assistant';
       const streamingText = isLastAssistantMessage && turnPhase === 'streaming_text';
       const activeTurnPhase: ChatTurnPhase = isLastAssistantMessage ? turnPhase : 'idle';
+      const entryKey = key
+        ?? (entry.kind === 'message' ? entry.nodeId : null)
+        ?? `${entry.kind}-${getEntryTimestamp(entry)}-${startIndex}`;
       rendered.push(
         <ChatMessage
-          key={key ?? entry.nodeId ?? `stream-${entry.message.timestamp}-${startIndex}`}
+          key={entryKey}
           entry={entry}
           toolResults={toolResults}
           streaming={streamingText}
           turnPhase={activeTurnPhase}
-          grouped={startIndex > 0 && messages[startIndex - 1]?.message.role === entry.message.role}
+          grouped={startIndex > 0 && getEntryRole(messages[startIndex - 1]!) === getEntryRole(entry)}
           busy={chatBusy}
-          isLastInTurn={endIndex === messages.length - 1 || messages[endIndex + 1]?.message.role !== entry.message.role}
+          isLastInTurn={endIndex === messages.length - 1 || getEntryRole(messages[endIndex + 1]!) !== getEntryRole(entry)}
           onEdit={handleEditMessage}
           onRegenerate={handleRegenerateMessage}
           onSwitchBranch={switchBranch}
@@ -409,12 +420,16 @@ export function ChatPanel({ sessionId, hideHeader, debugOpen: externalDebugOpen 
     while (index < messages.length) {
       const entry = messages[index]!;
 
-      if (isToolCallOnlyMessage(entry.message)) {
+      if (entry.kind === 'message' && isToolCallOnlyMessage(entry.message)) {
         const runStart = index;
         const toolCallEntries: ToolCallOnlyEntry[] = [];
 
-        while (index < messages.length && isToolCallOnlyMessage(messages[index]!.message)) {
-          toolCallEntries.push(messages[index] as ToolCallOnlyEntry);
+        while (index < messages.length) {
+          const candidate = messages[index]!;
+          if (candidate.kind !== 'message' || !isToolCallOnlyMessage(candidate.message)) {
+            break;
+          }
+          toolCallEntries.push(candidate as ToolCallOnlyEntry);
           index += 1;
         }
 

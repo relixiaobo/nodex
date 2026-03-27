@@ -26,6 +26,7 @@ function makeResult(toolCallId: string, toolName: string, opts: { isError?: bool
 function makeAssistantEntry(content: (ToolCall | { type: 'text'; text: string })[], nodeId = 'msg_1') {
   return {
     entry: {
+      kind: 'message' as const,
       nodeId,
       message: {
         role: 'assistant' as const,

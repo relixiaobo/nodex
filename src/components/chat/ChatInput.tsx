@@ -486,11 +486,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
 
   return (
     <div className="px-3 pb-3 pt-1">
-      {error && (
-        <div className="mb-2 rounded-lg border border-destructive/15 bg-destructive/5 px-2.5 py-2 text-xs text-destructive">
-          {error}
-        </div>
-      )}
+      {/* Error is now shown inline on the assistant message with retry button */}
       <div className="rounded-xl border border-border bg-surface transition-colors focus-within:border-foreground/20">
         <div className={compact ? 'px-3 py-2' : 'px-3 pt-2.5 pb-1'}>
           <div

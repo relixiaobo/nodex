@@ -63,46 +63,11 @@ export function shouldStickChatScroll(
   return scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight <= threshold;
 }
 
-export function shouldRenderActiveAssistantPlaceholder(
-  messages: ChatMessageEntry[],
-  turnPhase: ChatTurnPhase,
-): boolean {
-  if (turnPhase === 'idle' || messages.length === 0) {
-    return false;
-  }
-
-  return messages[messages.length - 1]!.message.role !== 'assistant';
-}
-
 function getActionErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message.trim().length > 0) {
     return error.message;
   }
   return fallback;
-}
-
-function createActiveAssistantPlaceholder(timestamp: number): ChatMessageEntry {
-  return {
-    nodeId: null,
-    branches: null,
-    message: {
-      role: 'assistant',
-      content: [],
-      api: 'anthropic-messages',
-      provider: 'anthropic',
-      model: 'pending',
-      usage: {
-        input: 0,
-        output: 0,
-        cacheRead: 0,
-        cacheWrite: 0,
-        totalTokens: 0,
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-      },
-      stopReason: 'stop',
-      timestamp,
-    },
-  };
 }
 
 type ToolCallOnlyEntry = ChatMessageEntry & { message: AssistantMessage };
@@ -425,7 +390,7 @@ export function ChatPanel({ sessionId, hideHeader, debugOpen: externalDebugOpen 
       const activeTurnPhase: ChatTurnPhase = isLastAssistantMessage ? turnPhase : 'idle';
       rendered.push(
         <ChatMessage
-          key={key ?? entry.nodeId ?? `stream-${entry.message.timestamp}-${startIndex}`}
+          key={key ?? entry.nodeId ?? `${entry.displayKind ?? 'message'}-${entry.message.timestamp}-${startIndex}`}
           entry={entry}
           toolResults={toolResults}
           streaming={streamingText}
@@ -470,25 +435,6 @@ export function ChatPanel({ sessionId, hideHeader, debugOpen: externalDebugOpen 
 
       renderMessage(entry, index, index);
       index += 1;
-    }
-
-    if (shouldRenderActiveAssistantPlaceholder(messages, turnPhase)) {
-      const lastTimestamp = messages[messages.length - 1]?.message.timestamp ?? 0;
-      rendered.push(
-        <ChatMessage
-          key={`active-turn-placeholder-${lastTimestamp}-${turnPhase}`}
-          entry={createActiveAssistantPlaceholder(lastTimestamp)}
-          toolResults={toolResults}
-          streaming={false}
-          turnPhase={turnPhase}
-          grouped={false}
-          busy={chatBusy}
-          isLastInTurn
-          onEdit={handleEditMessage}
-          onRegenerate={handleRegenerateMessage}
-          onSwitchBranch={switchBranch}
-        />,
-      );
     }
 
     return rendered;

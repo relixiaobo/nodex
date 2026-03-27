@@ -7,12 +7,13 @@ import { flushSync } from 'react-dom';
 import { ChatInput } from '../../src/components/chat/ChatInput.js';
 import { ChatPanelHeader } from '../../src/components/chat/ChatPanelHeader.js';
 import { ChatMessage } from '../../src/components/chat/ChatMessage.js';
-import { ChatPanel, shouldRenderActiveAssistantPlaceholder, shouldStickChatScroll } from '../../src/components/chat/ChatPanel.js';
+import { ChatPanel, shouldStickChatScroll } from '../../src/components/chat/ChatPanel.js';
 import { extractInlineMarkup, splitMarkdownBlocks } from '../../src/components/chat/MarkdownRenderer.js';
 import { DrawerLayout } from '../../src/components/layout/DrawerLayout.js';
 import { appendMessage, createSession, editMessage, getLinearPath, linearToTree, switchBranch as switchChatBranch } from '../../src/lib/ai-chat-tree.js';
 import { resetChatPersistenceForTests, saveChatSession } from '../../src/lib/ai-persistence.js';
 import { resetAIAgentForTests } from '../../src/lib/ai-service.js';
+import { shouldAppendActiveAssistantPlaceholder } from '../../src/hooks/use-agent.js';
 import { findProviderOptionNodeId, getApiKeyForProvider } from '../../src/lib/ai-provider-config.js';
 import { ensureTodayNode } from '../../src/lib/journal.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
@@ -209,7 +210,7 @@ describe('chat ui', () => {
   });
 
   it('shows an active assistant placeholder as soon as a user-authored tail becomes in-flight', () => {
-    expect(shouldRenderActiveAssistantPlaceholder([
+    expect(shouldAppendActiveAssistantPlaceholder([
       {
         nodeId: 'msg_user',
         message: createUserMessage('Need help', 1),
@@ -217,7 +218,7 @@ describe('chat ui', () => {
       },
     ], 'resuming_after_tool')).toBe(true);
 
-    expect(shouldRenderActiveAssistantPlaceholder([
+    expect(shouldAppendActiveAssistantPlaceholder([
       {
         nodeId: 'msg_assistant',
         message: createAssistantMessage('Already responding', 2),
@@ -225,7 +226,7 @@ describe('chat ui', () => {
       },
     ], 'streaming_text')).toBe(false);
 
-    expect(shouldRenderActiveAssistantPlaceholder([
+    expect(shouldAppendActiveAssistantPlaceholder([
       {
         nodeId: 'msg_user',
         message: createUserMessage('Need help', 1),

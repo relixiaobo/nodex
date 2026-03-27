@@ -19,13 +19,13 @@
 | nodex-claude | — | 空闲 | — |
 | nodex-claude-2 | — | 空闲 | — |
 | nodex-gemini | — | 空闲 | — |
-| nodex-codex | codex/steering-context-minimal | #189 Steering 上下文优化 | 待执行 |
+| nodex-codex | — | 空闲 | — |
 
 ---
 
 ## 进行中
 
-- [ ] **#189 Steering 上下文优化 — 插话/tool-call 续轮不注入 system-reminder** → nodex-codex
+（无）
 
 ---
 
@@ -126,6 +126,7 @@
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-27 | Steering 上下文优化 — 插话不注入 system-reminder | codex | #190 |
 | 2026-03-27 | Chat 复制/粘贴/Debug 增强 + thinking level 持久化 | codex | #188 |
 | 2026-03-27 | node_search 长混合查询召回率优化 | codex | #187 |
 | 2026-03-27 | Chat 呼吸胶囊立即显示 — placeholder display entry | codex | #186 |

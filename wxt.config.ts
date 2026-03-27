@@ -11,7 +11,7 @@ const isPreview = mode === 'preview';    // npm run build:preview
 const iconDir = isPreview ? 'icon-preview' : isStore ? 'icon' : 'icon-dev';
 
 // Manifest name: visually distinguish environments
-const name = isPreview ? 'soma Preview' : isStore ? 'soma' : 'soma Dev';
+const name = isPreview ? 'soma Preview' : isStore ? 'soma — Notes that think with you' : 'soma Dev';
 
 export default defineConfig({
   srcDir: 'src',

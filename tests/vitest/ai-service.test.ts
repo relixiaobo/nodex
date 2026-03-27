@@ -587,6 +587,43 @@ describe('ai-service', () => {
     expect(transformed).toBe(sourceMessages);
   });
 
+  it('clears steering reminder bypass after the active turn finishes', async () => {
+    const { createAgent, setSteeringNote, streamChat } = await import('../../src/lib/ai-service.js');
+    const agent = createAgent();
+    const internalAgent = agent as unknown as {
+      transformContext: (messages: import('@mariozechner/pi-agent-core').AgentMessage[]) => Promise<import('@mariozechner/pi-agent-core').AgentMessage[]>;
+      prompt: ReturnType<typeof vi.fn>;
+    };
+    const steerSpy = vi.spyOn(agent, 'steer');
+    vi.spyOn(agent, 'prompt').mockResolvedValue(undefined);
+
+    setSteeringNote('  course correct  ', agent);
+
+    const steeringMessage = steerSpy.mock.calls[0]?.[0];
+    if (!steeringMessage || steeringMessage.role !== 'user') {
+      throw new Error('expected a steering user message');
+    }
+
+    prepareAgentContextMock.mockClear();
+    const skipped = await internalAgent.transformContext([steeringMessage]);
+    expect(prepareAgentContextMock).not.toHaveBeenCalled();
+    expect(skipped).toEqual([steeringMessage]);
+
+    await streamChat('fresh prompt', agent);
+
+    prepareAgentContextMock.mockClear();
+    prepareAgentContextMock.mockResolvedValueOnce({
+      reminder: '<system-reminder>ctx</system-reminder>',
+      messages: [{ ...steeringMessage, content: 'prepared after turn' }],
+    });
+
+    const transformedAfterTurn = await internalAgent.transformContext([steeringMessage]);
+
+    expect(prepareAgentContextMock).toHaveBeenCalledTimes(1);
+    expect(prepareAgentContextMock).toHaveBeenCalledWith([steeringMessage]);
+    expect(transformedAfterTurn).toEqual([{ ...steeringMessage, content: 'prepared after turn' }]);
+  });
+
   it('registers convertToLlm that filters out non-LLM message types', async () => {
     const { createAgent } = await import('../../src/lib/ai-service.js');
     const agent = createAgent();

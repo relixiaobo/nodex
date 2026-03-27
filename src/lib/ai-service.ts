@@ -84,7 +84,7 @@ interface AgentRuntimeState {
   activeDebugTurnId: string | null;
   pendingShellPatch: UpdateChatSessionShellInput | null;
   pendingShellPatchTimer: ReturnType<typeof setTimeout> | null;
-  lastSteeringMessage: {
+  steeringReminderBypass: {
     content: string;
     timestamp: number;
   } | null;
@@ -155,7 +155,7 @@ function getAgentRuntimeState(agent: Agent): AgentRuntimeState {
       activeDebugTurnId: null,
       pendingShellPatch: null,
       pendingShellPatchTimer: null,
-      lastSteeringMessage: null,
+      steeringReminderBypass: null,
     };
     agentRuntimeState.set(agent, state);
   }
@@ -393,7 +393,7 @@ function getLatestUserMessage(messages: AgentMessage[]): Extract<AgentMessage, {
 }
 
 function shouldSkipReminderForSteering(agent: Agent, messages: AgentMessage[]): boolean {
-  const signature = getAgentRuntimeState(agent).lastSteeringMessage;
+  const signature = getAgentRuntimeState(agent).steeringReminderBypass;
   if (!signature) return false;
 
   const lastUserMessage = getLatestUserMessage(messages);
@@ -885,6 +885,7 @@ async function runAgentTurn(session: ChatSession, agent: Agent, input: AgentTurn
     await persistChatSession(agent);
     throw error;
   } finally {
+    getAgentRuntimeState(agent).steeringReminderBypass = null;
     unsubscribe();
   }
 }
@@ -1262,7 +1263,7 @@ export function stopStreaming(agent: Agent = getAIAgent()): void {
 export function setSteeringNote(text: string | null, agent: Agent = getAIAgent()): void {
   const runtime = getAgentRuntimeState(agent);
   agent.clearSteeringQueue();
-  runtime.lastSteeringMessage = null;
+  runtime.steeringReminderBypass = null;
   if (text) {
     const normalized = text.trim();
     if (normalized) {
@@ -1271,7 +1272,7 @@ export function setSteeringNote(text: string | null, agent: Agent = getAIAgent()
         content: normalized,
         timestamp: Date.now(),
       } as const;
-      runtime.lastSteeringMessage = {
+      runtime.steeringReminderBypass = {
         content: normalized,
         timestamp: steeringMessage.timestamp,
       };

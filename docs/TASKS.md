@@ -19,13 +19,13 @@
 | nodex-claude | — | 空闲 | — |
 | nodex-claude-2 | — | 空闲 | — |
 | nodex-gemini | — | 空闲 | — |
-| nodex-codex | — | 空闲 | — |
+| nodex-codex | codex/steering-context-minimal | #189 Steering 上下文优化 | 待执行 |
 
 ---
 
 ## 进行中
 
-（无）
+- [ ] **#189 Steering 上下文优化 — 插话/tool-call 续轮不注入 system-reminder** → nodex-codex
 
 ---
 

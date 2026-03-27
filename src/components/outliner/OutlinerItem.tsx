@@ -933,10 +933,14 @@ function OutlinerItemInner({
       if (!scrollParent) return;
       const rowRect = row.getBoundingClientRect();
       const containerRect = scrollParent.getBoundingClientRect();
+      // Account for floating chat bar overlapping the bottom of the scroll container
+      const floatingBar = scrollParent.parentElement?.querySelector('[data-testid="floating-chat-bar"]') as HTMLElement | null;
+      const bottomInset = floatingBar ? floatingBar.offsetHeight : 0;
+      const visibleBottom = containerRect.bottom - bottomInset;
       if (rowRect.top < containerRect.top) {
         scrollParent.scrollTop += rowRect.top - containerRect.top;
-      } else if (rowRect.bottom > containerRect.bottom) {
-        scrollParent.scrollTop += rowRect.bottom - containerRect.bottom;
+      } else if (rowRect.bottom > visibleBottom) {
+        scrollParent.scrollTop += rowRect.bottom - visibleBottom;
       }
     }
   }, [isFocused]);

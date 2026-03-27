@@ -16,7 +16,7 @@ import {
   syncAgentToTree,
 } from './ai-chat-tree.js';
 import { compactForOverflow, compactIfNeeded, getCompressedPath } from './ai-compress.js';
-import { prepareAgentContext } from './ai-context.js';
+import { prepareAgentContext, transformAgentContext } from './ai-context.js';
 import { type ProxyStreamRequestPayload, streamProxyWithApiKey } from './ai-proxy.js';
 import {
   getChatDebugTurns,
@@ -84,6 +84,10 @@ interface AgentRuntimeState {
   activeDebugTurnId: string | null;
   pendingShellPatch: UpdateChatSessionShellInput | null;
   pendingShellPatchTimer: ReturnType<typeof setTimeout> | null;
+  lastSteeringMessage: {
+    content: string;
+    timestamp: number;
+  } | null;
 }
 
 let agentSingleton: Agent | null = null;
@@ -151,6 +155,7 @@ function getAgentRuntimeState(agent: Agent): AgentRuntimeState {
       activeDebugTurnId: null,
       pendingShellPatch: null,
       pendingShellPatchTimer: null,
+      lastSteeringMessage: null,
     };
     agentRuntimeState.set(agent, state);
   }
@@ -381,6 +386,21 @@ function getMessageText(message: AgentMessage): string {
     .filter((part): part is Extract<typeof message.content[number], { type: 'text' }> => part.type === 'text')
     .map((part) => part.text)
     .join(' ');
+}
+
+function getLatestUserMessage(messages: AgentMessage[]): Extract<AgentMessage, { role: 'user' }> | null {
+  return [...messages].reverse().find((message): message is Extract<AgentMessage, { role: 'user' }> => message.role === 'user') ?? null;
+}
+
+function shouldSkipReminderForSteering(agent: Agent, messages: AgentMessage[]): boolean {
+  const signature = getAgentRuntimeState(agent).lastSteeringMessage;
+  if (!signature) return false;
+
+  const lastUserMessage = getLatestUserMessage(messages);
+  if (!lastUserMessage) return false;
+
+  return lastUserMessage.timestamp === signature.timestamp
+    && getMessageText(lastUserMessage).trim() === signature.content;
 }
 
 function deriveSessionTitle(messages: AgentMessage[]): string | null {
@@ -900,7 +920,12 @@ export function createAgent(model: Model<any> = DEFAULT_CHAT_MODEL): Agent {
       const apiKey = getApiKeyForProvider(provider);
       return apiKey ?? undefined;
     },
-    transformContext: async (messages) => (await prepareAgentContext(messages)).messages,
+    transformContext: async (messages) => {
+      if (shouldSkipReminderForSteering(agent, messages)) {
+        return transformAgentContext(messages, '');
+      }
+      return (await prepareAgentContext(messages)).messages;
+    },
     convertToLlm: (messages) => messages.filter(isLlmCompatibleMessage),
     streamFn: async (activeModel, context, options = {}) => {
       const authToken = await getStoredToken();
@@ -1235,15 +1260,22 @@ export function stopStreaming(agent: Agent = getAIAgent()): void {
 }
 
 export function setSteeringNote(text: string | null, agent: Agent = getAIAgent()): void {
+  const runtime = getAgentRuntimeState(agent);
   agent.clearSteeringQueue();
+  runtime.lastSteeringMessage = null;
   if (text) {
     const normalized = text.trim();
     if (normalized) {
-      agent.steer({
+      const steeringMessage = {
         role: 'user',
         content: normalized,
         timestamp: Date.now(),
-      });
+      } as const;
+      runtime.lastSteeringMessage = {
+        content: normalized,
+        timestamp: steeringMessage.timestamp,
+      };
+      agent.steer(steeringMessage);
     }
   }
 }

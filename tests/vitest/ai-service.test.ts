@@ -555,6 +555,38 @@ describe('ai-service', () => {
     ]);
   });
 
+  it('skips reminder injection when the latest user message came from steering', async () => {
+    const { createAgent, setSteeringNote } = await import('../../src/lib/ai-service.js');
+    const agent = createAgent();
+    const internalAgent = agent as unknown as {
+      transformContext: (messages: import('@mariozechner/pi-agent-core').AgentMessage[]) => Promise<import('@mariozechner/pi-agent-core').AgentMessage[]>;
+    };
+    const steerSpy = vi.spyOn(agent, 'steer');
+
+    setSteeringNote('  course correct  ', agent);
+
+    const steeringMessage = steerSpy.mock.calls[0]?.[0];
+    if (!steeringMessage || steeringMessage.role !== 'user') {
+      throw new Error('expected a steering user message');
+    }
+
+    prepareAgentContextMock.mockClear();
+
+    const sourceMessages = [
+      createUserMessage('hello', 1),
+      createAssistantToolCallMessage(2),
+      createToolResultMessage('initial result', 3),
+      steeringMessage,
+      createAssistantToolCallMessage(4, 'tool_call_2'),
+      createToolResultMessage('follow-up result', 5, 'tool_call_2'),
+    ];
+
+    const transformed = await internalAgent.transformContext(sourceMessages);
+
+    expect(prepareAgentContextMock).not.toHaveBeenCalled();
+    expect(transformed).toBe(sourceMessages);
+  });
+
   it('registers convertToLlm that filters out non-LLM message types', async () => {
     const { createAgent } = await import('../../src/lib/ai-service.js');
     const agent = createAgent();

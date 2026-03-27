@@ -7,6 +7,25 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.3.4',
+    date: '2026-03-27',
+    summary: 'Smoother Chat & Smarter Errors',
+    items: [
+      'Opening chat and switching models is now snappy — no more freeze',
+      'Tool steps and AI responses stay visible during multi-step tasks — no more flickering',
+      'Errors during AI responses show a clear message with a Retry button that resumes at the failed step',
+      'Retry resumes from the exact point of failure instead of restarting the entire response',
+      'Long conversations compress automatically before hitting the context limit',
+      'Copy tool input/output and debug payloads with one click',
+      'Paste long text into chat works reliably, with undo/redo support',
+      'Thinking level carries over when starting a new chat',
+      'AI search handles mixed Chinese + English keyword queries',
+      'New node at the bottom no longer hidden behind the chat bar',
+      'Provider names display correctly (Anthropic, OpenAI, not anthropic, openai)',
+      'Floating bar shows "soma is working…" when AI is active in the background',
+    ],
+  },
+  {
     version: '0.3.3',
     date: '2026-03-27',
     summary: 'Faster Everywhere',

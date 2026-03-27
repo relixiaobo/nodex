@@ -1,4 +1,5 @@
 import { createSession } from './ai-chat-tree.js';
+import type { ChatSession } from './ai-chat-tree.js';
 import { saveChatSession } from './ai-persistence.js';
 import { useUIStore } from '../stores/ui-store.js';
 
@@ -6,14 +7,15 @@ let pendingEnsureChatSession: Promise<string> | null = null;
 const FLOATING_CHAT_INPUT_SELECTOR = '[data-floating-chat-input="true"]';
 const CHAT_DRAWER_TEXTAREA_SELECTOR = '[data-chat-drawer="true"] textarea';
 
+function persistNewChatSession(session: ChatSession): void {
+  void saveChatSession(session).catch(() => {
+    // Fail open: the in-memory session is still usable even if persistence fails.
+  });
+}
+
 async function createChatSession(): Promise<string> {
   const session = createSession();
-  try {
-    await saveChatSession(session);
-  } catch {
-    // Fail open: the in-memory session is still usable even if persistence fails.
-  }
-
+  persistNewChatSession(session);
   return session.id;
 }
 
@@ -67,9 +69,10 @@ export async function ensureChatSession(): Promise<string> {
 }
 
 export async function openNewChatDrawer(): Promise<string> {
-  const sessionId = await createChatSession();
-  selectChatSession(sessionId, true);
-  return sessionId;
+  const session = createSession();
+  selectChatSession(session.id, true);
+  persistNewChatSession(session);
+  return session.id;
 }
 
 export async function focusOrOpenChat(): Promise<void> {
@@ -110,8 +113,10 @@ export async function openChatWithPrompt(prompt: string): Promise<void> {
   let sessionId = ui.currentChatSessionId;
 
   if (!sessionId) {
-    sessionId = await createChatSession();
+    const session = createSession();
+    sessionId = session.id;
     selectChatSession(sessionId, true);
+    persistNewChatSession(session);
   } else {
     ui.openChatDrawer();
   }

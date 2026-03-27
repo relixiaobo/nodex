@@ -9,12 +9,15 @@ import {
   getChatDebugTurns,
   getChatSession,
   getChatSessionMeta,
+  getChatSessionShell,
   getLatestChatSession,
+  getLatestChatSessionShell,
   listChatSessionMetas,
   listChatSessionUserMessageMetasPage,
   resetChatPersistenceForTests,
   saveChatDebugTurns,
   saveChatSession,
+  saveChatSessionShellPatch,
 } from '../../src/lib/ai-persistence.js';
 
 const DB_NAME = 'soma-ai-chat';
@@ -264,6 +267,52 @@ describe('ai persistence', () => {
 
     expect(restored?.selectedProvider).toBe('openai');
     expect(restored?.selectedModelId).toBe('gpt-4o');
+  });
+
+  it('patches only the chat session shell without rewriting the message tree', async () => {
+    await saveChatSession(buildSession('session_shell_patch', [
+      { role: 'user', content: 'hello', timestamp: 1 },
+      { role: 'assistant', content: [{ type: 'text', text: 'world' }], api: 'anthropic-messages', provider: 'anthropic', model: 'claude-sonnet-4-5', usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } }, stopReason: 'stop', timestamp: 2 },
+    ], {
+      title: 'hello',
+      selectedProvider: 'anthropic',
+      selectedModelId: 'claude-sonnet-4-5',
+    }));
+
+    const before = await getChatSession('session_shell_patch');
+    const beforePath = getLinearPath(before!).map((node) => node.message);
+
+    const patched = await saveChatSessionShellPatch('session_shell_patch', {
+      title: 'renamed',
+      selectedProvider: 'openai',
+      selectedModelId: 'gpt-5.4',
+    }, { touchUpdatedAt: false });
+
+    const restored = await getChatSession('session_shell_patch');
+    const shell = await getChatSessionShell('session_shell_patch');
+    const latestShell = await getLatestChatSessionShell();
+
+    expect(patched).toMatchObject({
+      id: 'session_shell_patch',
+      title: 'renamed',
+      selectedProvider: 'openai',
+      selectedModelId: 'gpt-5.4',
+    });
+    expect(getLinearPath(restored!).map((node) => node.message)).toEqual(beforePath);
+    expect(restored?.title).toBe('renamed');
+    expect(restored?.selectedProvider).toBe('openai');
+    expect(restored?.selectedModelId).toBe('gpt-5.4');
+    expect(shell).toMatchObject({
+      id: 'session_shell_patch',
+      title: 'renamed',
+      selectedProvider: 'openai',
+      selectedModelId: 'gpt-5.4',
+    });
+    expect(latestShell?.id).toBe('session_shell_patch');
+    expect(await getChatSessionMeta('session_shell_patch')).toMatchObject({
+      title: 'renamed',
+      searchText: 'renamed\n\nhello\n\nworld',
+    });
   });
 
   it('persists debug turn logs separately from the chat session payload', async () => {

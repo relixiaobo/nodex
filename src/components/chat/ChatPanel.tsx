@@ -151,6 +151,8 @@ export function ChatPanel({ sessionId, hideHeader, debugOpen: externalDebugOpen 
   const [pendingMessageActionId, setPendingMessageActionId] = useState<string | null>(null);
   const [steeringNote, setLocalSteeringNote] = useState<string | null>(null);
   const openProfileRef = useRef<ChatProfileHandle | null>(null);
+  const openProfileShellMarkedRef = useRef(false);
+  const openProfileEndedRef = useRef(false);
   const chatBusy = isStreaming || pendingMessageActionId !== null;
 
   const availableModels = useMemo(() => {
@@ -219,22 +221,37 @@ export function ChatPanel({ sessionId, hideHeader, debugOpen: externalDebugOpen 
       sessionId,
       mode: hideHeader ? 'drawer' : 'panel',
     });
+    openProfileShellMarkedRef.current = false;
+    openProfileEndedRef.current = false;
     return () => {
-      openProfileRef.current?.end({ status: 'unmounted-before-ready' });
+      if (!openProfileEndedRef.current) {
+        openProfileRef.current?.end({ status: 'unmounted-before-ready' });
+      }
       openProfileRef.current = null;
+      openProfileShellMarkedRef.current = false;
+      openProfileEndedRef.current = false;
     };
   }, [hideHeader, sessionId]);
 
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || openProfileEndedRef.current || openProfileShellMarkedRef.current) return;
     openProfileRef.current?.mark('shell-ready', {
       chatState,
       hasConfiguredProvider,
     });
+    openProfileShellMarkedRef.current = true;
   }, [chatState, hasConfiguredProvider, ready]);
 
   useEffect(() => {
-    if (!messagesReady) return;
+    if (!messagesReady || openProfileEndedRef.current) return;
+    if (!openProfileShellMarkedRef.current && ready) {
+      openProfileRef.current?.mark('shell-ready', {
+        chatState,
+        hasConfiguredProvider,
+      });
+      openProfileShellMarkedRef.current = true;
+    }
+    if (!openProfileShellMarkedRef.current) return;
     openProfileRef.current?.mark('messages-ready', {
       messageCount: messages.length,
     });
@@ -242,8 +259,9 @@ export function ChatPanel({ sessionId, hideHeader, debugOpen: externalDebugOpen 
       messageCount: messages.length,
       chatState,
     });
+    openProfileEndedRef.current = true;
     openProfileRef.current = null;
-  }, [chatState, messages.length, messagesReady]);
+  }, [chatState, hasConfiguredProvider, messages.length, messagesReady, ready]);
 
   const steeringArmedRef = useRef(false);
   useEffect(() => {

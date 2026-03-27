@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useMemo, useState } from 'react';
+import { startTransition, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import type { Agent } from '@mariozechner/pi-agent-core';
 import type { AgentMessage, AgentTool } from '@mariozechner/pi-agent-core';
 import type { AssistantMessage, Message, ThinkingLevel, ToolResultMessage, UserMessage } from '@mariozechner/pi-ai';
@@ -106,10 +106,13 @@ export function useAgent(agent: Agent = getAIAgent(), sessionId?: string) {
   const [ready, setReady] = useState(() => isChatSessionShellReady(agent));
   const [messagesReady, setMessagesReady] = useState(() => isChatSessionBodyReady(agent));
 
-  useEffect(() => {
-    let cancelled = false;
+  useLayoutEffect(() => {
     setReady(false);
     setMessagesReady(false);
+  }, [agent, sessionId]);
+
+  useEffect(() => {
+    let cancelled = false;
 
     const restoreShell = sessionId
       ? prepareChatSessionById(sessionId, agent)

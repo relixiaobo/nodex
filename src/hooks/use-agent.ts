@@ -32,6 +32,7 @@ export interface ChatMessageEntry {
   nodeId: string | null;
   message: ChatConversationMessage;
   branches: { ids: string[]; currentIndex: number } | null;
+  displayKind?: 'message' | 'active_assistant_placeholder';
 }
 
 export type ChatTurnPhase = 'idle' | 'streaming_text' | 'waiting_for_tool' | 'resuming_after_tool';
@@ -94,6 +95,66 @@ function assistantHasPendingToolCalls(
   return sawToolCall ? false : false;
 }
 
+export function shouldAppendActiveAssistantPlaceholder(
+  messages: ChatMessageEntry[],
+  turnPhase: ChatTurnPhase,
+): boolean {
+  if (turnPhase === 'idle' || messages.length === 0) {
+    return false;
+  }
+
+  return messages[messages.length - 1]!.message.role !== 'assistant';
+}
+
+function createActiveAssistantPlaceholderEntry(
+  timestamp: number,
+  provider: string,
+  modelId: string,
+): ChatMessageEntry {
+  return {
+    nodeId: null,
+    branches: null,
+    displayKind: 'active_assistant_placeholder',
+    message: {
+      role: 'assistant',
+      content: [],
+      api: 'anthropic-messages',
+      provider,
+      model: modelId,
+      usage: {
+        input: 0,
+        output: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+        totalTokens: 0,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+      },
+      stopReason: 'stop',
+      timestamp,
+    },
+  };
+}
+
+function appendActiveAssistantPlaceholder(
+  messages: ChatMessageEntry[],
+  turnPhase: ChatTurnPhase,
+  agent: Agent,
+): ChatMessageEntry[] {
+  if (!shouldAppendActiveAssistantPlaceholder(messages, turnPhase)) {
+    return messages;
+  }
+
+  const lastTimestamp = messages[messages.length - 1]?.message.timestamp ?? 0;
+  return [
+    ...messages,
+    createActiveAssistantPlaceholderEntry(
+      lastTimestamp,
+      agent.state.model?.provider ?? 'anthropic',
+      agent.state.model?.id ?? 'pending',
+    ),
+  ];
+}
+
 function getConversationState(
   agent: Agent,
   toolResults: Map<string, ToolResultMessage>,
@@ -115,6 +176,7 @@ function getConversationState(
           branches: branchIds.length > 1 && currentIndex >= 0
             ? { ids: branchIds, currentIndex }
             : null,
+          displayKind: 'message',
         } satisfies ChatMessageEntry];
       })
     : [];
@@ -129,6 +191,7 @@ function getConversationState(
           nodeId: null,
           message,
           branches: null,
+          displayKind: 'message',
         } satisfies ChatMessageEntry]
         : [],
     );
@@ -145,26 +208,26 @@ function getConversationState(
       nodeId: null,
       message: streamingMessage,
       branches: null,
+      displayKind: 'message',
     });
   }
 
+  let turnPhase: ChatTurnPhase;
   if (!agent.state.isStreaming) {
-    return { messages: entries, turnPhase: 'idle' };
+    turnPhase = 'idle';
+  } else if (streamingMessage?.role === 'assistant') {
+    turnPhase = assistantHasVisibleText(streamingMessage) ? 'streaming_text' : 'resuming_after_tool';
+  } else {
+    const latestAssistant = [...entries].reverse().find((entry) => entry.message.role === 'assistant')?.message as AssistantMessage | undefined;
+    turnPhase = latestAssistant && assistantHasPendingToolCalls(latestAssistant, toolResults)
+      ? 'waiting_for_tool'
+      : 'resuming_after_tool';
   }
 
-  if (streamingMessage?.role === 'assistant') {
-    return {
-      messages: entries,
-      turnPhase: assistantHasVisibleText(streamingMessage) ? 'streaming_text' : 'resuming_after_tool',
-    };
-  }
-
-  const latestAssistant = [...entries].reverse().find((entry) => entry.message.role === 'assistant')?.message as AssistantMessage | undefined;
-  if (latestAssistant && assistantHasPendingToolCalls(latestAssistant, toolResults)) {
-    return { messages: entries, turnPhase: 'waiting_for_tool' };
-  }
-
-  return { messages: entries, turnPhase: 'resuming_after_tool' };
+  return {
+    messages: appendActiveAssistantPlaceholder(entries, turnPhase, agent),
+    turnPhase,
+  };
 }
 
 export function useAgent(agent: Agent = getAIAgent(), sessionId?: string) {

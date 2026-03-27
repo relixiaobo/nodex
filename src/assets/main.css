@@ -372,23 +372,14 @@ html, body {
   caret-color: currentColor;
 }
 
-/* Keep paragraph inline with tags while avoiding empty-node double-height.
-   ProseMirror uses <br class="ProseMirror-trailingBreak"> for empty lines; when
-   paragraph is inline this <br> introduces an extra visual line in our row layout. */
+/* Keep paragraph inline-block so display type never changes between empty
+   and non-empty states (prevents position jitter when typing into an empty node).
+   inline-block also ensures Chrome renders the caret in empty paragraphs. */
 .editor-inline .ProseMirror p {
-  display: inline;
+  display: inline-block;
   margin: 0;
   min-width: 1px;
   vertical-align: top;
-}
-
-/* Force empty inline paragraphs to have height so Chrome renders the caret.
-   When pressing Enter, a new node has a <br> as its only child. We must switch
-   to inline-block so the caret is actually drawn. As soon as text is typed,
-   it reverts to display: inline so tags don't wrap. */
-.editor-inline .ProseMirror p:empty,
-.editor-inline .ProseMirror p:has(> br.ProseMirror-trailingBreak:only-child) {
-  display: inline-block;
 }
 
 .editor-inline .ProseMirror p::after {

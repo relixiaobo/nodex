@@ -10,7 +10,7 @@
 import type { AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core';
 import { Type } from '@mariozechner/pi-ai';
 import * as loroDoc from '../loro-doc.js';
-import { fuzzySort } from '../fuzzy-search.js';
+import { fuzzyMatch, fuzzySort } from '../fuzzy-search.js';
 import { getFieldValue } from '../filter-utils.js';
 import { computeBacklinks, buildBacklinkCountMap } from '../backlinks.js';
 import { compareNodes, type SortConfig } from '../sort-utils.js';
@@ -39,6 +39,13 @@ const searchToolParameters = Type.Object({
 });
 
 type SearchToolParams = typeof searchToolParameters.static;
+type RankedSearchNode = NodexNode & {
+  _fuzzyScore: number;
+  _fuzzyRanges: number[];
+  _matchedTokenCount?: number;
+};
+
+const QUERY_FALLBACK_SPLIT_RE = /[\s,，、;；|/]+/u;
 
 // ─── Helpers ───
 
@@ -108,6 +115,88 @@ function formatSearchItem(node: NodexNode): {
     parentName,
     fields: fieldsMap,
   };
+}
+
+function buildSearchHaystack(node: NodexNode): string {
+  return `${node.name ?? ''}\n${node.description ?? ''}`;
+}
+
+function tokenizeSearchQuery(query: string): string[] {
+  const seen = new Set<string>();
+  const tokens: string[] = [];
+
+  for (const rawToken of query.split(QUERY_FALLBACK_SPLIT_RE)) {
+    const token = rawToken.trim().toLowerCase();
+    if (!token) continue;
+    if (!/[\u3400-\u9fff]/u.test(token) && token.length < 2) continue;
+    if (seen.has(token)) continue;
+    seen.add(token);
+    tokens.push(token);
+  }
+
+  return tokens;
+}
+
+function rankCandidatesByTokenCoverage(
+  candidates: NodexNode[],
+  tokens: string[],
+  minMatchedTokens: number,
+): RankedSearchNode[] {
+  const ranked: RankedSearchNode[] = [];
+
+  for (const node of candidates) {
+    const haystack = buildSearchHaystack(node);
+    let matchedTokenCount = 0;
+    let bestRanges: number[] = [];
+    let bestScore = Number.NEGATIVE_INFINITY;
+    let totalScore = 0;
+
+    for (const token of tokens) {
+      const match = fuzzyMatch(token, haystack);
+      if (!match) continue;
+      matchedTokenCount += 1;
+      totalScore += match.score;
+      if (match.score > bestScore) {
+        bestScore = match.score;
+        bestRanges = match.ranges;
+      }
+    }
+
+    if (matchedTokenCount < minMatchedTokens) continue;
+
+    ranked.push({
+      ...node,
+      _fuzzyScore: totalScore + matchedTokenCount * 1000,
+      _fuzzyRanges: bestRanges,
+      _matchedTokenCount: matchedTokenCount,
+    });
+  }
+
+  ranked.sort((a, b) =>
+    (b._matchedTokenCount ?? 0) - (a._matchedTokenCount ?? 0)
+    || b._fuzzyScore - a._fuzzyScore
+    || b.updatedAt - a.updatedAt,
+  );
+
+  return ranked;
+}
+
+function rankCandidatesByQuery(candidates: NodexNode[], query: string): RankedSearchNode[] {
+  const exactRanked = fuzzySort(
+    candidates.map((node) => ({ ...node, _h: buildSearchHaystack(node) })),
+    query,
+    (item) => item._h,
+    candidates.length,
+  );
+  if (exactRanked.length > 0) return exactRanked;
+
+  const tokens = tokenizeSearchQuery(query);
+  if (tokens.length < 2) return exactRanked;
+
+  const allTokenRanked = rankCandidatesByTokenCoverage(candidates, tokens, 2);
+  if (allTokenRanked.length > 0) return allTokenRanked;
+
+  return rankCandidatesByTokenCoverage(candidates, tokens, 1);
 }
 
 // ─── Backlinks search path ───
@@ -194,22 +283,16 @@ function searchByFilters(rules: SearchRules, params: SearchToolParams, requiredT
   // Count mode
   if (params.count) {
     if (query) {
-      const ranked = fuzzySort(
-        candidates.map((n) => ({ ...n, _h: `${n.name ?? ''}\n${n.description ?? ''}` })),
-        query, (item) => item._h, candidates.length,
-      );
+      const ranked = rankCandidatesByQuery(candidates, query);
       return countResult(ranked.length, unresolvedFilters);
     }
     return countResult(candidates.length, unresolvedFilters);
   }
 
   // Ranking
-  let ranked: Array<NodexNode & { _fuzzyScore: number; _fuzzyRanges: unknown[] }>;
+  let ranked: RankedSearchNode[];
   if (query) {
-    ranked = fuzzySort(
-      candidates.map((n) => ({ ...n, _h: `${n.name ?? ''}\n${n.description ?? ''}` })),
-      query, (item) => item._h, candidates.length,
-    );
+    ranked = rankCandidatesByQuery(candidates, query);
   } else {
     ranked = candidates.map((n) => ({ ...n, _fuzzyScore: 0, _fuzzyRanges: [] }));
   }

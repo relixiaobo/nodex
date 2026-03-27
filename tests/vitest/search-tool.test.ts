@@ -142,4 +142,29 @@ describe('node_search tool', () => {
 
     expect(result.items.map((item: { id: string }) => item.id)).toContain(createdToday.id);
   });
+
+  it('falls back to token-level recall when a long mixed query has no exact matches', async () => {
+    const store = useNodeStore.getState();
+    const contextNode = store.createChild('proj_1', undefined, {
+      name: '上下文缓存策略',
+      description: '讨论压缩前的上下文窗口管理',
+    });
+    const tokenNode = store.createChild('proj_1', undefined, {
+      name: 'token cache internals',
+      description: 'cache reuse and compression tradeoffs',
+    });
+    store.createChild('proj_1', undefined, {
+      name: '无关节点',
+      description: '完全不相关的内容',
+    });
+
+    const result = await executeSearch({
+      rules: { query: '上下文 缓存 压缩 token cache' },
+      limit: 10,
+    });
+
+    expect(result.total).toBeGreaterThanOrEqual(2);
+    expect(result.items.map((item: { id: string }) => item.id)).toContain(contextNode.id);
+    expect(result.items.map((item: { id: string }) => item.id)).toContain(tokenNode.id);
+  });
 });

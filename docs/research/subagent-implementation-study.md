@@ -430,7 +430,11 @@ subagent 执行:
   → Chat: "定价提取完成，创建了 <ref id="...">LLM 定价对比</ref> 节点。"
 ```
 
-**关键**: subagent 不需要独立的持久化层（不需要自己的 IndexedDB session）。它的"记忆"是 Loro 中的节点——面板关闭后节点仍在，subagent 下次可以从节点状态恢复（虽然当前设计是面板关闭 = 终止）。
+**双重持久化**:
+- **节点结果** → Loro CRDT（用户可见、可搜索、可关联）
+- **执行过程** → IndexedDB session（完整对话可回溯，通过 `<cite type="chat">` 从 Chat 中链接访问）
+
+面板关闭后两者都持久化——节点在 Loro 中，session 在 IndexedDB 中。用户下次打开可以从 #task 节点或 Chat 历史引用回溯完整执行过程。
 
 ---
 
@@ -789,20 +793,54 @@ agent.subscribe((event) => {
    - "✓ 定价提取完成 — 创建了 8 个节点 [查看]"
    - "⚠ 后台任务需要确认: ..."
 
-#### Q5: Session 隔离到什么程度？
+#### Q5: Session 持久化 — 独立 session，完整可回溯
 
-**纯内存 Agent 实例，不持久化 session。**
+**每个 subagent 拥有独立的 IndexedDB session，与主 Chat 相同的持久化机制。**
 
-- Subagent 不创建 IndexedDB session（不出现在 chat history 列表中）
-- Subagent 的 agent.state.messages 只在内存中
-- 面板关闭 = subagent 终止 = 内存释放
-- 已写入 Loro 的节点持久化（CRDT 独立于 agent 生命周期）
+现有基础设施完全支持：
+- `createAgent()` → 独立 Agent 实例
+- `createSession()` → 独立 ChatSession（IndexedDB 持久化）
+- `agentRegistry.set(sessionId, agent)` → 注册到全局 registry
+- `useAgent(agent, sessionId)` → 任何 session 都可渲染
 
-**为什么不持久化 subagent session**:
-1. Subagent 是临时工作者，对话内容是实现细节（tool calls），用户不需要回看
-2. 节省 IndexedDB 空间
-3. 避免 chat history 被大量 subagent session 污染
-4. 如果需要审计 subagent 的执行历史，可以从 Loro OpLog 重建（所有节点操作都有记录）
+**与主 Chat session 的区分**: `ChatSessionMeta` 新增 `type` 字段——
+
+```typescript
+interface ChatSessionMeta {
+  // ... existing fields
+  type?: 'chat' | 'subagent';   // 默认 'chat'，subagent session 标记为 'subagent'
+  taskNodeId?: string;           // subagent 关联的 #task 节点 ID
+}
+```
+
+- Chat history 列表过滤 `type !== 'subagent'`，不被污染
+- Subagent session 从 #task 节点或 Chat 引用入口访问
+
+**用户入口 — 复用现有 Citation 系统**:
+
+soma 已有 `CitationBadge` 组件，支持三种引用类型：`node` / `chat` / `url`。`type="chat"` 时：
+- hover → `ChatCitePopover` 显示 session 标题 + 用户消息预览
+- 点击 "Open this chat" → `switchToChatSession(sessionId)` 在 ChatDrawer 中打开
+
+主 agent 完成 subagent 任务后在 Chat 中报告时，直接用 `<cite type="chat">` 引用 subagent session：
+
+```
+主 Agent: "定价提取完成，创建了 8 个节点。[查看结果]¹ [执行过程]²"
+                                              ↑ node cite   ↑ chat cite
+                                              hover→节点预览  hover→session 预览
+                                              click→导航节点  click→打开 subagent 对话
+```
+
+**完整回溯路径**:
+1. **从 Chat** → 主 agent 报告中的 `<cite type="chat">` → 打开 subagent session → 看到完整对话（tool calls、推理、中间结果）
+2. **从 Outliner** → #task 节点 → 关联的 session ID → 同上
+3. **从 Task List** → 任务详情 → 打开关联 session
+
+**为什么现在选择持久化**:
+1. 用户需要回溯 subagent 的完整执行过程（tool calls、推理链、错误重试）
+2. 现有 session 基础设施零改动即可复用（`createSession` + `saveChatSession` + `agentRegistry`）
+3. `CitationBadge` + `ChatCitePopover` + `switchToChatSession` 提供了完整的引用→预览→打开链路
+4. `type` 字段隔离了 chat history 列表，不会污染
 
 #### Q6: 现有 `phase-4-orchestration.md` 方案是否合理？
 
@@ -817,7 +855,7 @@ agent.subscribe((event) => {
 | Inter-agent 协作 via CRDT | ✅ 设计正确 | 推迟到 Step 4 |
 | `docs/plans/subagent-system.md` | ❌ 文件不存在 | phase-4 是唯一计划文档 |
 | Subagent 创建方式 | ⚠️ 未详细定义 | 需要明确: 轻量 `new Agent()` + 工具子集 |
-| Session 持久化 | ⚠️ 未明确 | 建议: 纯内存，不持久化 |
+| Session 持久化 | ⚠️ 未明确 | 独立 IndexedDB session，`type: 'subagent'` 区分，复用 CitationBadge 引用 |
 | Rate limiting | ⚠️ 未提及 | 需要: 共享 streamFn 层全局 rate limiter |
 | 进度粒度 | ⚠️ 只有 badge | 建议: 三层进度（badge + task list + outliner 实时更新） |
 
@@ -941,7 +979,7 @@ class AgentOrchestrator {
    - 没有一个产品支持 subagent mid-task clarification
    - 只有 Notion AI 和 Tana AI 将 AI 输出写入数据模型（block/node），其他都是对话消息
 
-3. **现有方案（phase-4-orchestration.md）整体正确**，主要需要补充：subagent 创建细节、session 不持久化策略、rate limiting、三层进度 UI。
+3. **现有方案（phase-4-orchestration.md）整体正确**，主要需要补充：subagent 创建细节、独立 session 持久化（复用现有 CitationBadge 引用链路）、rate limiting、三层进度 UI。
 
 4. **Loro CRDT 是最大差异化优势**——天然解决并发写入、自动 UI 更新、结果持久化，比任何框架的 state management 都强大。"一切皆节点"让 subagent 的产出天然成为知识图谱的一部分。
 

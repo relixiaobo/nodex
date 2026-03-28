@@ -703,8 +703,8 @@ bus.send({
 const delegateTool: AgentTool = {
   name: 'delegate',
   label: 'Delegate Task',
-  description: `在隔离的 context 中执行任务。用于：
-    - 工具调用多（>3 次），避免污染当前对话上下文
+  description: `在隔离的 context 中执行任务。拥有与你相同的完整工具集（node 操作、浏览器、搜索等）。用于：
+    - 工具调用较多，避免污染当前对话上下文
     - 任务可以独立执行，不需要逐步与用户交互
     返回文本摘要。完整执行过程自动保存，用户可回溯。`,
   parameters: Type.Object({
@@ -720,7 +720,7 @@ const delegateTool: AgentTool = {
     saveChatSession(session);  // 持久化到 IndexedDB
 
     // 2. 配置（复用已有函数）
-    agent.setTools(getAITools());  // 同样的 node tools，隔离的 context
+    agent.setTools(getAITools());  // 与主 agent 相同的完整工具集，隔离的 context
     agent.setSystemPrompt(buildDelegatePrompt(params.task));
 
     // 3a. 同步执行（短任务）

@@ -203,15 +203,16 @@
 
 #### AutoGen — Multi-Agent Conversation
 
-**Source**: [Microsoft AutoGen](https://github.com/microsoft/autogen)
+**Source**: [Microsoft AutoGen](https://github.com/microsoft/autogen), [AutoGen v0.4 Research](https://www.microsoft.com/en-us/research/articles/autogen-v0-4/)
 
 **核心模式**: **Agent 间对话** — 多个 agent 通过消息传递进行对话。支持 Round-robin（轮流发言）、Random（随机选择下一发言者）、Selector（LLM 决定谁发言）。
 
-**事件驱动**: AutoGen v0.4+ 使用 event-driven 架构——agent 注册 message handler，runtime 路由消息。
+**事件驱动 (v0.4+)**: Actor model——每个 agent = actor with typed message handlers (`@message_handler`)。Runtime 路由消息。`CancellationToken` in `MessageContext` 支持取消。`SingleThreadedAgentRuntime` + asyncio queue。Fan-out 用 `asyncio.gather()`。
 
 **对 soma 的启发**:
 - "Agent 间对话"模式对 soma **过于复杂**——soma 的 subagent 是独立工作者，不需要互相"讨论"
 - **Event-driven 消息路由** 的思路好——映射到 soma 的 EventTarget message bus
+- **Actor 模型的 full isolation**（agents only communicate via messages）验证了 soma 的"独立 Agent 实例 + 消息总线"设计
 - **Python/.NET 为主，JS 版不成熟**——不适用
 
 ---
@@ -220,11 +221,31 @@
 
 **Source**: [Mastra.ai](https://mastra.ai/)
 
-**核心模式**: **Workflow Graph** — 类似 LangGraph 的状态机，但 TypeScript 原生。支持 suspend/resume（长时间运行的 workflow 可以暂停等待外部输入后恢复）。内置 MCP 集成。
+**核心模式**: **Workflow Graph** — 类似 LangGraph 的状态机，但 TypeScript 原生。支持 suspend/resume（长时间运行的 workflow 可以暂停等待外部输入后恢复）。内置 MCP 集成。两种生命周期：`FilesystemLifecycle`（init → destroy）和 `SandboxLifecycle`（start → stop → destroy）。
 
 **对 soma 的启发**:
 - **Suspend/resume** 正好映射到 soma 的 clarification flow——subagent 暂停等待 clarification 后恢复
+- **两种生命周期** 有启发——soma 的简单 subagent 用两阶段（running → completed），复杂 subagent 用三阶段（running → stopping → stopped）
 - **但框架太重**（完整 AI stack），且主要面向服务端——不适合 Chrome extension
+
+---
+
+#### AG-UI Protocol — Agent-to-UI Standard
+
+**Source**: [AG-UI Protocol](https://docs.ag-ui.com/), [Event Types Guide](https://www.copilotkit.ai/blog/master-the-17-ag-ui-event-types)
+
+**核心模式**: **16 typed SSE events in 5 categories** — 标准化 agent-to-frontend 通信协议：
+1. **Lifecycle**: RUN_STARTED, RUN_FINISHED, RUN_ERROR, STEP_STARTED, STEP_FINISHED
+2. **Text**: TEXT_MESSAGE_START, TEXT_MESSAGE_CONTENT (streaming delta), TEXT_MESSAGE_END
+3. **Tool**: TOOL_CALL_START, TOOL_CALL_ARGS, TOOL_CALL_END
+4. **State**: STATE_DELTA (incremental state sync), STATE_SNAPSHOT
+5. **Special**: RAW, INTERRUPT (human-in-the-loop approval), CUSTOM
+
+**对 soma 的启发**:
+- **Event 分类法** 非常优秀——soma 的 `AgentMessageType` 应该借鉴这个 5 层分类
+- **`STATE_DELTA`** 映射到 Loro CRDT 的增量更新——soma 天然支持
+- **`INTERRUPT`** 映射到 soma 的 `clarification-needed`——验证了这个设计模式是行业共识
+- **不需要引入框架**——只借鉴 event taxonomy 设计思路
 
 ---
 
@@ -362,6 +383,27 @@ bus.send({ from: subagentId, to: 'main', type: 'task-completed', payload: { resu
 **为什么纯 Blackboard 不够**: Clarification request 需要结构化的 request/response。subagent 写一个"我有问题"节点，主 agent 怎么知道这是 clarification 而不是普通结果？消息总线提供语义明确的事件类型。
 
 **为什么纯 Message Bus 不够**: 数据在消息中传递不持久化，违背"一切皆节点"。消息 payload 中放完整数据 = 数据只在内存中，面板关闭就丢失。
+
+**借鉴 AG-UI Protocol 的 5 层事件分类**: 原有的 `AgentMessageType` 可以增强为更结构化的分类——
+
+```typescript
+type AgentMessageType =
+  // Lifecycle（任务生命周期）
+  | 'task-delegated'           // ~ AG-UI RUN_STARTED
+  | 'task-completed'           // ~ AG-UI RUN_FINISHED
+  | 'task-failed'              // ~ AG-UI RUN_ERROR
+  | 'task-cancelled'
+  // Progress（步骤级进度）
+  | 'task-progress'            // ~ AG-UI STEP_STARTED/FINISHED
+  // Tool visibility（工具调用可观测）
+  | 'tool-call-start'          // ~ AG-UI TOOL_CALL_START
+  | 'tool-call-end'            // ~ AG-UI TOOL_CALL_END
+  // State（数据变更通知）
+  | 'data-available'           // ~ AG-UI STATE_DELTA
+  // Special（特殊交互）
+  | 'clarification-needed'     // ~ AG-UI INTERRUPT
+  | 'clarification-response'
+```
 
 ---
 
@@ -556,6 +598,18 @@ async cancel(subagentId: string): Promise<void> {
 **已写入的部分结果保留**——用户可能需要。如果用户想清理，可以手动删除或通过主 agent 指令删除。
 
 **对比**: Claude Code 的 `abort()` 会立即终止，但 worktree 中的文件变更保留。soma 的模式一致——abort 终止执行，已写入 Loro 的节点保留。
+
+**借鉴 Vercel AI SDK 的 `onAbort({ steps })` 模式**: 在 `TaskDescriptor` 中添加可选的 `onCancel` 回调，让任务定义者有机会做取消后清理——
+
+```typescript
+interface TaskDescriptor {
+  // ... existing fields
+  onCancel?: (context: {
+    createdNodeIds: string[];  // subagent 取消前已创建的节点
+    lastStep: string;          // 最后在做什么
+  }) => Promise<void>;
+}
+```
 
 ---
 

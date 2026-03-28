@@ -1,7 +1,153 @@
-# Tab Group 作为 Agent 工作区隔离机制
+# Tab Group 作为 Agent 工作区
 
 > Date: 2026-03-28
-> Context: soma agent 执行浏览器任务时，需要隔离环境不干扰用户，类比 Claude Code 的 worktree
+> Context: soma 主 agent（无 subagent）如何利用 Chrome tab group 改善浏览器任务体验
+
+---
+
+## 0. 当前问题
+
+soma 的 agent 用 `browser` tool 操作浏览器时：
+- 打开的页面混在用户标签页中——用户分不清哪些是自己的、哪些是 agent 的
+- agent 完成后留下一堆散落的标签页——用户手动一个个关
+- 没有"工作区"概念——每次浏览器操作都是孤立的 tool call
+
+Tab group 解决的核心问题：**给 agent 的浏览器操作一个可见的、隔离的、可整体管理的工作区。**
+
+---
+
+## 1. 用户场景分析（无 subagent）
+
+### 场景 A：多页信息提取
+
+```
+用户: "对比 Anthropic、OpenAI、Google 三家的模型定价"
+
+当前（无 tab group）:
+  agent 打开 3 个标签页，混在用户标签页中
+  [GitHub] [Anthropic] [Twitter] [OpenAI] [Gmail] [Google AI]
+  用户: "哪些是我的？哪些是 agent 开的？"
+  agent 完成后 3 个标签页留着 → 用户手动关
+
+有 tab group:
+  用户标签页不受影响
+  [GitHub] [Twitter] [Gmail]
+  ┌─ 🔵 对比模型定价 ─────────────────────────────┐
+  │ [Anthropic Pricing] [OpenAI Pricing] [Google AI] │
+  └─────────────────────────────────────────────────┘
+  agent 完成后 → 折叠或关闭整个 group
+```
+
+**执行流程**（主 agent 同步执行，无 subagent）：
+1. `browser({ action: 'group_create', title: '对比模型定价', urls: [...] })` — 1 次 tool call
+2. `browser({ action: 'get_text', tabId: 201 })` — 读页面 1
+3. `browser({ action: 'get_text', tabId: 202 })` — 读页面 2
+4. `browser({ action: 'get_text', tabId: 203 })` — 读页面 3
+5. 分析 + 创建节点 + 回复用户
+6. `browser({ action: 'group_collapse', groupId: 42 })` — 折叠工作区
+
+**用户等待时间**：~30-60s（3 个页面读取 + LLM 分析）。用户需要等，但标签页不乱。
+
+---
+
+### 场景 B：引用验证
+
+```
+用户: "检查这篇文章里引用的 5 个数据源是否准确"
+
+agent:
+  1. 读取文章节点，提取引用 URL
+  2. 创建 tab group "引用验证" (红色)
+  3. 打开 5 个引用页面
+  4. 逐个读取并验证
+  5. 报告结果 + 折叠 group
+```
+
+用户可以**在 agent 工作期间看到 group 里的标签页在逐个加载**——这是天然的进度指示。
+
+---
+
+### 场景 C：用户和 agent 共建研究工作区
+
+这是 tab group 最独特的场景——**不是 agent 一次性完成的任务，而是持续的研究工作区**。
+
+```
+Day 1:
+  用户: "我在研究 CRDT 技术，帮我找一些关键资料"
+  agent: 创建 tab group "CRDT 研究" (绿色)
+         打开 Loro GitHub、CRDT.tech、Martin Kleppmann 的论文...
+  用户: 手动往 group 里加了几个自己找到的页面
+
+Day 2:
+  用户: "总结一下 CRDT 研究 group 里的内容"
+  agent: （通过 getPageContext 看到 "CRDT 研究" group 有 8 个标签页）
+         读取所有页面 → 生成总结
+
+Day 3:
+  用户: "这个研究差不多了，关掉 group 吧"
+  agent: browser({ action: 'group_close', groupId: ... })
+```
+
+**关键点**：
+- Tab group 不是一次性工具——它是一个**持续的工作区**
+- 用户和 agent 都可以往 group 里加/减标签页
+- agent 通过 `getPageContext()` 感知 group 的当前状态
+- `"总结这个 group"` 是非常自然的交互
+
+---
+
+### 场景 D：Clip 增强——自动展开来源
+
+```
+用户 clip 了一篇文章，文章里引用了 3 个外部链接
+
+agent（Spark 提取时）:
+  1. 读取文章内容
+  2. 发现 3 个关键引用链接
+  3. 创建 tab group "文章来源" (灰色, 折叠)
+  4. 打开 3 个来源页面（在折叠的 group 中）
+  5. 从来源中补充 Spark 分析
+
+用户看到:
+  ▸ 文章来源 (3)  ← 折叠状态，不打扰，但用户好奇时可以展开看
+```
+
+折叠的 group 是一种**温和的存在感**——"AI 帮你准备好了，你想看就看"。
+
+---
+
+### 场景 E：浏览器操作的"撤销空间"
+
+```
+用户: "帮我在 GitHub 上创建一个新 repo 并配置好"
+
+当前: agent 直接在用户的 GitHub 标签页上操作 → 用户担心 agent 做错
+
+有 tab group:
+  agent 创建 "GitHub 操作" group → 在 group 内的新标签页中操作
+  用户可以随时切到 group 看 agent 在做什么
+  如果做错 → 关闭 group 即可（原有标签页不受影响）
+```
+
+Tab group = 浏览器操作的**沙箱**。agent 不会"弄乱"用户的标签页。
+
+---
+
+## 1.5 主 agent 的限制（诚实评估）
+
+没有 subagent 时，tab group 的使用有明确的边界：
+
+| 方面 | 能做 | 不能做 |
+|------|------|--------|
+| **视觉隔离** | ✅ agent 标签页独立成组 | — |
+| **批量管理** | ✅ 整体折叠/关闭 | — |
+| **工作区感知** | ✅ getPageContext 显示 group 结构 | — |
+| **共建工作区** | ✅ 用户和 agent 共同维护 group | — |
+| **后台执行** | ❌ | 主 agent 同步执行，读 5 个页面期间用户等待 |
+| **Context 隔离** | ❌ | 5 个 get_text 结果全部进入主 agent context |
+| **并行读取** | ❌ | 只能顺序读取，一次一个 tool call |
+
+**结论**：tab group 解决的是**浏览器侧的组织问题**，不解决**执行效率问题**（那是 delegate tool 的事）。两者价值独立，可以分别交付。
 
 ---
 
@@ -310,3 +456,43 @@ Tab group 和 delegate tool 是**正交的能力**：
 | 创建 tab 后才能加入 group | 两步操作 | `group_create` 封装为一步 |
 | group 内 tab 物理相邻 | Chrome 自动移动 tab 位置 | 无需处理，Chrome 自动排列 |
 | 最多 9 种颜色 | 不支持自定义颜色 | 足够区分并发任务 |
+
+---
+
+## 7. agent system prompt 中的 tab group 使用指导
+
+agent 需要知道何时以及如何使用 tab group。在 system prompt 或 tool description 中加入简洁的规则：
+
+```
+Tab group 使用规则：
+- 需要打开 2+ 个新页面时，创建 tab group 归组
+- 只打开 1 个页面时，不需要 group
+- 用 group title 描述任务目的（如"对比模型定价"）
+- 任务完成后折叠 group（用户可自行关闭或保留）
+- 用户说"总结这个 group"时，读取 group 内所有标签页
+- 不要关闭用户的 tab group（只操作 agent 自己创建的）
+```
+
+这不需要复杂的代码——只是 prompt 中的行为引导。agent 的 LLM 会自然遵循这些规则来决定何时创建/折叠/关闭 group。
+
+---
+
+## 8. 总结
+
+**Tab group 对主 agent 的核心价值**（无需 subagent）：
+
+| 价值 | 说明 |
+|------|------|
+| **视觉隔离** | agent 的标签页不混入用户的 |
+| **整体管理** | 一键折叠/关闭整组标签页 |
+| **工作区感知** | agent 通过 context 知道 group 存在及其内容 |
+| **共建研究** | 用户和 agent 都可以往同一个 group 中添加页面 |
+| **天然进度** | 用户看到 group 中标签页在加载 = 知道 agent 在工作 |
+| **操作沙箱** | agent 在 group 中操作，不影响用户原有标签页 |
+
+**不能解决的**（需要 delegate tool）：
+- 后台执行（主 agent 同步阻塞）
+- Context 污染（多次 get_text 的结果占满 context）
+- 并行读取（顺序执行 tool calls）
+
+**实现量**：~230 行，复用现有 browser tool，零新 UI，静默权限。

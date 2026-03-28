@@ -372,38 +372,7 @@ subagent.setSystemPrompt(buildSubagentPrompt(task));
 - **数据交换** 通过 Loro CRDT——结果、进度、协作产出全部是节点（一切皆节点）
 - **协调信号** 通过 EventTarget 消息总线——任务生命周期、clarification、取消等轻量事件
 
-```typescript
-// 数据流: subagent → Loro CRDT → UI 自动更新
-subagentTools.node_create({ parentId: taskNodeId, text: '提取结果...' });
-
-// 协调流: subagent → EventTarget → 主 agent
-bus.send({ from: subagentId, to: 'main', type: 'task-completed', payload: { resultNodeIds } });
-```
-
-**为什么纯 Blackboard 不够**: Clarification request 需要结构化的 request/response。subagent 写一个"我有问题"节点，主 agent 怎么知道这是 clarification 而不是普通结果？消息总线提供语义明确的事件类型。
-
-**为什么纯 Message Bus 不够**: 数据在消息中传递不持久化，违背"一切皆节点"。消息 payload 中放完整数据 = 数据只在内存中，面板关闭就丢失。
-
-**借鉴 AG-UI Protocol 的 5 层事件分类**: 原有的 `AgentMessageType` 可以增强为更结构化的分类——
-
-```typescript
-type AgentMessageType =
-  // Lifecycle（任务生命周期）
-  | 'task-delegated'           // ~ AG-UI RUN_STARTED
-  | 'task-completed'           // ~ AG-UI RUN_FINISHED
-  | 'task-failed'              // ~ AG-UI RUN_ERROR
-  | 'task-cancelled'
-  // Progress（步骤级进度）
-  | 'task-progress'            // ~ AG-UI STEP_STARTED/FINISHED
-  // Tool visibility（工具调用可观测）
-  | 'tool-call-start'          // ~ AG-UI TOOL_CALL_START
-  | 'tool-call-end'            // ~ AG-UI TOOL_CALL_END
-  // State（数据变更通知）
-  | 'data-available'           // ~ AG-UI STATE_DELTA
-  // Special（特殊交互）
-  | 'clarification-needed'     // ~ AG-UI INTERRUPT
-  | 'clarification-response'
-```
+> **注意**：以上是框架调研中常见的 Hybrid 模式。soma 最终方案（§3）简化为 `delegate` tool——不需要显式的消息总线，通信通过 pi-agent-core 的 tool call return + `followUp()` 完成。
 
 ---
 
@@ -428,16 +397,14 @@ type AgentMessageType =
 
 **Session 是唯一保证存在的持久化层**——无论哪种模式，subagent 的完整对话（tool calls、推理链、中间结果）都通过 IndexedDB session 可回溯。主 agent 在 Chat 中通过 `<cite type="chat">` 链接到 subagent session。
 
-重量模式额外写入 Loro CRDT 节点（通过 node tools），结果天然结构化、可搜索、可关联。
+需要写入节点时，subagent 使用继承的工具（node_create 等）写入 Loro CRDT，结果天然结构化、可搜索、可关联。
 
 ```
-轻量模式:
-  subagent 分析完成 → 文本结果回传主 agent → Chat 中呈现 + cite session
+文本结果:
+  subagent 分析完成 → 文本回传主 agent → Chat 中呈现 + cite session
 
-重量模式:
-  subagent 执行:
-    1. node_create → 创建结果节点树
-    2. 完成 → bus.send('task-completed', { resultNodeIds: [...] })
+节点结果:
+  subagent 执行 → 通过工具创建/编辑节点 → 完成后文本摘要回传
   主 agent 收到:
     → Chat: "定价提取完成 [查看结果]¹ [执行过程]²"
                            ↑ node cite  ↑ chat cite (session)
@@ -703,8 +670,8 @@ bus.send({
 const delegateTool: AgentTool = {
   name: 'delegate',
   label: 'Delegate Task',
-  description: `在隔离的 context 中执行任务。拥有与你相同的完整工具集（node 操作、浏览器、搜索等）。用于：
-    - 工具调用较多，避免污染当前对话上下文
+  description: `在隔离的 context 中执行任务。用于：
+    - 工具调用多（>3 次），避免污染当前对话上下文
     - 任务可以独立执行，不需要逐步与用户交互
     返回文本摘要。完整执行过程自动保存，用户可回溯。`,
   parameters: Type.Object({
@@ -719,9 +686,14 @@ const delegateTool: AgentTool = {
     const session = createSession();
     saveChatSession(session);  // 持久化到 IndexedDB
 
-    // 2. 配置（复用已有函数）
-    agent.setTools(getAITools());  // 与主 agent 相同的完整工具集，隔离的 context
-    agent.setSystemPrompt(buildDelegatePrompt(params.task));
+    // 2. 配置
+    // 工具集 = 主 agent 当前所有工具 - delegate 自身（防递归）
+    // 未来新增 web search、CLI 等工具时，subagent 自动继承
+    const tools = mainAgent.state.tools.filter(t => t.name !== 'delegate');
+    agent.setTools(tools);
+    // System prompt 复用主 agent 的基础 prompt
+    // 不预设工作环境——task 参数本身就是全部上下文
+    agent.setSystemPrompt(mainAgent.state.systemPrompt);
 
     // 3a. 同步执行（短任务）
     if (!params.background) {
@@ -834,7 +806,7 @@ AI: "已取消。已提取的部分结果保留在 [定价对比] 节点中。"
   Agent class          — pi-agent-core（创建独立实例）
   createSession()      — ai-chat-tree.ts（创建 session）
   saveChatSession()    — ai-persistence.ts（IndexedDB 持久化）
-  getAITools()         — ai-tools/index.ts（node tools）
+  mainAgent.state.tools — 继承主 agent 全部工具（减去 delegate 自身）
   followUp()           — pi-agent-core（异步完成通知）
   agent.abort()        — pi-agent-core（取消）
   CitationBadge        — chat/CitationBadge.tsx（回溯入口）

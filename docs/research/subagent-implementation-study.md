@@ -417,24 +417,31 @@ type AgentMessageType =
 | **直接写入数据层** | Notion AI, Tana AI | 结构化、可搜索 | agent 需要数据写入能力 |
 | **两者结合** | Claude Code Teams | 写文件 + 摘要回报 | 复杂度高 |
 
-**推荐方案: 直接写入 Loro CRDT + 摘要回报给主 agent**
+**推荐方案: 按场景分层持久化**
 
-soma 的 subagent 通过 node tools（`node_create`, `node_edit`）直接写入 Loro CRDT。结果 = 节点树，天然结构化、可搜索、可关联。完成后通过消息总线发送摘要 + resultNodeIds 给主 agent，主 agent 在 Chat 中报告。
+不同模式的 subagent 产出不同形式的结果：
+
+| 模式 | 结果形式 | 持久化 |
+|------|---------|--------|
+| **轻量（Chat-only）** | 文本回传给主 agent | Session（IndexedDB） |
+| **重量（Node-producing）** | 节点树 + 文本摘要 | Session（IndexedDB）+ 节点（Loro CRDT） |
+
+**Session 是唯一保证存在的持久化层**——无论哪种模式，subagent 的完整对话（tool calls、推理链、中间结果）都通过 IndexedDB session 可回溯。主 agent 在 Chat 中通过 `<cite type="chat">` 链接到 subagent session。
+
+重量模式额外写入 Loro CRDT 节点（通过 node tools），结果天然结构化、可搜索、可关联。
 
 ```
-subagent 执行:
-  1. node_create → 创建结果节点树
-  2. 完成 → bus.send('task-completed', { resultNodeIds: [...] })
+轻量模式:
+  subagent 分析完成 → 文本结果回传主 agent → Chat 中呈现 + cite session
 
-主 agent 收到:
-  → Chat: "定价提取完成，创建了 <ref id="...">LLM 定价对比</ref> 节点。"
+重量模式:
+  subagent 执行:
+    1. node_create → 创建结果节点树
+    2. 完成 → bus.send('task-completed', { resultNodeIds: [...] })
+  主 agent 收到:
+    → Chat: "定价提取完成 [查看结果]¹ [执行过程]²"
+                           ↑ node cite  ↑ chat cite (session)
 ```
-
-**双重持久化**:
-- **节点结果** → Loro CRDT（用户可见、可搜索、可关联）
-- **执行过程** → IndexedDB session（完整对话可回溯，通过 `<cite type="chat">` 从 Chat 中链接访问）
-
-面板关闭后两者都持久化——节点在 Loro 中，session 在 IndexedDB 中。用户下次打开可以从 #task 节点或 Chat 历史引用回溯完整执行过程。
 
 ---
 
@@ -704,7 +711,71 @@ bus.send({
 └─────────────────────────────────────────────────┘
 ```
 
-### 3.2 关键设计决策
+### 3.2 两种 Subagent 模式：轻量 vs 重量
+
+**不是所有 subagent 任务都需要 #task 节点，也不是所有结论都需要写入 outliner。** Subagent 的使用场景是一个谱系，从"Chat 中快速回答"到"后台长时间运行 + 结构化产出"。
+
+#### 轻量模式（Chat-only）
+
+适用于：分析、翻译、比较、验证等**结论在对话中返回即可**的场景。
+
+```
+用户: "这篇文章和我上周读的那篇有什么关联？"
+主 Agent: （判断需要深度分析，但结果不需要写入节点）
+  → 创建 subagent（有独立 session，无 #task 节点）
+  → subagent 读取两篇文章节点，分析关联
+  → 结果以文本返回给主 agent
+  → 主 agent 在 Chat 中呈现分析结论
+  → subagent session 持久化（可通过 cite 回溯完整推理过程）
+```
+
+**特征**：
+- ✅ 独立 session（可回溯）
+- ❌ 不创建 #task 节点
+- ❌ 不写入结果节点
+- 结果 = 文本回传给主 agent → Chat 中呈现
+- 类似 Claude Code 的 foreground subagent（结果回传到对话流）
+
+**其他轻量场景**：
+- "帮我翻译这 3 段文字" → 结果写回原节点（`node_edit`），不创建新节点树
+- "总结今天的笔记" → Chat 中返回摘要
+- "检查这个标签的字段定义是否一致" → Chat 中报告结果
+
+#### 重量模式（Node-producing）
+
+适用于：数据提取、结构化整理、批量处理等**产出应该成为知识图谱一部分**的场景。
+
+```
+用户: "从这 5 个页面提取定价信息，整理成对比表"
+主 Agent: （判断需要后台运行 + 结构化产出）
+  → 创建 subagent（有独立 session + #task 节点）
+  → subagent 后台执行，结果写入 Loro CRDT 节点树
+  → 完成后在 Chat 中报告 + cite 结果节点 + cite session
+```
+
+**特征**：
+- ✅ 独立 session（可回溯）
+- ✅ 创建 #task 节点（可选，用于跟踪进度）
+- ✅ 写入结果节点（outliner 中可见）
+- 结果 = 节点树 + 文本摘要回传
+- 类似 Claude Code 的 background subagent + worktree
+
+#### 主 agent 如何选择模式？
+
+**不需要硬编码规则——主 agent 自行判断。** 关键信号：
+
+| 信号 | 倾向轻量 | 倾向重量 |
+|------|---------|---------|
+| 用户意图 | "分析/比较/解释/翻译" | "提取/整理/创建/收集" |
+| 耗时预期 | <30s | >30s |
+| 产出性质 | 回答/意见/分析 | 结构化数据/节点树 |
+| 是否阻塞 Chat | 可以短暂等待 | 不应阻塞 |
+
+**Session 是两种模式的共同基础**——无论轻量还是重量，subagent 都有独立 session 可回溯。#task 节点和结果节点是重量模式的可选扩展。
+
+---
+
+### 3.3 关键设计决策
 
 #### Q1: Sub-agent 的 Agent 实例如何创建？
 
@@ -859,7 +930,7 @@ soma 已有 `CitationBadge` 组件，支持三种引用类型：`node` / `chat` 
 | Rate limiting | ⚠️ 未提及 | 需要: 共享 streamFn 层全局 rate limiter |
 | 进度粒度 | ⚠️ 只有 badge | 建议: 三层进度（badge + task list + outliner 实时更新） |
 
-### 3.3 与现有架构的集成点
+### 3.4 与现有架构的集成点
 
 | 现有模块 | 集成方式 | 改动量 |
 |---------|---------|--------|
@@ -871,7 +942,7 @@ soma 已有 `CitationBadge` 组件，支持三种引用类型：`node` / `chat` 
 | `ui-store.ts` | 新增 orchestrator 状态（任务列表、badge 数字） | ~30 行 |
 | `ChatDrawer.tsx` | header 加 TaskIndicator 组件 | ~5 行 |
 
-### 3.4 实现路线图
+### 3.5 实现路线图
 
 #### Phase 4 Step 1: 单 subagent, fire-and-forget (~3 天)
 
@@ -933,7 +1004,7 @@ class AgentOrchestrator {
 - `data-available` 消息类型
 - 任务依赖追踪
 
-### 3.5 风险与缓解
+### 3.6 风险与缓解
 
 | 风险 | 影响 | 缓解 |
 |------|------|------|
@@ -978,12 +1049,15 @@ class AgentOrchestrator {
    - 没有一个笔记产品支持后台并发 AI 任务
    - 没有一个产品支持 subagent mid-task clarification
    - 只有 Notion AI 和 Tana AI 将 AI 输出写入数据模型（block/node），其他都是对话消息
+   - soma 的两种模式（轻量 Chat-only + 重量 Node-producing）覆盖了从快速分析到结构化产出的完整谱系
 
 3. **现有方案（phase-4-orchestration.md）整体正确**，主要需要补充：subagent 创建细节、独立 session 持久化（复用现有 CitationBadge 引用链路）、rate limiting、三层进度 UI。
 
-4. **Loro CRDT 是最大差异化优势**——天然解决并发写入、自动 UI 更新、结果持久化，比任何框架的 state management 都强大。"一切皆节点"让 subagent 的产出天然成为知识图谱的一部分。
+4. **Session 是 subagent 的基础层，节点是可选扩展**。每个 subagent 都有独立 IndexedDB session（完整可回溯），通过现有 `CitationBadge` + `ChatCitePopover` 从 Chat 中链接访问。#task 节点和结果节点只在重量模式下创建——不是所有任务都需要。
 
-5. **pi-agent-core 的 `steer()` / `followUp()` 是 clarification flow 的最佳原语**——所有调研的框架中，唯一支持 mid-stream 消息注入。这让 soma 的 "subagent 中途求助" 成为自然实现，而不是 hack。
+5. **Loro CRDT 是重量模式的差异化优势**——天然解决并发写入、自动 UI 更新、结果持久化，比任何框架的 state management 都强大。"一切皆节点"让 subagent 的结构化产出天然成为知识图谱的一部分。
+
+6. **pi-agent-core 的 `steer()` / `followUp()` 是 clarification flow 的最佳原语**——所有调研的框架中，唯一支持 mid-stream 消息注入。这让 soma 的 "subagent 中途求助" 成为自然实现，而不是 hack。
 
 ### 下一步
 

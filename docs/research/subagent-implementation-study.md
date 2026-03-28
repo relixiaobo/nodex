@@ -671,349 +671,217 @@ bus.send({
 
 ## 3. soma 推荐方案
 
-### 3.1 架构概览
+> **设计原则：从用户场景出发，不从实现概念出发。**
+> 用户不关心"subagent"——他们只需要 AI 帮忙做事。
+> 系统应该清晰、简单、优雅，而非面面俱到。
 
-```
-┌─────────────────────────────────────────────────┐
-│  Chrome Side Panel (单 JS 进程)                   │
-│                                                  │
-│  ┌──────────────────────────────────────────┐    │
-│  │  AgentOrchestrator (~200-300 行)          │    │
-│  │                                          │    │
-│  │  Main Agent (pi-agent-core Agent)        │    │
-│  │    ├── Chat 对话循环                      │    │
-│  │    ├── 判断: 简单任务 → 直接执行           │    │
-│  │    └── 判断: 复杂任务 → delegate()        │    │
-│  │                                          │    │
-│  │  AgentMessageBus (EventTarget)           │    │
-│  │    ├── task-delegated / completed / failed│    │
-│  │    ├── clarification-needed / response    │    │
-│  │    └── task-cancelled                     │    │
-│  │                                          │    │
-│  │  Subagent A (pi-agent-core Agent)        │    │
-│  │    ├── 独立 context + 独立 tools          │    │
-│  │    └── 结果写入 Loro CRDT 节点            │    │
-│  │  Subagent B (pi-agent-core Agent)        │    │
-│  │    └── 并发执行，共享事件循环              │    │
-│  └──────────────────────────────────────────┘    │
-│                       │                          │
-│  ┌──────────────────────────────────────────┐    │
-│  │  Loro CRDT (共享 Blackboard)              │    │
-│  │    ├── 所有 agent 读写同一个 loroDoc       │    │
-│  │    ├── CRDT 自动处理并发写入               │    │
-│  │    └── Subscription 自动触发 UI 更新       │    │
-│  └──────────────────────────────────────────┘    │
-│                       │                          │
-│  ┌──────────────────────────────────────────┐    │
-│  │  Cloudflare Worker (共享 LLM Proxy)       │    │
-│  │    └── 所有 agent 共享 streamFn + apiKey   │    │
-│  └──────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────┘
-```
+### 3.1 用户真实场景
 
-### 3.2 两种 Subagent 模式：轻量 vs 重量
+| 场景 | 工具调用量 | 耗时 | 用户期望 |
+|------|-----------|------|---------|
+| "比较这两篇文章的核心论点" | 多（读取多个节点 + 分析） | 20-60s | Chat 中看到分析结论 |
+| "帮我把所有 #article 加上 Author 字段" | 多（搜索 + 批量编辑） | 1-3min | 节点被更新，不需要阻塞聊天 |
+| "从 5 个页面提取定价信息" | 很多（5x 浏览器 + 创建节点） | 2-5min | 后台执行，结果出现在 outliner |
+| "翻译这段话" | 少（1 次编辑） | 5-10s | 直接看到结果 |
+| "总结今天的笔记" | 中（读取 + 分析） | 15-30s | Chat 中返回摘要 |
 
-**不是所有 subagent 任务都需要 #task 节点，也不是所有结论都需要写入 outliner。** Subagent 的使用场景是一个谱系，从"Chat 中快速回答"到"后台长时间运行 + 结构化产出"。
+**观察**：
+1. "翻译这段话"不需要 subagent——主 agent 直接做，tool call 少，不污染 context
+2. 其余场景受益于 subagent，但理由不同：有的是**context isolation**（工具调用多），有的是**非阻塞**（耗时长），有的两者都需要
+3. 用户**从头到尾都在跟主 agent 对话**——subagent 应该完全透明
+4. 结果应该**回到对话流中**，不要散布到 5 个地方
 
-#### 轻量模式（Chat-only）
+### 3.2 核心设计：Subagent = `delegate` Tool
 
-适用于：分析、翻译、比较、验证等**结论在对话中返回即可**的场景。
+**一句话**：Subagent 不是一套框架，而是主 agent 的一个工具——`delegate`。
 
-```
-用户: "这篇文章和我上周读的那篇有什么关联？"
-主 Agent: （判断需要深度分析，但结果不需要写入节点）
-  → 创建 subagent（有独立 session，无 #task 节点）
-  → subagent 读取两篇文章节点，分析关联
-  → 结果以文本返回给主 agent
-  → 主 agent 在 Chat 中呈现分析结论
-  → subagent session 持久化（可通过 cite 回溯完整推理过程）
-```
-
-**特征**：
-- ✅ 独立 session（可回溯）
-- ❌ 不创建 #task 节点
-- ❌ 不写入结果节点
-- 结果 = 文本回传给主 agent → Chat 中呈现
-- 类似 Claude Code 的 foreground subagent（结果回传到对话流）
-
-**其他轻量场景**：
-- "帮我翻译这 3 段文字" → 结果写回原节点（`node_edit`），不创建新节点树
-- "总结今天的笔记" → Chat 中返回摘要
-- "检查这个标签的字段定义是否一致" → Chat 中报告结果
-
-#### 重量模式（Node-producing）
-
-适用于：数据提取、结构化整理、批量处理等**产出应该成为知识图谱一部分**的场景。
-
-```
-用户: "从这 5 个页面提取定价信息，整理成对比表"
-主 Agent: （判断需要后台运行 + 结构化产出）
-  → 创建 subagent（有独立 session + #task 节点）
-  → subagent 后台执行，结果写入 Loro CRDT 节点树
-  → 完成后在 Chat 中报告 + cite 结果节点 + cite session
-```
-
-**特征**：
-- ✅ 独立 session（可回溯）
-- ✅ 创建 #task 节点（可选，用于跟踪进度）
-- ✅ 写入结果节点（outliner 中可见）
-- 结果 = 节点树 + 文本摘要回传
-- 类似 Claude Code 的 background subagent + worktree
-
-#### 主 agent 如何选择模式？
-
-**不需要硬编码规则——主 agent 自行判断。** 关键信号：
-
-| 信号 | 倾向轻量 | 倾向重量 |
-|------|---------|---------|
-| 用户意图 | "分析/比较/解释/翻译" | "提取/整理/创建/收集" |
-| 耗时预期 | <30s | >30s |
-| 产出性质 | 回答/意见/分析 | 结构化数据/节点树 |
-| 是否阻塞 Chat | 可以短暂等待 | 不应阻塞 |
-
-**Session 是两种模式的共同基础**——无论轻量还是重量，subagent 都有独立 session 可回溯。#task 节点和结果节点是重量模式的可选扩展。
-
----
-
-### 3.3 关键设计决策
-
-#### Q1: Sub-agent 的 Agent 实例如何创建？
-
-**复用 `createAgent()` 的核心逻辑，但简化配置。** 不需要 session 持久化、debug turns、title 生成等主 agent 才需要的功能。
+就像 Claude Code 的 `Agent` tool：主 agent 决定什么时候用，用完拿结果。用户只看到主 agent 的回答，不知道背后发生了 delegation。
 
 ```typescript
-// src/lib/ai-orchestrator.ts
+// src/lib/ai-tools/delegate-tool.ts — 这是整个 subagent 系统的全部
 
-function createSubagent(task: TaskDescriptor): Agent {
-  const model = resolveModel(null, task.modelId ?? DEFAULT_AGENT_MODEL_ID);
+const delegateTool: AgentTool = {
+  name: 'delegate',
+  label: 'Delegate Task',
+  description: `在隔离的 context 中执行任务。用于：
+    - 工具调用多（>3 次），避免污染当前对话上下文
+    - 任务可以独立执行，不需要逐步与用户交互
+    返回文本摘要。完整执行过程自动保存，用户可回溯。`,
+  parameters: Type.Object({
+    task: Type.String({ description: '完整的任务描述' }),
+    background: Type.Optional(Type.Boolean({
+      description: '后台执行（用于耗时 >30s 的任务），默认 false'
+    })),
+  }),
+  execute: async (toolCallId, params, signal) => {
+    // 1. 创建独立 Agent 实例（已有基础设施）
+    const agent = createAgent(model);
+    const session = createSession();
+    saveChatSession(session);  // 持久化到 IndexedDB
 
-  const agent = new Agent({
-    initialState: { model },
-    streamFn: getSharedStreamFn(),    // 复用主 agent 的 proxy 通道
-    getApiKey: getSharedApiKeyResolver(),
-    convertToLlm: (messages) => messages.filter(isLlmCompatibleMessage),
-    // 不需要 transformContext (subagent 不需要 panel context / browser tabs)
-  });
+    // 2. 配置（复用已有函数）
+    agent.setTools(getAITools());  // 同样的 node tools，隔离的 context
+    agent.setSystemPrompt(buildDelegatePrompt(params.task));
 
-  // 工具集: node tools 子集 + 任务特定工具
-  agent.setTools(buildSubagentTools(task));
+    // 3a. 同步执行（短任务）
+    if (!params.background) {
+      await agent.prompt(params.task);
+      return {
+        content: [{ type: 'text', text: extractSummary(agent) }],
+        details: { sessionId: session.id },
+      };
+    }
 
-  // System prompt: 从 #skill 节点构建
-  agent.setSystemPrompt(buildSubagentPrompt(task));
-
-  return agent;
-}
+    // 3b. 异步执行（长任务）——立即返回，完成后通过 followUp 通知
+    runInBackground(agent, session, params.task, signal);
+    return {
+      content: [{ type: 'text', text: `任务已在后台启动。` }],
+      details: { sessionId: session.id, background: true },
+    };
+  },
+};
 ```
 
-**工具集配置**:
-- 默认: `node_create`, `node_read`, `node_edit`, `node_delete`, `node_search`
-- 如果任务涉及浏览器: + `browser`
-- 不包含: `past_chats`（subagent 不需要访问 chat 历史），`undo`（subagent 的 undo 由 orchestrator 管理）
+### 3.3 两种执行模式，同一个机制
 
-#### Q2: Sub-agent 的 streaming 如何处理？
-
-**后台静默运行，不开放 streaming UI。**
-
-Subagent 的 LLM streaming 在内存中处理，不映射到任何 UI。用户通过 task indicator 看到进度（步骤描述），但看不到 LLM 的逐字输出。
-
-原因：
-1. 多个 subagent 并发 streaming → 多个实时文本流 → UI 混乱
-2. subagent 的对话内容是实现细节（tool calls, intermediate reasoning），用户不需要看
-3. 结果已经以节点形式出现在 outliner 中——这是用户真正关心的
-
-**例外**: 如果未来需要 "观察 subagent 工作" 的 debug 模式，可以通过 `agent.subscribe()` 把 subagent 事件映射到一个独立的 debug panel。但这是 P2 需求。
-
-#### Q3: 主 agent 如何知道 sub-agent 完成了？
-
-**EventTarget 消息总线 + Zustand 状态更新。**
-
-```typescript
-// AgentOrchestrator 内部
-agent.subscribe((event) => {
-  if (event.type === 'agent_end') {
-    handle.status = 'completed';
-    handle.completedAt = Date.now();
-    this.bus.send({ type: 'task-completed', ... });
-    this.notifyUI(); // 触发 Zustand 更新 → React re-render
-  }
-});
-```
-
-主 agent 的响应方式取决于当前状态：
-- **主 agent 空闲**: 立即在 Chat 中报告完成（通过 `steer()` 注入完成通知）
-- **主 agent 正在 streaming**: 等 streaming 结束后通过 `followUp()` 报告
-- **用户不在 Chat**: badge 更新 + 下次进入 Chat 时报告
-
-#### Q4: Chat UI 如何呈现？
-
-**三层 UI**:
-
-1. **Badge (TaskIndicator)** — `src/components/chat/TaskIndicator.tsx` (~40 行)
-   - Chat header 右上角
-   - 圆形 badge 显示运行中任务数
-   - 点击展开 TaskList
-
-2. **Task List (TaskList)** — `src/components/chat/TaskList.tsx` (~80 行)
-   - 每个任务一行: 名称 + 状态图标 + 当前步骤 + 操作按钮
-   - Running: ● + 步骤描述 + [✕]取消
-   - Waiting: ◐ + 问题 + [→]回答
-   - Completed: ✓ + 结果链接
-   - Failed: ✗ + 错误信息 + [↻]重试
-
-3. **Chat Inline 通知** — 在 Chat 对话流中插入完成/失败/clarification 消息
-   - "✓ 定价提取完成 — 创建了 8 个节点 [查看]"
-   - "⚠ 后台任务需要确认: ..."
-
-#### Q5: Session 持久化 — 独立 session，完整可回溯
-
-**每个 subagent 拥有独立的 IndexedDB session，与主 Chat 相同的持久化机制。**
-
-现有基础设施完全支持：
-- `createAgent()` → 独立 Agent 实例
-- `createSession()` → 独立 ChatSession（IndexedDB 持久化）
-- `agentRegistry.set(sessionId, agent)` → 注册到全局 registry
-- `useAgent(agent, sessionId)` → 任何 session 都可渲染
-
-**与主 Chat session 的区分**: `ChatSessionMeta` 新增 `type` 字段——
-
-```typescript
-interface ChatSessionMeta {
-  // ... existing fields
-  type?: 'chat' | 'subagent';   // 默认 'chat'，subagent session 标记为 'subagent'
-  taskNodeId?: string;           // subagent 关联的 #task 节点 ID
-}
-```
-
-- Chat history 列表过滤 `type !== 'subagent'`，不被污染
-- Subagent session 从 #task 节点或 Chat 引用入口访问
-
-**用户入口 — 复用现有 Citation 系统**:
-
-soma 已有 `CitationBadge` 组件，支持三种引用类型：`node` / `chat` / `url`。`type="chat"` 时：
-- hover → `ChatCitePopover` 显示 session 标题 + 用户消息预览
-- 点击 "Open this chat" → `switchToChatSession(sessionId)` 在 ChatDrawer 中打开
-
-主 agent 完成 subagent 任务后在 Chat 中报告时，直接用 `<cite type="chat">` 引用 subagent session：
+#### 同步模式（短任务，context isolation）
 
 ```
-主 Agent: "定价提取完成，创建了 8 个节点。[查看结果]¹ [执行过程]²"
-                                              ↑ node cite   ↑ chat cite
-                                              hover→节点预览  hover→session 预览
-                                              click→导航节点  click→打开 subagent 对话
+用户: "比较这两篇文章的核心论点"
+
+主 Agent 内部:
+  → 判断：需要读取多个节点 + 深度分析，tool calls 多 → 用 delegate
+  → 调用 delegate tool（background: false）
+  → delegate 内部：独立 Agent 执行 5-6 个 tool calls → 返回摘要
+
+Chat 中用户看到:
+  AI: "这两篇文章有三个关键差异：..."
+       [delegate tool call — 折叠，可展开查看详情]
 ```
 
-**完整回溯路径**:
-1. **从 Chat** → 主 agent 报告中的 `<cite type="chat">` → 打开 subagent session → 看到完整对话（tool calls、推理、中间结果）
-2. **从 Outliner** → #task 节点 → 关联的 session ID → 同上
-3. **从 Task List** → 任务详情 → 打开关联 session
+用户视角：跟直接提问没有区别。唯一的痕迹是 tool call 块可以展开看细节。
 
-**为什么现在选择持久化**:
-1. 用户需要回溯 subagent 的完整执行过程（tool calls、推理链、错误重试）
-2. 现有 session 基础设施零改动即可复用（`createSession` + `saveChatSession` + `agentRegistry`）
-3. `CitationBadge` + `ChatCitePopover` + `switchToChatSession` 提供了完整的引用→预览→打开链路
-4. `type` 字段隔离了 chat history 列表，不会污染
+#### 异步模式（长任务，非阻塞）
 
-#### Q6: 现有 `phase-4-orchestration.md` 方案是否合理？
+```
+用户: "从这 5 个页面提取定价信息"
 
-**整体方向正确，需要调整的地方：**
+主 Agent 内部:
+  → 判断：需要访问 5 个页面，耗时长 → 用 delegate（background: true）
+  → delegate tool 立即返回 "任务已在后台启动"
+  → 主 agent 回复用户
 
-| 现有方案 | 评估 | 建议调整 |
-|---------|------|---------|
-| 双层通信模型 (CRDT + EventTarget) | ✅ 经过充分调研验证 | 保持 |
-| AgentOrchestrator ~200-300 行 | ✅ 合理估算 | 保持 |
-| 任务即节点 (#task + status 字段) | ✅ 符合"一切皆节点" | 保持 |
-| 求助流 (clarification) | ✅ 核心差异化 | 保持，但推迟到 Step 3 |
-| Inter-agent 协作 via CRDT | ✅ 设计正确 | 推迟到 Step 4 |
-| `docs/plans/subagent-system.md` | ❌ 文件不存在 | phase-4 是唯一计划文档 |
-| Subagent 创建方式 | ⚠️ 未详细定义 | 需要明确: 轻量 `new Agent()` + 工具子集 |
-| Session 持久化 | ⚠️ 未明确 | 独立 IndexedDB session，`type: 'subagent'` 区分，复用 CitationBadge 引用 |
-| Rate limiting | ⚠️ 未提及 | 需要: 共享 streamFn 层全局 rate limiter |
-| 进度粒度 | ⚠️ 只有 badge | 建议: 三层进度（badge + task list + outliner 实时更新） |
+Chat 中用户看到:
+  AI: "好的，我在后台提取定价信息。你可以继续聊天。"
 
-### 3.4 与现有架构的集成点
+[用户继续聊天...]
 
-| 现有模块 | 集成方式 | 改动量 |
-|---------|---------|--------|
-| `ai-service.ts` | 复用 `resolveModel()`, `getSharedStreamFn()`, `getApiKeyForProvider()` | 导出几个内部函数 |
-| `ai-tools/index.ts` | 新建 `getSubagentTools()` 返回工具子集 | ~20 行 |
-| `ai-agent-node.ts` | 复用 `buildAgentSystemPrompt()` 基础 + #skill 节点扩展 | 小改动 |
-| `use-agent.ts` | 不改——subagent 不使用 useAgent hook（纯后台） | 无 |
-| `node-store.ts` | 不改——subagent 通过现有 node tools 操作 Loro | 无 |
-| `ui-store.ts` | 新增 orchestrator 状态（任务列表、badge 数字） | ~30 行 |
-| `ChatDrawer.tsx` | header 加 TaskIndicator 组件 | ~5 行 |
+[...2 分钟后，subagent 完成，通过 followUp() 通知主 agent...]
 
-### 3.5 实现路线图
-
-#### Phase 4 Step 1: 单 subagent, fire-and-forget (~3 天)
-
-**交付物**: 主 agent 可以委派一个后台任务，任务完成后 Chat 中通知
-
-**新建文件**:
-- `src/lib/ai-orchestrator.ts` — AgentOrchestrator class (~150 行)
-- `src/lib/ai-message-bus.ts` — EventTarget wrapper (~40 行)
-- `src/lib/ai-orchestrator-types.ts` — 类型定义 (~50 行)
-- `src/components/chat/TaskIndicator.tsx` — badge (~40 行)
-- `tests/vitest/ai-orchestrator.test.ts` — 单元测试
-
-**修改文件**:
-- `src/lib/ai-service.ts` — 导出共享函数
-- `src/lib/ai-tools/index.ts` — `getSubagentTools()`
-- `src/stores/ui-store.ts` — 任务状态
-- `src/components/chat/ChatDrawer.tsx` — 加 TaskIndicator
-
-**核心 API**:
-```typescript
-class AgentOrchestrator {
-  delegate(task: TaskDescriptor): Promise<string>  // 返回 subagent ID
-  cancel(subagentId: string): Promise<void>
-  getStatus(): SubagentHandle[]
-  subscribe(handler: () => void): () => void       // UI 订阅
-}
+Chat 中用户看到:
+  AI: "定价提取完成，创建了 8 个节点。[查看结果]¹ [执行过程]²"
+                                        ↑ node cite   ↑ chat cite
 ```
 
-#### Phase 4 Step 2: 并发 subagent + 进度 (~2 天)
+### 3.4 回溯：复用现有 Citation 系统
 
-**交付物**: 多个 subagent 同时运行，task list UI
+每个 delegate 调用自动创建独立 session（IndexedDB）。回溯链路全部复用已有基础设施：
 
-**新建文件**:
-- `src/components/chat/TaskList.tsx` — 任务列表 (~80 行)
+**入口 1 — Tool call 展开**：Chat 中的 delegate tool call 块，展开可看到摘要 + "查看完整过程" 链接
 
-**核心变更**:
-- 移除单 subagent 限制
-- 添加 `currentStep` 字段到 SubagentHandle
-- 通过 `tool_execution_start` / `tool_execution_end` 事件更新步骤描述
-- Task list UI（popover，从 badge 展开）
+**入口 2 — Citation badge**：主 agent 报告完成时用 `<cite type="chat" id="sessionId">执行过程</cite>`，hover 预览，点击打开 subagent session
 
-#### Phase 4 Step 3: 求助流 (~3 天)
+**入口 3 — 用户主动询问**：`"刚才那个任务是怎么做的？"` → 主 agent 知道 sessionId，引用给用户
 
-**交付物**: subagent 可以暂停等待 clarification，主 agent 路由到 Chat
+**Session 隔离**：`ChatSessionMeta` 加 `type?: 'chat' | 'delegate'`。Chat history 列表过滤 `type !== 'delegate'`，不被污染。
 
-**核心变更**:
-- `askClarification()` 方法（subagent 调用）
-- 主 agent 收到 clarification → 通过 `steer()` 注入对话流
-- 用户回答 → 主 agent 发送 `clarification-response` → subagent 恢复
+### 3.5 Clarification 简化
 
-**这是 soma 的核心差异化能力**——调研的 15 个产品中没有一个支持 subagent mid-task clarification。
+~~复杂方案~~：subagent 暂停 → 发消息给主 agent → 主 agent 路由到 Chat → 用户回答 → 消息返回 → subagent 恢复。需要 pause/resume 协议、消息总线、状态机。
 
-#### Phase 4 Step 4: Inter-agent 协作 (~2 天)
+**简单方案：做能做的，带着问题返回。**
 
-**交付物**: subagent A 的输出可以触发 subagent B
+```
+Subagent 执行提取任务 → 遇到歧义 → 不暂停，做出最佳判断并继续
+→ 返回结果 + 说明："我用了 Developer 价格表。如果你要 Enterprise 的，告诉我。"
 
-**核心变更**:
-- Pipeline pattern via Loro CRDT subscription
-- `data-available` 消息类型
-- 任务依赖追踪
+用户: "用 Enterprise 的"
 
-### 3.6 风险与缓解
+主 Agent: → 再次调用 delegate，带上修正指令
+```
 
-| 风险 | 影响 | 缓解 |
-|------|------|------|
-| **API rate limit** — 多 agent 并发调用超限 | subagent 失败 | 共享 streamFn + 全局 rate limiter + 指数退避 |
-| **内存压力** — 多 Agent 实例 + 多 context window | 页面卡顿/崩溃 | 限制同时运行 subagent 数量（默认 3），idle subagent 及时清理 |
-| **Token 成本** — subagent 有独立 context，总 token 消耗翻倍 | 用户 API 费用增加 | subagent context 最小化（只包含任务描述 + #skill 规则，不包含完整对话历史） |
-| **UI 复杂度** — 任务指示器 + 通知 + outliner 实时更新 | 用户困惑 | Phase 4 Step 1 只加 badge，逐步增加复杂度 |
-| **CRDT 写入冲突** — 多 agent 操作同一节点 | 意外结果 | TaskDescriptor 明确作用域，避免重叠；CRDT 自动合并兜底 |
-| **面板关闭 = 任务丢失** | 用户期望后台继续 | 明确告知用户（UX copy），未来可考虑 Service Worker 持续 |
+这跟人类协作方式一致——助手不会因为一个细节暂停整个任务等你回复，而是做出合理判断，完成后汇报。如果需要修正，再来一轮。
+
+**更自然、更鲁棒、不需要任何新协议。**
+
+### 3.6 取消
+
+```
+用户: "取消那个定价提取"
+主 Agent: → 找到对应的后台 delegate → agent.abort()
+AI: "已取消。已提取的部分结果保留在 [定价对比] 节点中。"
+```
+
+不需要三层取消机制——`agent.abort()` 终止 agent loop，`AbortSignal` 取消进行中的 fetch。两行代码。
+
+### 3.7 完整架构
+
+```
+新增代码:
+  src/lib/ai-tools/delegate-tool.ts    (~100-150 行)
+
+复用已有基础设施:
+  Agent class          — pi-agent-core（创建独立实例）
+  createSession()      — ai-chat-tree.ts（创建 session）
+  saveChatSession()    — ai-persistence.ts（IndexedDB 持久化）
+  getAITools()         — ai-tools/index.ts（node tools）
+  followUp()           — pi-agent-core（异步完成通知）
+  agent.abort()        — pi-agent-core（取消）
+  CitationBadge        — chat/CitationBadge.tsx（回溯入口）
+  ChatCitePopover      — chat/ChatCitePopover.tsx（session 预览）
+  switchToChatSession  — chat-panel-actions.ts（打开 session）
+  ToolCallBlock        — chat/ToolCallBlock.tsx（tool call 展示）
+  Loro CRDT            — loro-doc.ts（数据共享）
+  streamProxyWithApiKey — ai-proxy.ts（LLM 代理）
+
+不需要:
+  ❌ AgentOrchestrator class
+  ❌ AgentMessageBus (EventTarget)
+  ❌ SubagentHandle / 6 种状态
+  ❌ #task 节点（作为基础设施）
+  ❌ TaskIndicator badge
+  ❌ TaskList UI
+  ❌ Clarification protocol (pause/resume)
+  ❌ Inter-agent collaboration
+  ❌ AG-UI event taxonomy
+  ❌ 三层取消机制
+  ❌ Rate limiting infrastructure
+  ❌ 两种显式模式分类
+```
+
+### 3.8 为什么这比之前的方案更好
+
+| | 之前的方案 | 新方案 |
+|--|--|--|
+| **核心抽象** | AgentOrchestrator + MessageBus + SubagentHandle | `delegate` tool（一个文件） |
+| **新增代码** | ~500-600 行 + 3 个新 UI 组件 | ~100-150 行，零新 UI 组件 |
+| **用户感知** | badge、task list、#task 节点、subagent session — 5 个地方 | Chat 对话流中自然出现，tool call 可展开 |
+| **Clarification** | pause/resume 协议 + 消息路由 | 做完带着问题返回，下一轮修正 |
+| **取消** | 三层（AbortController + abort() + bus notification） | `agent.abort()` |
+| **扩展性** | 每个新场景需要适配 orchestrator | 每个新场景 = delegate tool 的一次调用 |
+| **鲁棒性** | 状态机 6 种状态 + 消息路由 + 生命周期管理 | tool call 只有 running/done/error |
+
+### 3.9 未来扩展
+
+当 `delegate` tool 被证明可靠后，自然的扩展方向：
+
+1. **并发后台任务**：主 agent 多次调用 delegate（background: true），每个独立运行。不需要 orchestrator——就是多个 tool call。用户问"有什么在跑？"→ 主 agent 查看 pending tool calls 即可回答。
+
+2. **专业化 subagent**：通过 `#skill` 节点定制 subagent 的 system prompt 和工具集。在 delegate tool 参数中加 `skills: string[]`。
+
+3. **系统级后台任务**：Schema evolution、Taste 学习等可以作为系统触发的 delegate 调用，不经过 Chat。
+
+4. **如果真的需要 Task UI**：当并发后台任务成为高频场景时，再加 badge + task list。但现在不需要——过早加 UI 是过度工程化。
 
 ---
 
@@ -1043,22 +911,28 @@ class AgentOrchestrator {
 
 ### 核心结论
 
-1. **没有现成框架满足 soma 的约束**（浏览器单进程 + CRDT + mid-task clarification + 轻量 bundle）。在 pi-agent-core 上自建 AgentOrchestrator 是正确决策。
+1. **Subagent 的价值是 context isolation + 非阻塞**，不是"多 agent 编排"。大多数日常 AI 请求不需要 subagent；真正受益的是工具调用多（污染 context）或耗时长（阻塞 Chat）的场景。
 
-2. **soma 的 subagent 设计在笔记领域是独特创新**。调研的 15 个产品中：
-   - 没有一个笔记产品支持后台并发 AI 任务
-   - 没有一个产品支持 subagent mid-task clarification
-   - 只有 Notion AI 和 Tana AI 将 AI 输出写入数据模型（block/node），其他都是对话消息
-   - soma 的两种模式（轻量 Chat-only + 重量 Node-producing）覆盖了从快速分析到结构化产出的完整谱系
+2. **Subagent = 一个 tool，不是一套框架。** Claude Code 的 Agent tool 是最佳参考——主 agent 的一个工具，执行在隔离 context 中，结果回传到对话流。~100 行代码，零新 UI 组件，全部复用已有基础设施。
 
-3. **现有方案（phase-4-orchestration.md）整体正确**，主要需要补充：subagent 创建细节、独立 session 持久化（复用现有 CitationBadge 引用链路）、rate limiting、三层进度 UI。
+3. **用户不应该感知"subagent"的存在。** 用户始终在跟主 agent 对话。结果在 Chat 流中自然出现。过程可通过 tool call 展开或 cite 链接回溯。不需要 badge、task list、#task 节点等专门 UI。
 
-4. **Session 是 subagent 的基础层，节点是可选扩展**。每个 subagent 都有独立 IndexedDB session（完整可回溯），通过现有 `CitationBadge` + `ChatCitePopover` 从 Chat 中链接访问。#task 节点和结果节点只在重量模式下创建——不是所有任务都需要。
+4. **Clarification 不需要 pause/resume 协议。** Subagent 做出最佳判断，完成后带着问题返回。用户给反馈后再来一轮。这更自然、更鲁棒、不需要任何新协议。
 
-5. **Loro CRDT 是重量模式的差异化优势**——天然解决并发写入、自动 UI 更新、结果持久化，比任何框架的 state management 都强大。"一切皆节点"让 subagent 的结构化产出天然成为知识图谱的一部分。
+5. **Session 持久化提供完整可回溯性。** 每个 delegate 调用自动创建 IndexedDB session。通过现有 `CitationBadge` + `ChatCitePopover` + `switchToChatSession` 访问——零新 UI 代码。
 
-6. **pi-agent-core 的 `steer()` / `followUp()` 是 clarification flow 的最佳原语**——所有调研的框架中，唯一支持 mid-stream 消息注入。这让 soma 的 "subagent 中途求助" 成为自然实现，而不是 hack。
+6. **先做最小可用版本，按需扩展。** 并发任务 UI、专业化 subagent、系统级后台任务——都是 `delegate` tool 被验证后的自然扩展，不需要预先设计。
+
+### 设计演进
+
+| 版本 | 核心抽象 | 复杂度 |
+|------|---------|--------|
+| v1（phase-4-orchestration.md） | AgentOrchestrator + MessageBus + SubagentHandle + TaskUI | ~500-600 行 + 3 新 UI 组件 |
+| v2（本文前几版） | 两种模式 + 独立 session + Citation 引用 | ~300-400 行 + type 字段 |
+| **v3（最终方案）** | **`delegate` tool** | **~100-150 行，零新 UI** |
+
+每次简化都砍掉了"可能需要但现在不需要"的东西。留下的是真正解决用户问题的最小集合。
 
 ### 下一步
 
-按 Phase 4 Step 1 开始实现：AgentOrchestrator + AgentMessageBus + TaskIndicator。预估 ~200-300 行核心代码，零新依赖。
+实现 `src/lib/ai-tools/delegate-tool.ts`（~100-150 行），加入主 agent 工具集。

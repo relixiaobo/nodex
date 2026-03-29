@@ -86,35 +86,92 @@ Agent 通过 context 自然感知：
 
 ## 四、Browser Tool 扩展
 
-在现有 `tab` action（list/switch/create/close）基础上，新增 tab group 操作。
+> **设计原则**：完全遵循现有 browser tool 的模式——
+> - `action: 'tab'` + `tabAction` 子操作（不新增顶层 action）
+> - 参数通过 `browserToolParameters` 的 Optional 字段传递
+> - 返回值 `Record<string, unknown>`，经 `formatResultText()` → JSON.stringify 序列化给 LLM
+> - Side Panel → Background 通过 `sendBrowserMessage(BROWSER_TAB, payload)` 通信
+> - 错误通过 `throw new Error(message)` → 被 `assertBrowserResponseOk` 捕获
 
-### 4.1 新增 action
-
-| action | 参数 | 返回 | 说明 |
-|--------|------|------|------|
-| `tab` + `tabAction: 'group_create'` | `title`, `color?`, `urls: string[]` | `{ groupId, tabs: [{tabId, url}] }` | 创建 group + 打开页面（一步完成） |
-| `tab` + `tabAction: 'group_add'` | `groupId`, `url` 或 `tabId` | `{ tabId }` | 往已有 group 中加页面 |
-| `tab` + `tabAction: 'group_list'` | — | `{ groups: [{groupId, title, color, collapsed, tabs}] }` | 列出所有 group |
-| `tab` + `tabAction: 'group_collapse'` | `groupId`, `collapsed: boolean` | `{ ok }` | 折叠/展开 |
-| `tab` + `tabAction: 'group_close'` | `groupId` | `{ closedTabCount }` | 关闭 group 内所有标签页 |
-
-### 4.2 `group_create` 内部实现
+### 4.1 现有 tab action 模式（参考）
 
 ```typescript
-async function handleGroupCreate(title: string, urls: string[], color?: string): Promise<GroupCreateResult> {
-  // 1. 创建所有标签页
-  const tabs = await Promise.all(
-    urls.map(url => chrome.tabs.create({ url, active: false }))
-  );
-  const tabIds = tabs.map(t => t.id!);
+// browser-messaging.ts — 消息类型
+export type BrowserTabAction = 'switch' | 'create' | 'close' | 'list';
 
-  // 2. 编组
+export interface BrowserTabPayload extends BrowserBasePayload {
+  tabAction: BrowserTabAction;
+  url?: string;
+}
+
+// interaction.ts — Side Panel 端入口
+export async function handleTab(params) {
+  const tabAction = requireNonEmptyString(params.tabAction, 'tabAction', 'tab');
+  // 参数验证 → sendBrowserMessage(BROWSER_TAB, payload) → assertBrowserResponseOk
+  return mutationResult(result, params.tabId);
+}
+
+// background/index.ts — Background 端处理
+async function handleBrowserTab(payload: BrowserTabPayload): Promise<Record<string, unknown>> {
+  switch (payload.tabAction) {
+    case 'list':   return { tabs: [...] };
+    case 'switch': return { switched: true, title, url };
+    case 'create': return { created: true, tabId, title, url };
+    case 'close':  return { closed: true };
+  }
+}
+```
+
+**返回值约定**：
+- 操作确认用 boolean flag（`created: true`、`switched: true`、`closed: true`）
+- 新建资源返回 ID（`tabId: number`）
+- 查询返回数组（`tabs: [{tabId, title, url, active}]`）
+- 所有 mutation action 通过 `mutationResult()` 自动附带截图
+
+### 4.2 扩展：新增 tabAction
+
+```diff
+// browser-messaging.ts
+- export type BrowserTabAction = 'switch' | 'create' | 'close' | 'list';
++ export type BrowserTabAction = 'switch' | 'create' | 'close' | 'list'
++   | 'group_create' | 'group_add' | 'group_list' | 'group_collapse' | 'group_close';
+
+  export interface BrowserTabPayload extends BrowserBasePayload {
+    tabAction: BrowserTabAction;
+    url?: string;
++   urls?: string[];           // group_create: 初始 URL 列表
++   groupId?: number;          // group_add/collapse/close: 目标 group
++   groupTitle?: string;       // group_create: group 名称
++   groupColor?: string;       // group_create: 颜色（9 种之一）
++   collapsed?: boolean;       // group_collapse: 折叠/展开
+  }
+```
+
+### 4.3 Background handler 实现
+
+```typescript
+// background/index.ts — 在 handleBrowserTab 的 switch 中新增
+
+const agentCreatedGroups = new Set<number>();
+
+case 'group_create': {
+  if (!payload.urls?.length) throw new Error("'group_create' requires non-empty 'urls' array.");
+  const title = payload.groupTitle ?? 'Agent workspace';
+
+  // 1. 批量创建标签页
+  const tabs = await Promise.all(
+    payload.urls.map(url => createTab({ url: normalizeBrowserUrl(url), active: false }))
+  );
+  const tabIds = tabs.map(t => t.id!).filter(Boolean);
+  if (tabIds.length === 0) throw new Error('Failed to create any tabs.');
+
+  // 2. 编组（chrome.tabs.group 返回 groupId）
   const groupId = await chrome.tabs.group({ tabIds });
 
-  // 3. 配置
+  // 3. 配置 title + color
   await chrome.tabGroups.update(groupId, {
     title,
-    color: (color as chrome.tabGroups.Color) ?? 'blue',
+    color: (payload.groupColor as chrome.tabGroups.ColorEnum) || 'blue',
     collapsed: false,
   });
 
@@ -122,47 +179,105 @@ async function handleGroupCreate(title: string, urls: string[], color?: string):
   agentCreatedGroups.add(groupId);
 
   return {
+    created: true,
     groupId,
-    tabs: tabs.map(t => ({ tabId: t.id!, url: t.url ?? '' })),
+    title,
+    tabs: tabs.map(t => ({ tabId: t.id, title: t.title ?? '', url: t.url ?? '' })),
   };
+}
+
+case 'group_add': {
+  if (!payload.groupId) throw new Error("'group_add' requires 'groupId'.");
+  // 可以传 tabId（已有 tab 加入 group）或 url（新建 tab 再加入）
+  let tabId = payload.tabId;
+  if (!tabId && payload.url) {
+    const tab = await createTab({ url: normalizeBrowserUrl(payload.url), active: false });
+    tabId = tab.id;
+  }
+  if (!tabId) throw new Error("'group_add' requires 'tabId' or 'url'.");
+  await chrome.tabs.group({ tabIds: [tabId], groupId: payload.groupId });
+  return { added: true, tabId, groupId: payload.groupId };
+}
+
+case 'group_list': {
+  const groups = await chrome.tabGroups.query({ windowId: chrome.windows.WINDOW_ID_CURRENT });
+  const result = await Promise.all(groups.map(async (g) => {
+    const tabs = await chrome.tabs.query({ groupId: g.id });
+    return {
+      groupId: g.id,
+      title: g.title,
+      color: g.color,
+      collapsed: g.collapsed,
+      isAgentCreated: agentCreatedGroups.has(g.id),
+      tabs: tabs.map(t => ({ tabId: t.id, title: t.title ?? '', url: t.url ?? '' })),
+    };
+  }));
+  return { groups: result };
+}
+
+case 'group_collapse': {
+  if (!payload.groupId) throw new Error("'group_collapse' requires 'groupId'.");
+  const collapsed = payload.collapsed ?? true;
+  await chrome.tabGroups.update(payload.groupId, { collapsed });
+  return { collapsed, groupId: payload.groupId };
+}
+
+case 'group_close': {
+  if (!payload.groupId) throw new Error("'group_close' requires 'groupId'.");
+  const tabs = await chrome.tabs.query({ groupId: payload.groupId });
+  const tabIds = tabs.map(t => t.id!).filter(Boolean);
+  if (tabIds.length > 0) await chrome.tabs.remove(tabIds);
+  agentCreatedGroups.delete(payload.groupId);
+  return { closed: true, closedTabCount: tabIds.length };
 }
 ```
 
-### 4.3 Tool description 更新
+**返回值设计**（遵循现有约定）：
 
-在 browser tool 的 description 中加入：
+| tabAction | 返回值 | 说明 |
+|-----------|--------|------|
+| `group_create` | `{ created: true, groupId, title, tabs: [{tabId, title, url}] }` | 同 `create` 的 `created: true` 模式，扩展为返回多个 tab |
+| `group_add` | `{ added: true, tabId, groupId }` | 确认 flag + 资源 ID |
+| `group_list` | `{ groups: [{groupId, title, color, collapsed, isAgentCreated, tabs}] }` | 同 `list` 返回数组模式 |
+| `group_collapse` | `{ collapsed: boolean, groupId }` | 最终状态 |
+| `group_close` | `{ closed: true, closedTabCount }` | 同 `close` 的 `closed: true` 模式 |
 
-```
-Tab group actions:
-- "tab" + tabAction "group_create": Create a tab group with pages for a task.
-  Use when you need to open pages for your own work (research, extraction, verification).
-  Do NOT use when the user asks you to open a specific link (that's just "tab" + "create").
-- "tab" + tabAction "group_add": Add a page to an existing group.
-- "tab" + tabAction "group_list": List all tab groups and their tabs.
-- "tab" + tabAction "group_collapse": Collapse/expand a group.
-- "tab" + tabAction "group_close": Close all tabs in a group.
+### 4.4 Side Panel 端（interaction.ts）
 
-Rules:
-- Only close/collapse groups you created. Never modify user's groups.
-- After completing a task, collapse (don't close) the work group.
-- User may ask about any group's content — read tabs in any group when asked.
-```
-
-### 4.4 新增参数
+`handleTab()` 不需要改——现有代码已经把 `tabAction` + 所有参数透传给 background：
 
 ```typescript
-// 新增到 browserToolParameters
+// 现有代码，不改
+export async function handleTab(params) {
+  const tabAction = requireNonEmptyString(params.tabAction, 'tabAction', 'tab');
+  // ... 参数验证 ...
+  const result = await sendBrowserMessage(BROWSER_TAB, { tabAction, tabId, url, ... });
+  assertBrowserResponseOk(result);
+  return mutationResult(result, params.tabId);
+}
+```
+
+只需要：
+1. 放宽参数验证（group actions 不要求 `tabId`）
+2. 透传新参数（`urls`, `groupId`, `groupTitle`, `groupColor`, `collapsed`）
+
+注意：`mutationResult()` 会自动截图。对 `group_list` 这种纯查询操作，应该用 `textResult()` 代替（不截图）。
+
+### 4.5 browser-tool.ts 参数扩展
+
+```typescript
+// 新增到 browserToolParameters（遵循现有 Type.Optional 模式）
 groupId: Type.Optional(Type.Number({
   description: "For tab group actions: target group ID.",
 })),
 groupTitle: Type.Optional(Type.String({
-  description: "For 'group_create': name for the new group.",
+  description: "For 'group_create': display name for the group.",
 })),
 groupColor: Type.Optional(Type.Union([
   Type.Literal('grey'), Type.Literal('blue'), Type.Literal('red'),
   Type.Literal('yellow'), Type.Literal('green'), Type.Literal('pink'),
   Type.Literal('purple'), Type.Literal('cyan'), Type.Literal('orange'),
-], { description: "For 'group_create': group color. Default: blue." })),
+], { description: "For 'group_create': group color (default: blue)." })),
 urls: Type.Optional(Type.Array(Type.String(), {
   description: "For 'group_create': URLs to open in the group.",
 })),
@@ -179,13 +294,30 @@ tabAction: Type.Optional(Type.Union([
   Type.Literal('create'),
   Type.Literal('close'),
   Type.Literal('list'),
-  // 新增
   Type.Literal('group_create'),
   Type.Literal('group_add'),
   Type.Literal('group_list'),
   Type.Literal('group_collapse'),
   Type.Literal('group_close'),
-])),
+], { description: "For 'tab': operation to perform." })),
+```
+
+`executeBrowserTool()` switch case 不用改——`action: 'tab'` 已经统一走 `handleTab()`，新 tabAction 在 background 端 dispatch。
+
+### 4.6 Tool description 更新
+
+在 `BROWSER_DESCRIPTION` 的 Control actions 区域追加：
+
+```
+- "tab": Switch, create, close, or list browser tabs. Manage tab groups for workspace isolation.
+  Tab group sub-actions:
+  · tabAction "group_create" + urls + groupTitle: Open pages in a named tab group.
+    Use when YOU need to visit pages for a task. NOT for user-directed navigation.
+  · tabAction "group_add" + groupId + url: Add a page to an existing group.
+  · tabAction "group_list": List all tab groups with their tabs.
+  · tabAction "group_collapse" + groupId: Collapse/expand a group after task completion.
+  · tabAction "group_close" + groupId: Close all tabs in a group.
+  Only collapse/close groups you created. User's groups are read-only.
 ```
 
 ---

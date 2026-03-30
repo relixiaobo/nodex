@@ -31,6 +31,8 @@ export interface SomaProxyStreamOptions extends ProxyStreamOptions {
 /** No-data timeout: if the stream produces nothing for this long, consider it dead. */
 const STREAM_STALL_TIMEOUT_MS = 60_000;
 
+let streamDebugId = 0;
+
 /**
  * Race `reader.read()` against abort signal and idle timeout.
  * Ensures the stream loop can never hang indefinitely — the two failure modes
@@ -52,6 +54,7 @@ function guardedRead(
     const timer = setTimeout(() => {
       if (settled) return;
       settle();
+      console.log('[stream-debug] guardedRead: STALL TIMEOUT fired after', stallMs, 'ms');
       void reader.cancel('Stream stalled').catch(() => {});
       reject(new Error(`Stream stalled: no data for ${stallMs / 1000}s`));
     }, stallMs);
@@ -60,6 +63,7 @@ function guardedRead(
     const onAbort = () => {
       if (settled) return;
       settle();
+      console.log('[stream-debug] guardedRead: ABORT signal received');
       clearTimeout(timer);
       void reader.cancel('Aborted').catch(() => {});
       reject(new Error('Request aborted by user'));
@@ -97,6 +101,8 @@ export function streamProxyWithApiKey(
   options: SomaProxyStreamOptions,
 ): AssistantMessageEventStream {
   const stream = createAssistantMessageEventStream();
+  const sid = ++streamDebugId;
+  const log = (msg: string, ...args: unknown[]) => console.log(`[stream-debug #${sid}] ${msg}`, ...args);
 
   void (async () => {
     const partial: AssistantMessage = {
@@ -119,17 +125,22 @@ export function streamProxyWithApiKey(
 
     let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
     const abortHandler = () => {
+      log('abortHandler fired, calling reader.cancel()');
       void reader?.cancel('Request aborted by user').catch(() => {});
     };
 
     if (options.signal) {
       options.signal.addEventListener('abort', abortHandler);
+      log('start, signal.aborted=', options.signal.aborted);
+    } else {
+      log('start, NO signal provided');
     }
 
     try {
       const requestBody = buildProxyStreamRequestPayload(model, context, options);
       options.onRequestBody?.(requestBody);
 
+      log('fetching', options.proxyUrl);
       const response = await fetch(`${options.proxyUrl}/api/stream`, {
         method: 'POST',
         headers: {
@@ -139,6 +150,7 @@ export function streamProxyWithApiKey(
         body: JSON.stringify(requestBody),
         signal: options.signal,
       });
+      log('fetch response', response.status);
 
       if (!response.ok) {
         let errorMessage = `Proxy error: ${response.status} ${response.statusText}`;
@@ -160,10 +172,16 @@ export function streamProxyWithApiKey(
       reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
+      let readCount = 0;
+      let lastEventType = '';
 
       while (true) {
         const { done, value } = await guardedRead(reader, options.signal, STREAM_STALL_TIMEOUT_MS);
-        if (done) break;
+        if (done) {
+          log('reader done after', readCount, 'reads, lastEvent:', lastEventType);
+          break;
+        }
+        readCount++;
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
@@ -182,6 +200,7 @@ export function streamProxyWithApiKey(
             console.error('[ai-proxy] SSE event JSON.parse failed:', (sseParseError as Error).message?.slice(0, 80), 'data:', data.slice(0, 100));
             continue;
           }
+          lastEventType = proxyEvent.type;
           const event = processProxyEvent(proxyEvent, partial);
           if (event) {
             stream.push(event);
@@ -189,10 +208,12 @@ export function streamProxyWithApiKey(
         }
       }
 
+      log('stream.end() — normal');
       stream.end();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       const reason = options.signal?.aborted ? 'aborted' : 'error';
+      log('catch:', reason, errorMessage);
       partial.stopReason = reason;
       partial.errorMessage = errorMessage;
       stream.push({
@@ -202,6 +223,7 @@ export function streamProxyWithApiKey(
       });
       stream.end();
     } finally {
+      log('finally — cleanup');
       if (options.signal) {
         options.signal.removeEventListener('abort', abortHandler);
       }

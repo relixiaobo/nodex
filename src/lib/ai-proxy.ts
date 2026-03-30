@@ -28,109 +28,8 @@ export interface SomaProxyStreamOptions extends ProxyStreamOptions {
   onRequestBody?: (payload: ProxyStreamRequestPayload) => void;
 }
 
-/** Initial request timeout before response headers arrive. */
-const FETCH_TIMEOUT_MS = 30_000;
 /** No-data timeout: if the stream produces nothing for this long, consider it dead. */
 const STREAM_STALL_TIMEOUT_MS = 60_000;
-/** Bound error-body parsing so failed responses cannot hang forever either. */
-const ERROR_BODY_TIMEOUT_MS = 5_000;
-
-interface TimeoutAbortScope {
-  signal: AbortSignal;
-  cleanup(): void;
-}
-
-function waitForAbort(signal: AbortSignal): Promise<never> {
-  return new Promise((_, reject) => {
-    const rejectAbort = () => {
-      reject(signal.reason instanceof Error ? signal.reason : new Error('Request aborted by user'));
-    };
-
-    if (signal.aborted) {
-      rejectAbort();
-      return;
-    }
-
-    signal.addEventListener('abort', rejectAbort, { once: true });
-  });
-}
-
-function createAbortScope(
-  signal: AbortSignal | undefined,
-  timeoutMs: number,
-  timeoutMessage: string,
-): TimeoutAbortScope {
-  const controller = new AbortController();
-
-  const abortWithReason = (reason: unknown) => {
-    if (!controller.signal.aborted) controller.abort(reason);
-  };
-
-  const onAbort = () => {
-    abortWithReason(signal?.reason ?? new Error('Request aborted by user'));
-  };
-
-  if (signal?.aborted) {
-    onAbort();
-  } else if (signal) {
-    signal.addEventListener('abort', onAbort, { once: true });
-  }
-
-  const timer = setTimeout(() => {
-    abortWithReason(new Error(timeoutMessage));
-  }, timeoutMs);
-
-  return {
-    signal: controller.signal,
-    cleanup() {
-      clearTimeout(timer);
-      signal?.removeEventListener('abort', onAbort);
-    },
-  };
-}
-
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
-function getStopReason(signal: AbortSignal | undefined): 'aborted' | 'error' {
-  return signal?.aborted ? 'aborted' : 'error';
-}
-
-async function readErrorBody(
-  response: Response,
-  signal: AbortSignal | undefined,
-): Promise<string | null> {
-  try {
-    const scope = createAbortScope(signal, ERROR_BODY_TIMEOUT_MS, 'Timed out while reading proxy error response');
-    try {
-      return await Promise.race([
-        response.text(),
-        waitForAbort(scope.signal),
-      ]);
-    } finally {
-      scope.cleanup();
-    }
-  } catch {
-    return null;
-  }
-}
-
-function pushTerminalError(
-  stream: AssistantMessageEventStream,
-  partial: AssistantMessage,
-  signal: AbortSignal | undefined,
-  errorMessage: string,
-): void {
-  const reason = getStopReason(signal);
-  partial.stopReason = reason;
-  partial.errorMessage = errorMessage;
-  stream.push({
-    type: 'error',
-    reason,
-    error: partial,
-  });
-}
 
 
 /**
@@ -228,16 +127,10 @@ export function streamProxyWithApiKey(
       options.signal.addEventListener('abort', abortHandler);
     }
 
-    let fetchScope: TimeoutAbortScope | null = null;
     try {
       const requestBody = buildProxyStreamRequestPayload(model, context, options);
       options.onRequestBody?.(requestBody);
 
-      fetchScope = createAbortScope(
-        options.signal,
-        FETCH_TIMEOUT_MS,
-        'Proxy request timed out before response headers arrived',
-      );
       const response = await fetch(`${options.proxyUrl}/api/stream`, {
         method: 'POST',
         headers: {
@@ -245,21 +138,17 @@ export function streamProxyWithApiKey(
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(requestBody),
-        signal: fetchScope.signal,
+        signal: options.signal,
       });
-      fetchScope.cleanup();
       if (!response.ok) {
         let errorMessage = `Proxy error: ${response.status} ${response.statusText}`;
-        const errorBody = await readErrorBody(response, options.signal);
-        if (errorBody) {
-          try {
-            const errorData = JSON.parse(errorBody) as { error?: string };
-            if (errorData.error) {
-              errorMessage = `Proxy error: ${errorData.error}`;
-            }
-          } catch {
-            // Ignore non-JSON error bodies.
+        try {
+          const errorData = await response.json() as { error?: string };
+          if (errorData.error) {
+            errorMessage = `Proxy error: ${errorData.error}`;
           }
+        } catch {
+          // Ignore non-JSON error bodies.
         }
         throw new Error(errorMessage);
       }
@@ -271,7 +160,6 @@ export function streamProxyWithApiKey(
       reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
-      let sawTerminalEvent = false;
 
       while (true) {
         const { done, value } = await guardedRead(reader, options.signal, STREAM_STALL_TIMEOUT_MS);
@@ -296,42 +184,24 @@ export function streamProxyWithApiKey(
           }
           const event = processProxyEvent(proxyEvent, partial);
           if (event) {
-            if (event.type === 'done' || event.type === 'error') {
-              sawTerminalEvent = true;
-            }
             stream.push(event);
           }
         }
       }
 
-      const trailingLine = buffer.trim();
-      if (!sawTerminalEvent && trailingLine.startsWith('data: ')) {
-        try {
-          const proxyEvent = JSON.parse(trailingLine.slice(6).trim()) as ProxyAssistantMessageEvent;
-          const event = processProxyEvent(proxyEvent, partial);
-          if (event) {
-            sawTerminalEvent = event.type === 'done' || event.type === 'error';
-            stream.push(event);
-          }
-        } catch {
-          // Ignore malformed trailing event and fall back to the synthetic terminal error below.
-        }
-      }
-
-      if (!sawTerminalEvent) {
-        pushTerminalError(
-          stream,
-          partial,
-          options.signal,
-          'Proxy stream ended before a terminal event was received',
-        );
-      }
       stream.end();
     } catch (error) {
-      pushTerminalError(stream, partial, options.signal, getErrorMessage(error));
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const reason = options.signal?.aborted ? 'aborted' : 'error';
+      partial.stopReason = reason;
+      partial.errorMessage = errorMessage;
+      stream.push({
+        type: 'error',
+        reason,
+        error: partial,
+      });
       stream.end();
     } finally {
-      fetchScope?.cleanup();
       if (options.signal) {
         options.signal.removeEventListener('abort', abortHandler);
       }

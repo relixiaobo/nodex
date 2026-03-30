@@ -3,8 +3,9 @@ import { createRoot, type Root } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockEnsureChatSession } = vi.hoisted(() => ({
+const { mockEnsureChatSession, mockGetAgentForSession } = vi.hoisted(() => ({
   mockEnsureChatSession: vi.fn<() => Promise<string>>(),
+  mockGetAgentForSession: vi.fn(),
 }));
 
 vi.mock('../../src/lib/chat-panel-actions.js', () => ({
@@ -14,7 +15,7 @@ vi.mock('../../src/lib/chat-panel-actions.js', () => ({
 }));
 
 vi.mock('../../src/lib/ai-service.js', () => ({
-  getAgentForSession: vi.fn(),
+  getAgentForSession: mockGetAgentForSession,
   getChatTitle: (sessionId: string) => sessionId === 'session_1' ? 'Session One' : 'Chat',
   subscribeChatTitles: () => () => {},
   updateSessionTitle: vi.fn(),
@@ -66,6 +67,11 @@ describe('DrawerLayout', () => {
   beforeEach(() => {
     resetAndSeed();
     mockEnsureChatSession.mockReset();
+    mockGetAgentForSession.mockReset();
+    mockGetAgentForSession.mockReturnValue({
+      state: { isStreaming: false },
+      subscribe: vi.fn(() => () => {}),
+    });
     mockEnsureChatSession.mockImplementation(async () => {
       useUIStore.getState().setCurrentChatSessionId('session_auto');
       return 'session_auto';

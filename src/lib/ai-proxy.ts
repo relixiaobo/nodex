@@ -28,6 +28,69 @@ export interface SomaProxyStreamOptions extends ProxyStreamOptions {
   onRequestBody?: (payload: ProxyStreamRequestPayload) => void;
 }
 
+/** No-data timeout: if the stream produces nothing for this long, consider it dead. */
+const STREAM_STALL_TIMEOUT_MS = 60_000;
+
+/**
+ * Race `reader.read()` against abort signal and idle timeout.
+ * Ensures the stream loop can never hang indefinitely — the two failure modes
+ * that cause the "stuck streaming, stop button does nothing" bug:
+ *   1. Server stops sending data but keeps the connection open → stall timeout fires
+ *   2. `agent.abort()` fires but `reader.cancel()` doesn't interrupt the pending read
+ *      → abort listener rejects the race immediately
+ */
+function guardedRead(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  signal: AbortSignal | undefined,
+  stallMs: number,
+): Promise<ReadableStreamReadResult<Uint8Array>> {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const settle = () => { settled = true; };
+
+    // --- Stall timeout ---
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settle();
+      void reader.cancel('Stream stalled').catch(() => {});
+      reject(new Error(`Stream stalled: no data for ${stallMs / 1000}s`));
+    }, stallMs);
+
+    // --- Abort signal ---
+    const onAbort = () => {
+      if (settled) return;
+      settle();
+      clearTimeout(timer);
+      void reader.cancel('Aborted').catch(() => {});
+      reject(new Error('Request aborted by user'));
+    };
+    if (signal?.aborted) {
+      clearTimeout(timer);
+      reject(new Error('Request aborted by user'));
+      return;
+    }
+    signal?.addEventListener('abort', onAbort, { once: true });
+
+    // --- Actual read ---
+    reader.read().then(
+      (result) => {
+        if (settled) return;
+        settle();
+        clearTimeout(timer);
+        signal?.removeEventListener('abort', onAbort);
+        resolve(result);
+      },
+      (err) => {
+        if (settled) return;
+        settle();
+        clearTimeout(timer);
+        signal?.removeEventListener('abort', onAbort);
+        reject(err);
+      },
+    );
+  });
+}
+
 export function streamProxyWithApiKey(
   model: Model<any>,
   context: Context,
@@ -99,12 +162,8 @@ export function streamProxyWithApiKey(
       let buffer = '';
 
       while (true) {
-        const { done, value } = await reader.read();
+        const { done, value } = await guardedRead(reader, options.signal, STREAM_STALL_TIMEOUT_MS);
         if (done) break;
-
-        if (options.signal?.aborted) {
-          throw new Error('Request aborted by user');
-        }
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
@@ -128,10 +187,6 @@ export function streamProxyWithApiKey(
             stream.push(event);
           }
         }
-      }
-
-      if (options.signal?.aborted) {
-        throw new Error('Request aborted by user');
       }
 
       stream.end();

@@ -58,80 +58,6 @@ const EMPTY_USAGE: Usage = {
   },
 };
 
-interface UpstreamWatchdogOptions {
-  intervalMs?: number;
-  stallMs?: number;
-  now?: () => number;
-  onHeartbeat: () => void;
-  onStall: () => void;
-}
-
-interface UpstreamWatchdog {
-  markUpstreamEvent(): void;
-  stop(): void;
-}
-
-export function mergeAbortSignals(signals: AbortSignal[]): AbortSignal {
-  const activeSignals = signals.filter((signal) => !!signal);
-  if (activeSignals.length === 0) {
-    return new AbortController().signal;
-  }
-  if (activeSignals.length === 1) {
-    return activeSignals[0]!;
-  }
-  if (typeof AbortSignal.any === 'function') {
-    return AbortSignal.any(activeSignals);
-  }
-
-  const controller = new AbortController();
-  const cleanup = () => {
-    for (const signal of activeSignals) {
-      signal.removeEventListener('abort', onAbort);
-    }
-  };
-  const onAbort = (event: Event) => {
-    cleanup();
-    const signal = event.target as AbortSignal | null;
-    controller.abort(signal?.reason ?? new Error('Aborted'));
-  };
-
-  for (const signal of activeSignals) {
-    if (signal.aborted) {
-      controller.abort(signal.reason ?? new Error('Aborted'));
-      return controller.signal;
-    }
-    signal.addEventListener('abort', onAbort, { once: true });
-  }
-
-  return controller.signal;
-}
-
-export function startUpstreamWatchdog(options: UpstreamWatchdogOptions): UpstreamWatchdog {
-  const intervalMs = options.intervalMs ?? 10_000;
-  const stallMs = options.stallMs ?? 45_000;
-  const now = options.now ?? Date.now;
-
-  let lastUpstreamEventAt = now();
-  const timer = setInterval(() => {
-    const silentMs = now() - lastUpstreamEventAt;
-    if (silentMs >= stallMs) {
-      clearInterval(timer);
-      options.onStall();
-      return;
-    }
-    options.onHeartbeat();
-  }, intervalMs);
-
-  return {
-    markUpstreamEvent() {
-      lastUpstreamEventAt = now();
-    },
-    stop() {
-      clearInterval(timer);
-    },
-  };
-}
-
 const ai = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
 
 ai.use('*', requireAuth);
@@ -168,46 +94,38 @@ ai.post('/stream', async (c) => {
 
   const responseStream = new ReadableStream<Uint8Array>({
     async start(controller) {
+      let lastUpstreamEventAt = Date.now();
       let abortUpstream: (() => void) | null = null;
-      let terminalSent = false;
 
-      const enqueueChunk = (chunk: string): void => {
-        try {
-          controller.enqueue(encoder.encode(chunk));
-        } catch {
-          // Client went away or controller already closed.
-        }
-      };
-
-      const sendTerminalEvent = (event: ProxyAssistantMessageEvent): void => {
-        if (terminalSent) return;
-        terminalSent = true;
-        enqueueChunk(`data: ${JSON.stringify(event)}\n\n`);
-      };
-
-      const watchdog = startUpstreamWatchdog({
-        intervalMs: WATCHDOG_INTERVAL_MS,
-        stallMs: UPSTREAM_STALL_MS,
-        onHeartbeat: () => {
-          enqueueChunk(': heartbeat\n\n');
-        },
-        onStall: () => {
-          sendTerminalEvent({
-            type: 'error',
-            reason: 'error',
-            errorMessage: 'Upstream API stopped responding',
-            usage: EMPTY_USAGE,
-          });
+      const watchdog = setInterval(() => {
+        const silentMs = Date.now() - lastUpstreamEventAt;
+        if (silentMs >= UPSTREAM_STALL_MS) {
+          // Upstream is dead — send error and tear down.
+          clearInterval(watchdog);
+          try {
+            const stallError: ProxyAssistantMessageEvent = {
+              type: 'error',
+              reason: 'error',
+              errorMessage: 'Upstream API stopped responding',
+              usage: EMPTY_USAGE,
+            };
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(stallError)}\n\n`));
+          } catch { /* controller already closed */ }
           abortUpstream?.();
-        },
-      });
+        } else {
+          // Upstream alive — send heartbeat to keep client connection alive.
+          try { controller.enqueue(encoder.encode(': heartbeat\n\n')); } catch { /* ignore */ }
+        }
+      }, WATCHDOG_INTERVAL_MS);
 
       try {
         const upstreamAbort = new AbortController();
         abortUpstream = () => upstreamAbort.abort();
 
         // Combine client abort + upstream stall abort
-        const combinedSignal = mergeAbortSignals([c.req.raw.signal, upstreamAbort.signal]);
+        const combinedSignal = c.req.raw.signal.aborted
+          ? c.req.raw.signal
+          : AbortSignal.any([c.req.raw.signal, upstreamAbort.signal]);
 
         const eventStream = piStream(model, context, {
           ...streamOptions,
@@ -216,22 +134,20 @@ ai.post('/stream', async (c) => {
         });
 
         for await (const event of eventStream) {
-          watchdog.markUpstreamEvent();
+          lastUpstreamEventAt = Date.now();
           const proxyEvent = convertToProxyEvent(event);
-          if (proxyEvent.type === 'done' || proxyEvent.type === 'error') {
-            terminalSent = true;
-          }
-          enqueueChunk(`data: ${JSON.stringify(proxyEvent)}\n\n`);
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify(proxyEvent)}\n\n`),
+          );
         }
       } catch (error) {
-        sendTerminalEvent(createProxyErrorEvent(error, c.req.raw.signal.aborted));
+        const proxyError = createProxyErrorEvent(error, c.req.raw.signal.aborted);
+        controller.enqueue(
+          encoder.encode(`data: ${JSON.stringify(proxyError)}\n\n`),
+        );
       } finally {
-        watchdog.stop();
-        try {
-          controller.close();
-        } catch {
-          // Already closed by the runtime.
-        }
+        clearInterval(watchdog);
+        controller.close();
       }
     },
   });

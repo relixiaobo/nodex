@@ -161,7 +161,6 @@ export function ChatPanel({ sessionId, hideHeader, debugOpen: externalDebugOpen 
   const [pendingMessageActionId, setPendingMessageActionId] = useState<string | null>(null);
   const [steeringNote, setLocalSteeringNote] = useState<string | null>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
-  const pendingScrollSessionRef = useRef<string | null>(null);
   const openProfileRef = useRef<ChatProfileHandle | null>(null);
   const openProfileShellMarkedRef = useRef(false);
   const openProfileEndedRef = useRef(false);
@@ -295,23 +294,12 @@ export function ChatPanel({ sessionId, hideHeader, debugOpen: externalDebugOpen 
     });
   }, [chatState, isStreaming, messages, steeringNote]);
 
-  // Mark for auto-scroll when session changes
+  // Reset scroll position when switching sessions — the existing auto-scroll
+  // effect (above) naturally scrolls to bottom when shouldStickToBottom is true.
   useEffect(() => {
-    pendingScrollSessionRef.current = sessionId;
+    shouldStickToBottomRef.current = true;
+    setShowScrollToBottom(false);
   }, [sessionId]);
-
-  // Auto-scroll to bottom when messages become ready for a new session
-  useEffect(() => {
-    if (!messagesReady || pendingScrollSessionRef.current !== sessionId) return;
-    pendingScrollSessionRef.current = null;
-    const scroller = scrollRef.current;
-    if (!scroller) return;
-    requestAnimationFrame(() => {
-      scroller.scrollTop = scroller.scrollHeight;
-      shouldStickToBottomRef.current = true;
-      setShowScrollToBottom(false);
-    });
-  }, [sessionId, messagesReady]);
 
   useEffect(() => {
     if (!isActive || !pendingChatPrompt || pendingChatPrompt.sessionId !== sessionId) return;
@@ -589,7 +577,7 @@ export function ChatPanel({ sessionId, hideHeader, debugOpen: externalDebugOpen 
                   renderConversationMessages()
                 )}
               </div>
-              {showScrollToBottom && !(isStreaming && shouldStickToBottomRef.current) && (
+              {showScrollToBottom && (
                 <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center pb-2">
                   <button
                     type="button"

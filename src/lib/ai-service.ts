@@ -950,6 +950,7 @@ export function createAgent(model: Model<any> = DEFAULT_CHAT_MODEL): Agent {
 
       const reasoning = options.reasoning ?? runtime.thinkingLevel ?? undefined;
 
+      console.log('[stream-debug] streamFn called, model:', activeModel.id, 'signal:', !!options.signal, 'signalAborted:', options.signal?.aborted);
       return streamProxyWithApiKey(activeModel, context, {
         ...options,
         apiKey: resolvedApiKey,
@@ -1257,7 +1258,9 @@ export function switchMessageBranch(nodeId: string, agent: Agent = getAIAgent())
 }
 
 export function stopStreaming(agent: Agent = getAIAgent()): void {
+  console.log('[stream-debug] stopStreaming called, isStreaming:', agent.state.isStreaming);
   agent.abort();
+  console.log('[stream-debug] agent.abort() returned, isStreaming:', agent.state.isStreaming);
 }
 
 export function setSteeringNote(text: string | null, agent: Agent = getAIAgent()): void {

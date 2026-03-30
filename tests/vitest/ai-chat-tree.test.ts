@@ -83,7 +83,7 @@ describe('ai chat tree', () => {
     const session = createSession();
     const root = getRootNode(session);
 
-    expect(session.title).toBeNull();
+    expect(session.title).toBe('Untitled');
     expect(session.currentNode).toBe(root.id);
     expect(session.syncedAt).toBeNull();
     expect(session.revision).toBe(0);

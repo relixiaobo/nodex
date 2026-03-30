@@ -39,9 +39,14 @@
 
 - [x] ~~**@ 引用节点**~~ (#179) — Chat 输入框 `@` 触发节点选择器，精确注入上下文
 - [x] ~~**View Context Injection**~~ (#174) — system reminder 注入可见树快照
+- [ ] **Scroll to bottom 按钮** — 聊天记录过长滚动后，显示浮动按钮快速回到最新消息
+- [ ] **User message 导航** — 长对话中提供 user message 索引，快速跳转到任意一条用户消息
+- [ ] **历史聊天自动滚到底部** — 进入历史聊天时自动定位到最新消息
+- [ ] **新聊天默认标题 "Untitled"** — 新建聊天初始名称为 Untitled，首次对话后再自动生成标题
 
 #### AI 能力
 
+- [x] ~~**Subagent 实现方案研究**~~ (#191) — 调研各产品/开源方案，输出 soma 最佳实现方案
 - [ ] Spark 质量提升 — 三轮认知压缩优化 + 进度 UI
 - [ ] 碰撞策略 v0→v1 — agent 驱动 node_search 渐进式碰撞
 - [ ] Taste 学习 — Schema evolution skill（OpLog Correction → #skill 规则）

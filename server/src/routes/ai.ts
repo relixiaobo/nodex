@@ -83,8 +83,17 @@ ai.post('/stream', async (c) => {
   }
 
   const encoder = new TextEncoder();
+  const heartbeatBytes = encoder.encode(': heartbeat\n\n');
+  const HEARTBEAT_MS = 15_000;
+
   const responseStream = new ReadableStream<Uint8Array>({
     async start(controller) {
+      // Keepalive: send SSE comment every 15s so the client knows the
+      // connection is alive during long thinking / slow upstream phases.
+      const heartbeat = setInterval(() => {
+        try { controller.enqueue(heartbeatBytes); } catch { clearInterval(heartbeat); }
+      }, HEARTBEAT_MS);
+
       try {
         const eventStream = piStream(model, context, {
           ...streamOptions,
@@ -104,6 +113,7 @@ ai.post('/stream', async (c) => {
           encoder.encode(`data: ${JSON.stringify(proxyError)}\n\n`),
         );
       } finally {
+        clearInterval(heartbeat);
         controller.close();
       }
     },

@@ -83,25 +83,58 @@ ai.post('/stream', async (c) => {
   }
 
   const encoder = new TextEncoder();
-  const heartbeatBytes = encoder.encode(': heartbeat\n\n');
-  const HEARTBEAT_MS = 15_000;
+
+  // Watchdog: checks every 10s whether the upstream API is still producing
+  // events. If no upstream event for UPSTREAM_STALL_MS, we send an error
+  // and close — the stream is dead, no point keeping the client waiting.
+  // While the upstream IS active, we send a heartbeat comment so the
+  // client's stall timer doesn't misfire during long thinking phases.
+  const WATCHDOG_INTERVAL_MS = 10_000;
+  const UPSTREAM_STALL_MS = 45_000;
 
   const responseStream = new ReadableStream<Uint8Array>({
     async start(controller) {
-      // Keepalive: send SSE comment every 15s so the client knows the
-      // connection is alive during long thinking / slow upstream phases.
-      const heartbeat = setInterval(() => {
-        try { controller.enqueue(heartbeatBytes); } catch { clearInterval(heartbeat); }
-      }, HEARTBEAT_MS);
+      let lastUpstreamEventAt = Date.now();
+      let abortUpstream: (() => void) | null = null;
+
+      const watchdog = setInterval(() => {
+        const silentMs = Date.now() - lastUpstreamEventAt;
+        if (silentMs >= UPSTREAM_STALL_MS) {
+          // Upstream is dead — send error and tear down.
+          clearInterval(watchdog);
+          try {
+            const stallError: ProxyAssistantMessageEvent = {
+              type: 'error',
+              reason: 'error',
+              errorMessage: 'Upstream API stopped responding',
+              usage: EMPTY_USAGE,
+            };
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(stallError)}\n\n`));
+          } catch { /* controller already closed */ }
+          abortUpstream?.();
+        } else {
+          // Upstream alive — send heartbeat to keep client connection alive.
+          try { controller.enqueue(encoder.encode(': heartbeat\n\n')); } catch { /* ignore */ }
+        }
+      }, WATCHDOG_INTERVAL_MS);
 
       try {
+        const upstreamAbort = new AbortController();
+        abortUpstream = () => upstreamAbort.abort();
+
+        // Combine client abort + upstream stall abort
+        const combinedSignal = c.req.raw.signal.aborted
+          ? c.req.raw.signal
+          : AbortSignal.any([c.req.raw.signal, upstreamAbort.signal]);
+
         const eventStream = piStream(model, context, {
           ...streamOptions,
           apiKey,
-          signal: c.req.raw.signal,
+          signal: combinedSignal,
         });
 
         for await (const event of eventStream) {
+          lastUpstreamEventAt = Date.now();
           const proxyEvent = convertToProxyEvent(event);
           controller.enqueue(
             encoder.encode(`data: ${JSON.stringify(proxyEvent)}\n\n`),
@@ -113,7 +146,7 @@ ai.post('/stream', async (c) => {
           encoder.encode(`data: ${JSON.stringify(proxyError)}\n\n`),
         );
       } finally {
-        clearInterval(heartbeat);
+        clearInterval(watchdog);
         controller.close();
       }
     },

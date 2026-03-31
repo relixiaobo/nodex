@@ -835,3 +835,12 @@ html, body {
   animation: chat-streaming-breathe 1.35s ease-in-out infinite;
   transform-origin: center;
 }
+
+.chat-message-highlight {
+  animation: chat-message-flash 1.5s ease-out;
+}
+
+@keyframes chat-message-flash {
+  0% { background-color: var(--color-primary-muted); }
+  100% { background-color: transparent; }
+}

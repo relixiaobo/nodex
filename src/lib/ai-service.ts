@@ -851,7 +851,7 @@ async function runAgentTurn(session: ChatSession, agent: Agent, input: AgentTurn
       assistantMessage: getLatestAssistantMessage(agent),
     });
     syncSessionFromAgent(session, agent.state.messages);
-    if (session.title === null) {
+    if (session.title === null || session.title === 'Untitled') {
       // Immediate fallback — truncated first message as temporary title
       session.title = deriveSessionTitle(agent.state.messages);
       if (session.title) notifyChatTitleChange(session.id, session.title);

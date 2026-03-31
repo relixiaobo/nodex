@@ -328,7 +328,7 @@ export function ChatMessage({
   const showToolbar = entry.kind === 'message' && nodeId !== null && !turnActive && !isEditing && (isUser || isLastInTurn);
 
   return (
-    <div className={`${isUser ? 'group/message' : ''} flex w-full ${isUser ? 'justify-end' : 'justify-start'} ${grouped ? 'mt-1' : 'mt-4 first:mt-0'}`}>
+    <div data-message-id={nodeId ?? undefined} className={`${isUser ? 'group/message' : ''} flex w-full ${isUser ? 'justify-end' : 'justify-start'} ${grouped ? 'mt-1' : 'mt-4 first:mt-0'}`}>
       <div className={`flex flex-col gap-1 ${isUser ? 'max-w-[88%] items-end' : 'w-full items-start'}`}>
         {isUser ? (
           isEditing ? (

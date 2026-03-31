@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Pencil, Trash2 } from '../../lib/icons.js';
+import { ArrowDown, Pencil, Trash2 } from '../../lib/icons.js';
 import { useAgent } from '../../hooks/use-agent.js';
 import type { AssistantMessage, ThinkingLevel } from '@mariozechner/pi-ai';
 import { readChatDebugEnabled } from '../../lib/ai-debug.js';
@@ -160,6 +160,7 @@ export function ChatPanel({ sessionId, hideHeader, debugOpen: externalDebugOpen 
   const [selectedModelKey, setSelectedModelKey] = useState<{ id: string; provider: string } | null>(null);
   const [pendingMessageActionId, setPendingMessageActionId] = useState<string | null>(null);
   const [steeringNote, setLocalSteeringNote] = useState<string | null>(null);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const openProfileRef = useRef<ChatProfileHandle | null>(null);
   const openProfileShellMarkedRef = useRef(false);
   const openProfileEndedRef = useRef(false);
@@ -292,6 +293,13 @@ export function ChatPanel({ sessionId, hideHeader, debugOpen: externalDebugOpen 
       shouldStickToBottomRef.current = true;
     });
   }, [chatState, isStreaming, messages, steeringNote]);
+
+  // Reset scroll position when switching sessions — the existing auto-scroll
+  // effect (above) naturally scrolls to bottom when shouldStickToBottom is true.
+  useEffect(() => {
+    shouldStickToBottomRef.current = true;
+    setShowScrollToBottom(false);
+  }, [sessionId]);
 
   useEffect(() => {
     if (!isActive || !pendingChatPrompt || pendingChatPrompt.sessionId !== sessionId) return;
@@ -469,6 +477,8 @@ export function ChatPanel({ sessionId, hideHeader, debugOpen: externalDebugOpen 
           onClose={(e) => {
             e.stopPropagation();
           }}
+          messages={messages}
+          scrollContainerRef={scrollRef}
         />
       )}
 
@@ -527,14 +537,16 @@ export function ChatPanel({ sessionId, hideHeader, debugOpen: externalDebugOpen 
           </div>
         ) : (
           <div className="flex flex-1 overflow-hidden">
-            <div className="flex flex-1 flex-col overflow-hidden">
+            <div className="relative flex flex-1 flex-col overflow-hidden">
               <div
                 ref={scrollRef}
                 className="flex flex-1 flex-col overflow-y-auto px-4 py-4"
                 onScroll={() => {
                   const scroller = scrollRef.current;
                   if (!scroller) return;
-                  shouldStickToBottomRef.current = shouldStickChatScroll(scroller);
+                  const atBottom = shouldStickChatScroll(scroller);
+                  shouldStickToBottomRef.current = atBottom;
+                  setShowScrollToBottom(!atBottom);
                 }}
               >
                 {!messagesReady ? (
@@ -565,6 +577,24 @@ export function ChatPanel({ sessionId, hideHeader, debugOpen: externalDebugOpen 
                   renderConversationMessages()
                 )}
               </div>
+              {showScrollToBottom && (
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center pb-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const scroller = scrollRef.current;
+                      if (!scroller) return;
+                      scroller.scrollTo({ top: scroller.scrollHeight, behavior: 'smooth' });
+                      shouldStickToBottomRef.current = true;
+                      setShowScrollToBottom(false);
+                    }}
+                    className="pointer-events-auto flex h-8 w-8 items-center justify-center rounded-full border border-border bg-background shadow-sm transition-colors hover:bg-foreground/4"
+                    aria-label="Scroll to bottom"
+                  >
+                    <ArrowDown size={16} strokeWidth={1.8} className="text-foreground-secondary" />
+                  </button>
+                </div>
+              )}
               <div className="relative">
                 {steeringNote && (
                   <div className="pointer-events-none absolute inset-x-0 bottom-full px-4 pb-2">

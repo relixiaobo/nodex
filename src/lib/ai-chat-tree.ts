@@ -99,7 +99,7 @@ export function createSession(id?: string): ChatSession {
 
   return {
     id: id ?? nanoid(),
-    title: null,
+    title: 'Untitled',
     mapping: {
       [rootNode.id]: rootNode,
     },

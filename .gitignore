@@ -6,9 +6,12 @@ dist/
 .env
 .env.local
 .DS_Store
-research/*.json
 *.pem
 docs/dev-setup.md
+
+# Personal research data (never commit)
+docs/research/*.json
+docs/research/*转录文本*
 
 # Cloudflare Worker (server/)
 server/.dev.vars

@@ -58,6 +58,24 @@ const EMPTY_USAGE: Usage = {
   },
 };
 
+function mergeAbortSignals(signals: AbortSignal[]): AbortSignal {
+  const active = signals.filter(Boolean);
+  if (active.length <= 1) return active[0] ?? new AbortController().signal;
+  if (typeof AbortSignal.any === 'function') return AbortSignal.any(active);
+  // Polyfill for runtimes without AbortSignal.any
+  const controller = new AbortController();
+  const onAbort = (event: Event) => {
+    for (const s of active) s.removeEventListener('abort', onAbort);
+    const signal = event.target as AbortSignal | null;
+    controller.abort(signal?.reason ?? new Error('Aborted'));
+  };
+  for (const s of active) {
+    if (s.aborted) { controller.abort(s.reason ?? new Error('Aborted')); return controller.signal; }
+    s.addEventListener('abort', onAbort, { once: true });
+  }
+  return controller.signal;
+}
+
 const ai = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
 
 ai.use('*', requireAuth);
@@ -123,9 +141,7 @@ ai.post('/stream', async (c) => {
         abortUpstream = () => upstreamAbort.abort();
 
         // Combine client abort + upstream stall abort
-        const combinedSignal = c.req.raw.signal.aborted
-          ? c.req.raw.signal
-          : AbortSignal.any([c.req.raw.signal, upstreamAbort.signal]);
+        const combinedSignal = mergeAbortSignals([c.req.raw.signal, upstreamAbort.signal]);
 
         const eventStream = piStream(model, context, {
           ...streamOptions,

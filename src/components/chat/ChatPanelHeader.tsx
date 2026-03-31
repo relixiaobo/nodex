@@ -6,7 +6,7 @@ import { DropdownPanel } from '../ui/DropdownPanel.js';
 
 const CHAT_HEADER_EDIT_BTN = 'flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-foreground-tertiary opacity-0 transition-opacity hover:bg-foreground/4 hover:text-foreground group-hover/chat-header:opacity-100';
 const CHAT_HEADER_CLOSE_BTN = 'flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground';
-const CHAT_HEADER_NAV_BTN = 'flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground';
+const CHAT_HEADER_NAV_BTN = 'flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground';
 
 export function useChatTitleEdit(sessionId: string) {
   const title = useSyncExternalStore(
@@ -101,7 +101,7 @@ function UserMessageNav({ messages, scrollContainerRef }: UserMessageNavProps) {
         title="Jump to message"
         className={CHAT_HEADER_NAV_BTN}
       >
-        <List size={12} strokeWidth={1.8} />
+        <List size={14} strokeWidth={1.5} />
       </button>
       {open && (
         <DropdownPanel

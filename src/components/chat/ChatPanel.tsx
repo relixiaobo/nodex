@@ -13,6 +13,7 @@ import { useUIStore } from '../../stores/ui-store.js';
 import { SYSTEM_NODE_IDS } from '../../types/index.js';
 import type { ChatConversationEntry, ChatConversationMessage, ChatMessageEntry, ChatTurnPhase } from '../../hooks/use-agent.js';
 import { ChatDebugPanel } from './ChatDebugPanel.js';
+import { ChatMessageMinimap } from './ChatMessageMinimap.js';
 import { ChatOnboarding } from './ChatOnboarding.js';
 import { ChatPanelHeader } from './ChatPanelHeader.js';
 import { ChatInput, type ChatInputHandle } from './ChatInput.js';
@@ -165,6 +166,10 @@ export function ChatPanel({ sessionId, hideHeader, debugOpen: externalDebugOpen 
   const openProfileShellMarkedRef = useRef(false);
   const openProfileEndedRef = useRef(false);
   const chatBusy = isStreaming || pendingMessageActionId !== null;
+  const userMessageCount = useMemo(
+    () => messages.filter((entry) => entry.kind === 'message' && entry.message.role === 'user' && entry.nodeId).length,
+    [messages],
+  );
 
   const availableModels = useMemo(() => {
     void settingsVersion;
@@ -477,8 +482,6 @@ export function ChatPanel({ sessionId, hideHeader, debugOpen: externalDebugOpen 
           onClose={(e) => {
             e.stopPropagation();
           }}
-          messages={messages}
-          scrollContainerRef={scrollRef}
         />
       )}
 
@@ -538,44 +541,52 @@ export function ChatPanel({ sessionId, hideHeader, debugOpen: externalDebugOpen 
         ) : (
           <div className="flex flex-1 overflow-hidden">
             <div className="relative flex flex-1 flex-col overflow-hidden">
-              <div
-                ref={scrollRef}
-                className="flex flex-1 flex-col overflow-y-auto px-4 py-4"
-                onScroll={() => {
-                  const scroller = scrollRef.current;
-                  if (!scroller) return;
-                  const atBottom = shouldStickChatScroll(scroller);
-                  shouldStickToBottomRef.current = atBottom;
-                  setShowScrollToBottom(!atBottom);
-                }}
-              >
-                {!messagesReady ? (
-                  <ChatMessagesSkeleton />
-                ) : messages.length === 0 ? (
-                  <div className="flex h-full min-h-40 flex-col items-center justify-center gap-4 px-6">
-                    <div className="text-center text-sm text-foreground-tertiary">
-                      What are you thinking about?
-                    </div>
-                    <div className="flex w-full max-w-[260px] flex-col gap-2">
-                      {[
-                        'Summarize this page',
-                        'Help me think through this',
-                        'What do I know about…',
-                      ].map((suggestion) => (
-                        <button
-                          key={suggestion}
-                          type="button"
-                          onClick={() => void handleSendMessage(suggestion)}
-                          className="rounded-lg border border-border px-3 py-2 text-left text-sm text-foreground-secondary transition-colors hover:bg-foreground/4 hover:text-foreground"
-                        >
-                          {suggestion}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  renderConversationMessages()
+              <div className="relative flex flex-1 overflow-hidden">
+                {userMessageCount >= 2 && messagesReady && (
+                  <ChatMessageMinimap
+                    messages={messages}
+                    scrollContainerRef={scrollRef}
+                  />
                 )}
+                <div
+                  ref={scrollRef}
+                  className="flex flex-1 flex-col overflow-y-auto px-4 py-4"
+                  onScroll={() => {
+                    const scroller = scrollRef.current;
+                    if (!scroller) return;
+                    const atBottom = shouldStickChatScroll(scroller);
+                    shouldStickToBottomRef.current = atBottom;
+                    setShowScrollToBottom(!atBottom);
+                  }}
+                >
+                  {!messagesReady ? (
+                    <ChatMessagesSkeleton />
+                  ) : messages.length === 0 ? (
+                    <div className="flex h-full min-h-40 flex-col items-center justify-center gap-4 px-6">
+                      <div className="text-center text-sm text-foreground-tertiary">
+                        What are you thinking about?
+                      </div>
+                      <div className="flex w-full max-w-[260px] flex-col gap-2">
+                        {[
+                          'Summarize this page',
+                          'Help me think through this',
+                          'What do I know about…',
+                        ].map((suggestion) => (
+                          <button
+                            key={suggestion}
+                            type="button"
+                            onClick={() => void handleSendMessage(suggestion)}
+                            className="rounded-lg border border-border px-3 py-2 text-left text-sm text-foreground-secondary transition-colors hover:bg-foreground/4 hover:text-foreground"
+                          >
+                            {suggestion}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    renderConversationMessages()
+                  )}
+                </div>
               </div>
               <div className="relative">
                 {showScrollToBottom && (

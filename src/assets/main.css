@@ -840,6 +840,15 @@ html, body {
   animation: chat-message-flash 1.5s ease-out;
 }
 
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
 @keyframes chat-message-flash {
   0% { background-color: var(--color-primary-muted); }
   100% { background-color: transparent; }

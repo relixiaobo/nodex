@@ -589,7 +589,7 @@ export function ChatPanel({ sessionId, hideHeader, debugOpen: externalDebugOpen 
                         shouldStickToBottomRef.current = true;
                         setShowScrollToBottom(false);
                       }}
-                      className="pointer-events-auto flex h-8 w-8 items-center justify-center rounded-full border border-border bg-background shadow-sm transition-colors hover:bg-foreground/4"
+                      className="pointer-events-auto flex h-8 w-8 items-center justify-center rounded-full border border-border bg-background shadow-sm transition-colors hover:border-foreground/20"
                       aria-label="Scroll to bottom"
                     >
                       <ArrowDown size={16} strokeWidth={1.5} className="text-foreground-secondary" />

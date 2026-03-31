@@ -577,25 +577,25 @@ export function ChatPanel({ sessionId, hideHeader, debugOpen: externalDebugOpen 
                   renderConversationMessages()
                 )}
               </div>
-              {showScrollToBottom && (
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center pb-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const scroller = scrollRef.current;
-                      if (!scroller) return;
-                      scroller.scrollTo({ top: scroller.scrollHeight, behavior: 'smooth' });
-                      shouldStickToBottomRef.current = true;
-                      setShowScrollToBottom(false);
-                    }}
-                    className="pointer-events-auto flex h-8 w-8 items-center justify-center rounded-full border border-border bg-background shadow-sm transition-colors hover:bg-foreground/4"
-                    aria-label="Scroll to bottom"
-                  >
-                    <ArrowDown size={16} strokeWidth={1.8} className="text-foreground-secondary" />
-                  </button>
-                </div>
-              )}
               <div className="relative">
+                {showScrollToBottom && (
+                  <div className="pointer-events-none absolute inset-x-0 bottom-full flex justify-center pb-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const scroller = scrollRef.current;
+                        if (!scroller) return;
+                        scroller.scrollTo({ top: scroller.scrollHeight, behavior: 'smooth' });
+                        shouldStickToBottomRef.current = true;
+                        setShowScrollToBottom(false);
+                      }}
+                      className="pointer-events-auto flex h-8 w-8 items-center justify-center rounded-full border border-border bg-background shadow-sm transition-colors hover:bg-foreground/4"
+                      aria-label="Scroll to bottom"
+                    >
+                      <ArrowDown size={16} strokeWidth={1.8} className="text-foreground-secondary" />
+                    </button>
+                  </div>
+                )}
                 {steeringNote && (
                   <div className="pointer-events-none absolute inset-x-0 bottom-full px-4 pb-2">
                     <div className="group/steer flex justify-end">

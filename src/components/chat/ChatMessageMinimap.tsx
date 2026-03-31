@@ -34,10 +34,16 @@ function getUserMessagePreview(text: string): string {
 function getCurrentMessageId(
   container: HTMLDivElement,
   userMessages: UserMessageItem[],
+  visibleMessageIds: ReadonlySet<string>,
+  previousMessageId: string | null,
 ): string | null {
   const rootRect = container.getBoundingClientRect();
-  let closestId: string | null = null;
-  let closestDistance = Number.POSITIVE_INFINITY;
+  let closestVisibleId: string | null = null;
+  let closestVisibleDistance = Number.POSITIVE_INFINITY;
+  let nearestAboveId: string | null = null;
+  let nearestAboveDistance = Number.POSITIVE_INFINITY;
+  let nearestBelowId: string | null = null;
+  let nearestBelowDistance = Number.POSITIVE_INFINITY;
 
   for (const entry of userMessages) {
     const element = container.querySelector<HTMLElement>(`[data-message-id="${entry.nodeId}"]`);
@@ -46,16 +52,41 @@ function getCurrentMessageId(
     const rect = element.getBoundingClientRect();
     const visibleTop = Math.max(rect.top, rootRect.top);
     const visibleBottom = Math.min(rect.bottom, rootRect.bottom);
-    if (visibleBottom <= visibleTop) continue;
+    const isVisible = visibleMessageIds.has(entry.nodeId) && visibleBottom > visibleTop;
 
-    const distance = Math.abs(rect.top - rootRect.top);
-    if (distance < closestDistance) {
-      closestDistance = distance;
-      closestId = entry.nodeId;
+    if (isVisible) {
+      const distance = Math.abs(rect.top - rootRect.top);
+      if (distance < closestVisibleDistance) {
+        closestVisibleDistance = distance;
+        closestVisibleId = entry.nodeId;
+      }
+      continue;
+    }
+
+    if (rect.bottom <= rootRect.top) {
+      const distance = rootRect.top - rect.bottom;
+      if (distance < nearestAboveDistance) {
+        nearestAboveDistance = distance;
+        nearestAboveId = entry.nodeId;
+      }
+      continue;
+    }
+
+    if (rect.top >= rootRect.top) {
+      const distance = rect.top - rootRect.top;
+      if (distance < nearestBelowDistance) {
+        nearestBelowDistance = distance;
+        nearestBelowId = entry.nodeId;
+      }
     }
   }
 
-  return closestId;
+  return closestVisibleId
+    ?? nearestAboveId
+    ?? nearestBelowId
+    ?? previousMessageId
+    ?? userMessages[0]?.nodeId
+    ?? null;
 }
 
 export function ChatMessageMinimap({ messages, scrollContainerRef }: ChatMessageMinimapProps) {
@@ -81,11 +112,13 @@ export function ChatMessageMinimap({ messages, scrollContainerRef }: ChatMessage
   const itemRefs = useRef(new Map<string, HTMLButtonElement>());
   const highlightTimeoutRef = useRef<number | null>(null);
   const visibilityTimeoutRef = useRef<number | null>(null);
+  const visibleMessageIdsRef = useRef(new Set<string>());
 
   useEffect(() => {
     if (userMessages.length < 2) {
       setCurrentMessageId(null);
       setIsScrollVisible(false);
+      visibleMessageIdsRef.current.clear();
       return;
     }
 
@@ -93,12 +126,28 @@ export function ChatMessageMinimap({ messages, scrollContainerRef }: ChatMessage
     if (!container) return;
 
     const updateCurrentMessage = () => {
-      const nextId = getCurrentMessageId(container, userMessages) ?? userMessages[0]?.nodeId ?? null;
-      setCurrentMessageId((prev) => (prev === nextId ? prev : nextId));
+      setCurrentMessageId((prev) => {
+        const nextId = getCurrentMessageId(
+          container,
+          userMessages,
+          visibleMessageIdsRef.current,
+          prev,
+        );
+        return prev === nextId ? prev : nextId;
+      });
     };
 
     const observer = new IntersectionObserver(
-      () => {
+      (entries) => {
+        for (const entry of entries) {
+          const messageId = (entry.target as HTMLElement).dataset.messageId;
+          if (!messageId) continue;
+          if (entry.isIntersecting && entry.intersectionRatio > 0) {
+            visibleMessageIdsRef.current.add(messageId);
+          } else {
+            visibleMessageIdsRef.current.delete(messageId);
+          }
+        }
         updateCurrentMessage();
       },
       {
@@ -130,6 +179,7 @@ export function ChatMessageMinimap({ messages, scrollContainerRef }: ChatMessage
     return () => {
       container.removeEventListener('scroll', handleScroll);
       observer.disconnect();
+      visibleMessageIdsRef.current.clear();
     };
   }, [scrollContainerRef, userMessages]);
 

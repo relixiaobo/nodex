@@ -689,6 +689,106 @@ describe('chat ui', () => {
     });
   });
 
+  it('expands minimap previews on hover and collapses them on leave', async () => {
+    resetAndSeed();
+    seedProviderConfig({
+      provider: 'anthropic',
+      enabled: true,
+      apiKey: 'sk-ant-minimap-hover',
+      name: 'Anthropic',
+    });
+
+    const session = linearToTree([
+      createUserMessage('First hover user prompt', 1),
+      createAssistantMessage('First assistant reply', 2),
+      createUserMessage('Second hover user prompt', 3),
+      createAssistantMessage('Second assistant reply', 4),
+    ]);
+    await saveChatSession(session);
+
+    flushSync(() => {
+      root.render(React.createElement(ChatPanel, { sessionId: session.id }));
+    });
+
+    await vi.waitFor(() => {
+      expect(container.querySelector('[aria-label="Chat message minimap"]')).not.toBeNull();
+    });
+
+    const minimap = container.querySelector('[aria-label="Chat message minimap"]') as HTMLDivElement;
+    const scrollContainer = container.querySelector('.overflow-y-auto.px-4.py-4') as HTMLDivElement;
+
+    flushSync(() => {
+      scrollContainer.dispatchEvent(new Event('scroll'));
+    });
+
+    await vi.waitFor(() => {
+      expect(minimap.className).toContain('opacity-100');
+    });
+
+    const preview = container.querySelector('button[aria-label="Jump to message 1"] > span') as HTMLSpanElement;
+    expect(preview.className).toContain('opacity-0');
+
+    flushSync(() => {
+      minimap.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+    });
+
+    await vi.waitFor(() => {
+      expect(preview.className).toContain('opacity-100');
+    });
+
+    flushSync(() => {
+      minimap.dispatchEvent(new MouseEvent('mouseout', { bubbles: true }));
+    });
+
+    await vi.waitFor(() => {
+      expect(preview.className).toContain('opacity-0');
+    });
+  });
+
+  it('hides the minimap again shortly after scrolling stops', async () => {
+    resetAndSeed();
+    seedProviderConfig({
+      provider: 'anthropic',
+      enabled: true,
+      apiKey: 'sk-ant-minimap-hide',
+      name: 'Anthropic',
+    });
+
+    const session = linearToTree([
+      createUserMessage('First hide user prompt', 1),
+      createAssistantMessage('First assistant reply', 2),
+      createUserMessage('Second hide user prompt', 3),
+      createAssistantMessage('Second assistant reply', 4),
+    ]);
+    await saveChatSession(session);
+
+    flushSync(() => {
+      root.render(React.createElement(ChatPanel, { sessionId: session.id }));
+    });
+
+    await vi.waitFor(() => {
+      expect(container.querySelector('[aria-label="Chat message minimap"]')).not.toBeNull();
+    });
+
+    const minimap = container.querySelector('[aria-label="Chat message minimap"]') as HTMLDivElement;
+    const scrollContainer = container.querySelector('.overflow-y-auto.px-4.py-4') as HTMLDivElement;
+
+    flushSync(() => {
+      scrollContainer.dispatchEvent(new Event('scroll'));
+    });
+
+    await vi.waitFor(() => {
+      expect(minimap.className).toContain('opacity-100');
+    });
+
+    await new Promise((resolve) => window.setTimeout(resolve, 950));
+
+    await vi.waitFor(() => {
+      expect(minimap.className).toContain('opacity-0');
+      expect(minimap.className).toContain('pointer-events-none');
+    });
+  });
+
   it('clicking a minimap pill scrolls to the user message and applies the highlight class', async () => {
     resetAndSeed();
     seedProviderConfig({

@@ -1,12 +1,9 @@
 import { useCallback, useRef, useState, useSyncExternalStore, type MouseEvent as ReactMouseEvent } from 'react';
 import { getAgentForSession, getChatTitle, subscribeChatTitles, updateSessionTitle } from '../../lib/ai-service.js';
-import { List, MessageCircle, Pencil, X } from '../../lib/icons.js';
-import type { ChatMessageEntry } from '../../hooks/use-agent.js';
-import { DropdownPanel } from '../ui/DropdownPanel.js';
+import { MessageCircle, Pencil, X } from '../../lib/icons.js';
 
 const CHAT_HEADER_EDIT_BTN = 'flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-foreground-tertiary opacity-0 transition-opacity hover:bg-foreground/4 hover:text-foreground group-hover/chat-header:opacity-100';
 const CHAT_HEADER_CLOSE_BTN = 'flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground';
-const CHAT_HEADER_NAV_BTN = 'flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground';
 
 export function useChatTitleEdit(sessionId: string) {
   const title = useSyncExternalStore(
@@ -62,98 +59,13 @@ export function ChatTitleInput({ edit }: { edit: ReturnType<typeof useChatTitleE
   );
 }
 
-function getUserMessageText(entry: ChatMessageEntry): string {
-  if (entry.kind !== 'message' || entry.message.role !== 'user') return '';
-  const msg = entry.message;
-  const raw = typeof msg.content === 'string'
-    ? msg.content
-    : msg.content
-        .filter((block) => block.type === 'text')
-        .map((block) => block.text)
-        .join(' ');
-  return raw.replace(/\s+/g, ' ').trim();
-}
-
-interface UserMessageNavProps {
-  messages: ChatMessageEntry[];
-  scrollContainerRef: React.RefObject<HTMLDivElement | null>;
-}
-
-function UserMessageNav({ messages, scrollContainerRef }: UserMessageNavProps) {
-  const [open, setOpen] = useState(false);
-  const anchorRef = useRef<HTMLButtonElement>(null);
-
-  const userMessages = messages.filter(
-    (entry) => entry.kind === 'message' && entry.message.role === 'user' && entry.nodeId,
-  );
-
-  if (userMessages.length === 0) return null;
-
-  return (
-    <>
-      <button
-        ref={anchorRef}
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          setOpen((v) => !v);
-        }}
-        title="Jump to message"
-        className={CHAT_HEADER_NAV_BTN}
-      >
-        <List size={14} strokeWidth={1.5} />
-      </button>
-      {open && (
-        <DropdownPanel
-          anchorRef={anchorRef}
-          onClose={() => setOpen(false)}
-          title="Messages"
-          width={280}
-        >
-          <div className="max-h-80 overflow-y-auto">
-            {userMessages.map((entry, index) => {
-              const nodeId = entry.kind === 'message' ? entry.nodeId : null;
-              const text = getUserMessageText(entry);
-              const preview = text.length > 50 ? text.slice(0, 50) + '…' : text;
-              return (
-                <button
-                  key={nodeId ?? index}
-                  type="button"
-                  onClick={() => {
-                    setOpen(false);
-                    if (!nodeId) return;
-                    const container = scrollContainerRef.current;
-                    if (!container) return;
-                    const el = container.querySelector(`[data-message-id="${nodeId}"]`);
-                    if (!el) return;
-                    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    // Brief highlight
-                    el.classList.add('chat-message-highlight');
-                    setTimeout(() => el.classList.remove('chat-message-highlight'), 1500);
-                  }}
-                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-foreground-secondary transition-colors hover:bg-foreground/4 hover:text-foreground"
-                >
-                  <span className="shrink-0 text-[11px] text-foreground-tertiary">{index + 1}</span>
-                  <span className="min-w-0 truncate">{preview || 'Empty message'}</span>
-                </button>
-              );
-            })}
-          </div>
-        </DropdownPanel>
-      )}
-    </>
-  );
-}
-
 interface ChatPanelHeaderProps {
   sessionId: string;
   onClose: (e: ReactMouseEvent<HTMLButtonElement>) => void;
   className?: string;
-  messages?: ChatMessageEntry[];
-  scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
 }
 
-export function ChatPanelHeader({ sessionId, onClose, className = '', messages, scrollContainerRef }: ChatPanelHeaderProps) {
+export function ChatPanelHeader({ sessionId, onClose, className = '' }: ChatPanelHeaderProps) {
   const edit = useChatTitleEdit(sessionId);
 
   return (
@@ -167,9 +79,6 @@ export function ChatPanelHeader({ sessionId, onClose, className = '', messages, 
         )}
       </div>
       <div className="mr-2.5 flex shrink-0 items-center">
-        {!edit.editing && messages && scrollContainerRef && (
-          <UserMessageNav messages={messages} scrollContainerRef={scrollContainerRef} />
-        )}
         {!edit.editing && (
           <button
             type="button"

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import type { ChatMessageEntry } from '../../hooks/use-agent.js';
 
+const MINIMAP_SCROLL_VISIBLE_MS = 900;
+
 export interface ChatMessageMinimapProps {
   messages: ChatMessageEntry[];
   scrollContainerRef: RefObject<HTMLDivElement | null>;
@@ -73,14 +75,17 @@ export function ChatMessageMinimap({ messages, scrollContainerRef }: ChatMessage
     [messages],
   );
   const [isHovered, setIsHovered] = useState(false);
+  const [isScrollVisible, setIsScrollVisible] = useState(false);
   const [currentMessageId, setCurrentMessageId] = useState<string | null>(userMessages[0]?.nodeId ?? null);
   const listRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef(new Map<string, HTMLButtonElement>());
   const highlightTimeoutRef = useRef<number | null>(null);
+  const visibilityTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (userMessages.length < 2) {
       setCurrentMessageId(null);
+      setIsScrollVisible(false);
       return;
     }
 
@@ -109,6 +114,14 @@ export function ChatMessageMinimap({ messages, scrollContainerRef }: ChatMessage
 
     const handleScroll = () => {
       updateCurrentMessage();
+      setIsScrollVisible(true);
+      if (visibilityTimeoutRef.current !== null) {
+        window.clearTimeout(visibilityTimeoutRef.current);
+      }
+      visibilityTimeoutRef.current = window.setTimeout(() => {
+        visibilityTimeoutRef.current = null;
+        setIsScrollVisible(false);
+      }, MINIMAP_SCROLL_VISIBLE_MS);
     };
 
     container.addEventListener('scroll', handleScroll, { passive: true });
@@ -133,19 +146,26 @@ export function ChatMessageMinimap({ messages, scrollContainerRef }: ChatMessage
     if (highlightTimeoutRef.current !== null) {
       window.clearTimeout(highlightTimeoutRef.current);
     }
+    if (visibilityTimeoutRef.current !== null) {
+      window.clearTimeout(visibilityTimeoutRef.current);
+    }
   }, []);
 
   if (userMessages.length < 2) return null;
 
+  const isVisible = isHovered || isScrollVisible;
+
   return (
     <div
-      className="absolute right-1 top-1/2 z-10 -translate-y-1/2"
+      aria-label="Chat message minimap"
+      className={`absolute right-1 top-1/2 z-10 -translate-y-1/2 transition-all duration-150 ease-out ${
+        isVisible ? 'pointer-events-auto opacity-100' : 'pointer-events-none translate-x-1 opacity-0'
+      }`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
       <div
         ref={listRef}
-        aria-label="Chat message minimap"
         className={`scrollbar-none flex flex-col items-end overflow-y-auto py-1 ${isHovered ? 'max-h-40' : 'max-h-[160px]'}`}
       >
         {userMessages.map((entry, index) => {

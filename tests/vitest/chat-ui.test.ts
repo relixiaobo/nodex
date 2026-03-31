@@ -648,6 +648,47 @@ describe('chat ui', () => {
     });
   });
 
+  it('keeps the minimap hidden until the chat scrolls, then reveals it', async () => {
+    resetAndSeed();
+    seedProviderConfig({
+      provider: 'anthropic',
+      enabled: true,
+      apiKey: 'sk-ant-minimap-visibility',
+      name: 'Anthropic',
+    });
+
+    const session = linearToTree([
+      createUserMessage('First visible user prompt', 1),
+      createAssistantMessage('First assistant reply', 2),
+      createUserMessage('Second visible user prompt', 3),
+      createAssistantMessage('Second assistant reply', 4),
+    ]);
+    await saveChatSession(session);
+
+    flushSync(() => {
+      root.render(React.createElement(ChatPanel, { sessionId: session.id }));
+    });
+
+    await vi.waitFor(() => {
+      expect(container.querySelector('[aria-label="Chat message minimap"]')).not.toBeNull();
+    });
+
+    const minimap = container.querySelector('[aria-label="Chat message minimap"]') as HTMLDivElement;
+    const scrollContainer = container.querySelector('.overflow-y-auto.px-4.py-4') as HTMLDivElement;
+
+    expect(minimap.className).toContain('opacity-0');
+    expect(minimap.className).toContain('pointer-events-none');
+
+    flushSync(() => {
+      scrollContainer.dispatchEvent(new Event('scroll'));
+    });
+
+    await vi.waitFor(() => {
+      expect(minimap.className).toContain('opacity-100');
+      expect(minimap.className).toContain('pointer-events-auto');
+    });
+  });
+
   it('clicking a minimap pill scrolls to the user message and applies the highlight class', async () => {
     resetAndSeed();
     seedProviderConfig({
@@ -689,19 +730,9 @@ describe('chat ui', () => {
     messageElements[2]!.getBoundingClientRect = () => new DOMRect(0, 120, 200, 56);
     messageElements[3]!.getBoundingClientRect = () => new DOMRect(0, 180, 200, 56);
 
-    const observer = MockIntersectionObserver.instances.at(-1);
-    expect(observer).toBeDefined();
-    observer!.trigger([
-      {
-        target: messageElements[0]!,
-        isIntersecting: true,
-        intersectionRatio: 1,
-        boundingClientRect: messageElements[0]!.getBoundingClientRect(),
-        intersectionRect: new DOMRect(0, 0, 200, 56),
-        rootBounds: scrollContainer.getBoundingClientRect(),
-        time: 0,
-      } as IntersectionObserverEntry,
-    ]);
+    flushSync(() => {
+      scrollContainer.dispatchEvent(new Event('scroll'));
+    });
 
     const minimapButton = container.querySelector('button[aria-label="Jump to message 2"]') as HTMLButtonElement;
     expect(minimapButton).not.toBeNull();
